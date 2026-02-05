@@ -9,6 +9,7 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 - **Procurement system**: Create, join, and manage group purchases
 - **Real-time chat**: WebSocket-based chat for each procurement
 - **Payment integration**: Tochka Bank (Cyclops) - nominal account for secure transactions
+- **Admin Panel**: Full-featured web-based admin panel for managing users, procurements, and payments
 - **Scalable architecture**: Microservices-based design
 
 ## Architecture
@@ -157,6 +158,91 @@ Features:
 - Personal cabinet for each role (Buyer, Organizer, Supplier)
 - Procurement browsing with horizontal slider
 - Dark/light theme support
+
+## Admin Panel
+
+The application includes a full-featured admin panel for managing all aspects of the platform.
+
+### Accessing the Admin Panel
+
+1. **Create an admin user** (if not already created):
+```bash
+docker-compose exec core python manage.py createsuperuser
+```
+
+2. **Access the admin panel** at `/admin-panel/` in your browser
+
+3. **Login** with your Django admin credentials
+
+### Admin Panel Features
+
+#### Dashboard
+- Overview of key statistics (users, procurements, payments)
+- User registration trends (today, week, month)
+- Revenue statistics and breakdown
+- Activity metrics (messages, notifications)
+
+#### User Management
+- View all registered users with filters (role, platform, status)
+- Search users by name, email, phone, or platform ID
+- Toggle user active/verified status
+- Adjust user balance with transaction logging
+- View user participation and organization history
+
+#### Procurement Management
+- View all procurements with status filters
+- Change procurement status (draft, active, stopped, payment, completed, cancelled)
+- Toggle featured status for promotions
+- View procurement details and participants
+- Filter by category, city, or featured status
+
+#### Payment Monitoring
+- View all payments with status filters
+- View transaction history
+- Payment summary and statistics
+- Filter by payment type, status, or date range
+
+#### Category Management
+- Create, edit, and delete procurement categories
+- Set category icons (emoji) and descriptions
+- Organize categories with parent-child relationships
+
+#### Message Management
+- View all chat messages
+- Search messages by content
+- Soft delete/restore messages
+- Send bulk notifications to all users
+
+### Admin Panel Security
+
+- Only Django staff users (is_staff=True) can access the admin panel
+- Session-based authentication with CSRF protection
+- All admin actions are logged for audit trails
+
+### Admin API Endpoints
+
+The admin panel is powered by a dedicated Admin API:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/admin/auth/` | Check authentication status |
+| `POST /api/admin/auth/` | Login |
+| `DELETE /api/admin/auth/` | Logout |
+| `GET /api/admin/dashboard/` | Get dashboard statistics |
+| `GET /api/admin/users/` | List users |
+| `POST /api/admin/users/{id}/toggle_active/` | Toggle user active status |
+| `POST /api/admin/users/{id}/toggle_verified/` | Toggle user verified status |
+| `POST /api/admin/users/{id}/update_balance/` | Update user balance |
+| `GET /api/admin/procurements/` | List procurements |
+| `POST /api/admin/procurements/{id}/update_status/` | Update procurement status |
+| `POST /api/admin/procurements/{id}/toggle_featured/` | Toggle featured status |
+| `GET /api/admin/payments/` | List payments |
+| `GET /api/admin/payments/summary/` | Get payment summary |
+| `GET /api/admin/transactions/` | List transactions |
+| `GET /api/admin/categories/` | List categories |
+| `POST /api/admin/categories/` | Create category |
+| `GET /api/admin/messages/` | List messages |
+| `POST /api/admin/notifications/send_bulk/` | Send bulk notification |
 
 ## API Documentation
 

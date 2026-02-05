@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'procurements',
     'chat',
     'payments',
+    'admin_api',
 ]
 
 MIDDLEWARE = [

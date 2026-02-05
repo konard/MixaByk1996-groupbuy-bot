@@ -11,7 +11,10 @@ import CreateProcurementModal from './components/CreateProcurementModal';
 import DepositModal from './components/DepositModal';
 import Toast from './components/Toast';
 
-function App() {
+// Admin Panel
+import AdminApp from './admin/AdminApp';
+
+function MainApp() {
   const { user, loadUser, theme, setTheme } = useStore();
 
   useEffect(() => {
@@ -32,7 +35,7 @@ function App() {
   }, [theme]);
 
   return (
-    <BrowserRouter>
+    <>
       <Layout>
         <Routes>
           <Route path="/" element={<ChatList />} />
@@ -45,6 +48,20 @@ function App() {
       <CreateProcurementModal />
       <DepositModal />
       <Toast />
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Admin Panel Routes */}
+        <Route path="/admin-panel/*" element={<AdminApp />} />
+
+        {/* Main App Routes */}
+        <Route path="/*" element={<MainApp />} />
+      </Routes>
     </BrowserRouter>
   );
 }
