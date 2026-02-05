@@ -8,7 +8,7 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 - **User management**: Registration with 3 roles (Buyer, Organizer, Supplier)
 - **Procurement system**: Create, join, and manage group purchases
 - **Real-time chat**: WebSocket-based chat for each procurement
-- **Payment integration**: YooKassa payment processing
+- **Payment integration**: Tochka Bank (Cyclops) - nominal account for secure transactions
 - **Scalable architecture**: Microservices-based design
 
 ## Architecture
@@ -41,7 +41,7 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 
 - Docker and Docker Compose
 - Telegram Bot Token (from @BotFather)
-- YooKassa account (for payments)
+- Tochka Bank account with Cyclops integration (for payments)
 
 ### Setup
 
@@ -209,8 +209,10 @@ API documentation is available at `/api/docs/` when the server is running.
 | `DB_USER` | PostgreSQL user |
 | `DB_PASSWORD` | PostgreSQL password |
 | `DJANGO_SECRET_KEY` | Django secret key |
-| `YOOKASSA_SHOP_ID` | YooKassa shop ID |
-| `YOOKASSA_SECRET_KEY` | YooKassa secret key |
+| `TOCHKA_API_URL` | Tochka Cyclops API URL |
+| `TOCHKA_NOMINAL_ACCOUNT` | Nominal account number |
+| `TOCHKA_PLATFORM_ID` | Platform ID in Cyclops |
+| `TOCHKA_PRIVATE_KEY_PATH` | Path to private key for API signing |
 | `JWT_SECRET` | JWT secret for WebSocket auth |
 
 ## Contributing

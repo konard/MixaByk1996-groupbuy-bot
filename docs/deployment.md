@@ -1,6 +1,8 @@
 # Инструкция по развёртыванию сервиса совместных закупок
 
 > **Примечание:** Для подробного технического задания на настройку сервера см. [SERVER-SETUP-TZ.md](./SERVER-SETUP-TZ.md)
+>
+> **Платёжная система:** Проект использует Точка Банк (Cyclops) для приёма и выплаты платежей. См. раздел «Интеграция с Cyclops» ниже.
 
 ## Требования к серверу
 
@@ -43,9 +45,13 @@ DB_PASSWORD=<НАДЁЖНЫЙ_ПАРОЛЬ>
 # Telegram бот
 TELEGRAM_TOKEN=<ТОКЕН_БОТА_ОТ_@BotFather>
 
-# Платёжная система YooKassa
-YOOKASSA_SHOP_ID=<ID_МАГАЗИНА>
-YOOKASSA_SECRET_KEY=<СЕКРЕТНЫЙ_КЛЮЧ>
+# Платёжная система Точка Банк (Cyclops)
+TOCHKA_API_URL=https://pre.tochka.com/api/v1/cyclops
+# Для Production: https://api.tochka.com/api/v1/cyclops
+TOCHKA_NOMINAL_ACCOUNT=<НОМЕР_НОМИНАЛЬНОГО_СЧЁТА>
+TOCHKA_PLATFORM_ID=<ID_ПЛОЩАДКИ>
+TOCHKA_PRIVATE_KEY_PATH=/opt/groupbuy/keys/tochka_private.pem
+TOCHKA_PUBLIC_KEY_PATH=/opt/groupbuy/keys/tochka_public.pem
 
 # JWT секрет
 JWT_SECRET=<СЛУЧАЙНАЯ_СТРОКА_32_СИМВОЛА>
@@ -309,3 +315,83 @@ docker-compose logs telegram-adapter
 # Проверить что TELEGRAM_TOKEN установлен
 docker-compose exec bot env | grep TELEGRAM
 ```
+
+## 10. Интеграция с Cyclops (Точка Банк)
+
+Проект использует сервис **Cyclops** от Точка Банка для обработки платежей через номинальный счёт.
+
+### 10.1 Предварительные требования
+
+- Расчётный счёт в Точка Банке
+- Согласованные документы (оферта, закрывающие документы)
+- Статический IP-адрес сервера (для Pre-слоя)
+
+### 10.2 Генерация ключей
+
+```bash
+# Создать директорию для ключей
+mkdir -p /opt/groupbuy/keys
+chmod 700 /opt/groupbuy/keys
+
+# Сгенерировать приватный ключ
+openssl genpkey -algorithm RSA -out /opt/groupbuy/keys/tochka_private.pem -pkeyopt rsa_keygen_bits:4096
+
+# Сгенерировать публичный ключ
+openssl rsa -in /opt/groupbuy/keys/tochka_private.pem -pubout -out /opt/groupbuy/keys/tochka_public.pem
+
+# Установить права доступа
+chmod 600 /opt/groupbuy/keys/tochka_private.pem
+chmod 644 /opt/groupbuy/keys/tochka_public.pem
+```
+
+> **Важно:** Для Pre и Prod слоёв используются **разные** пары ключей!
+
+### 10.3 Настройка переменных окружения
+
+Добавьте в `.env`:
+
+```env
+# Точка Банк (Cyclops)
+TOCHKA_API_URL=https://pre.tochka.com/api/v1/cyclops
+TOCHKA_NOMINAL_ACCOUNT=<номер_номинального_счёта>
+TOCHKA_PLATFORM_ID=<id_площадки>
+TOCHKA_PRIVATE_KEY_PATH=/opt/groupbuy/keys/tochka_private.pem
+TOCHKA_PUBLIC_KEY_PATH=/opt/groupbuy/keys/tochka_public.pem
+```
+
+### 10.4 Проверка связи с API
+
+```bash
+# Тест echo-запроса (требуется подпись)
+curl -X POST $TOCHKA_API_URL \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"echo","params":{"text":"test"},"id":"1"}'
+```
+
+### 10.5 Процесс подключения
+
+1. **Pre-слой (тестирование)**:
+   - Отправить IP-адрес и публичный ключ в техподдержку
+   - Получить доступ к тестовой площадке
+   - Реализовать и протестировать все методы API
+
+2. **Prod-слой (продакшен)**:
+   - Сгенерировать новую пару ключей для Prod
+   - Открыть номинальный счёт
+   - Подписать акты
+   - Получить данные площадки на Prod
+
+### 10.6 Устранение неполадок Cyclops
+
+| Ошибка | Причина | Решение |
+|--------|---------|---------|
+| `403` | Неверный IP или подпись | Проверить whitelist IP, кодировку, подпись |
+| `504` | Таймаут | Увеличить таймаут до 60 сек |
+| `4408` | Документ не загружен | Дождаться загрузки (до 5 мин) |
+| `4436` | Ошибка комплаенс | Платёж не прошёл проверку 115-ФЗ |
+
+### 10.7 Документация
+
+- [Техническое задание на настройку сервера](./SERVER-SETUP-TZ.md)
+- [Документация Cyclops](https://docs.tochka.com/cyclops)
+- Telegram-канал: «Точка | номинальный счёт для онлайн-платформ»
