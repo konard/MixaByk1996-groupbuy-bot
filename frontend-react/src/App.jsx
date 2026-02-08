@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from './store/useStore';
+import { loadWasm } from './services/wasm';
 import Layout from './components/Layout';
 import ChatList from './components/ChatList';
 import ChatView from './components/ChatView';
@@ -13,6 +14,9 @@ import Toast from './components/Toast';
 
 // Admin Panel
 import AdminApp from './admin/AdminApp';
+
+// Pre-load WASM module for high-performance processing
+loadWasm();
 
 function MainApp() {
   const { user, loadUser, theme, setTheme } = useStore();

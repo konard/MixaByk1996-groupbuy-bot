@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
+import { generatePlatformUserId } from '../services/wasm';
 
 export const useStore = create((set, get) => ({
   // User state
@@ -44,7 +45,7 @@ export const useStore = create((set, get) => ({
   register: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const platformUserId = `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const platformUserId = generatePlatformUserId();
       const user = await api.registerUser({ ...data, platform: 'websocket', platform_user_id: platformUserId });
       localStorage.setItem('userId', user.id);
       set({ user, isLoading: false, loginModalOpen: false });

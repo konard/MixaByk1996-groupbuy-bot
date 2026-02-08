@@ -1,15 +1,22 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { formatCurrency, getInitials, getAvatarColor } from '../utils/helpers';
+import { formatCurrency } from '../utils/helpers';
+import { batchProcessProcurements } from '../services/wasm';
 
 function ProcurementSlider() {
   const { procurements, selectProcurement } = useStore();
+
+  // Batch-process all procurements in WASM for high performance
+  const processedProcurements = useMemo(() => {
+    if (procurements.length === 0) return [];
+    return batchProcessProcurements(procurements);
+  }, [procurements]);
 
   const handleCardClick = (procurement) => {
     selectProcurement(procurement.id);
   };
 
-  if (procurements.length === 0) {
+  if (processedProcurements.length === 0) {
     return (
       <section className="procurement-slider">
         <h2 className="slider-title">Активные закупки</h2>
@@ -24,34 +31,28 @@ function ProcurementSlider() {
     <section className="procurement-slider">
       <h2 className="slider-title">Активные закупки</h2>
       <div className="slider-container">
-        {procurements.map((procurement) => {
-          const daysLeft = procurement.deadline
-            ? Math.max(0, Math.ceil((new Date(procurement.deadline) - new Date()) / (1000 * 60 * 60 * 24)))
-            : null;
-
-          return (
-            <div
-              key={procurement.id}
-              className="procurement-card"
-              onClick={() => handleCardClick(procurement)}
-            >
-              <div className="procurement-title">{procurement.title}</div>
-              <div className="procurement-info">{procurement.city || 'Город не указан'}</div>
-              <div className="procurement-progress">
-                <div
-                  className="procurement-progress-bar"
-                  style={{ width: `${procurement.progress || 0}%` }}
-                />
-              </div>
-              <div className="procurement-stats">
-                <span>
-                  {formatCurrency(procurement.current_amount)} / {formatCurrency(procurement.target_amount)}
-                </span>
-                {daysLeft !== null && <span>{daysLeft} дн.</span>}
-              </div>
+        {processedProcurements.map((procurement) => (
+          <div
+            key={procurement.id}
+            className="procurement-card"
+            onClick={() => handleCardClick(procurement)}
+          >
+            <div className="procurement-title">{procurement.title}</div>
+            <div className="procurement-info">{procurement.city || 'Город не указан'}</div>
+            <div className="procurement-progress">
+              <div
+                className="procurement-progress-bar"
+                style={{ width: `${procurement.progress || 0}%` }}
+              />
             </div>
-          );
-        })}
+            <div className="procurement-stats">
+              <span>
+                {procurement.formatted_current || formatCurrency(procurement.current_amount)} / {procurement.formatted_target || formatCurrency(procurement.target_amount)}
+              </span>
+              {procurement.days_left != null && <span>{procurement.days_left} дн.</span>}
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

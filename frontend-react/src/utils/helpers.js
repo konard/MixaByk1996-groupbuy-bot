@@ -1,4 +1,17 @@
 /**
+ * Utility helpers - powered by Rust+WebAssembly when available,
+ * with automatic JavaScript fallbacks.
+ */
+import {
+  formatCurrency as wasmFormatCurrency,
+  getInitials as wasmGetInitials,
+  getAvatarColor as wasmGetAvatarColor,
+  escapeHtml as wasmEscapeHtml,
+  formatMessageText as wasmFormatMessageText,
+  isWasmReady,
+} from '../services/wasm';
+
+/**
  * Format date to Telegram-like format
  */
 export function formatTime(date) {
@@ -38,46 +51,24 @@ export function formatMessageDate(date) {
 }
 
 /**
- * Format currency
+ * Format currency - uses WASM when available
  */
 export function formatCurrency(amount) {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount || 0);
+  return wasmFormatCurrency(amount);
 }
 
 /**
- * Get initials from name
+ * Get initials from name - uses WASM when available
  */
 export function getInitials(firstName, lastName = '') {
-  const first = firstName ? firstName.charAt(0).toUpperCase() : '';
-  const last = lastName ? lastName.charAt(0).toUpperCase() : '';
-  return first + last || '?';
+  return wasmGetInitials(firstName, lastName);
 }
 
 /**
- * Generate avatar background color based on name
+ * Generate avatar background color based on name - uses WASM when available
  */
 export function getAvatarColor(name) {
-  const colors = [
-    '#e17076',
-    '#faa774',
-    '#a695e7',
-    '#7bc862',
-    '#6ec9cb',
-    '#65aadd',
-    '#ee7aae',
-    '#f5a623',
-  ];
-  let hash = 0;
-  const str = name || '';
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
+  return wasmGetAvatarColor(name);
 }
 
 /**
@@ -108,12 +99,17 @@ export function getRoleText(role) {
 }
 
 /**
- * Escape HTML to prevent XSS
+ * Escape HTML to prevent XSS - uses WASM when available
  */
 export function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  return wasmEscapeHtml(text);
+}
+
+/**
+ * Format message text with URL detection - uses WASM when available
+ */
+export function formatMessageTextHelper(text) {
+  return wasmFormatMessageText(text);
 }
 
 /**

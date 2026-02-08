@@ -7,6 +7,7 @@ import {
   formatMessageDate,
   getInitials,
   getAvatarColor,
+  formatMessageTextHelper,
 } from '../utils/helpers';
 import { BackIcon, MoreIcon, AttachIcon, SendIcon } from './Icons';
 
@@ -87,15 +88,7 @@ function ChatView() {
   };
 
   const formatMessageText = (text) => {
-    if (!text) return '';
-    // Convert URLs to links
-    let formatted = text.replace(
-      /(https?:\/\/[^\s]+)/g,
-      '<a href="$1" target="_blank" rel="noopener">$1</a>'
-    );
-    // Convert line breaks
-    formatted = formatted.replace(/\n/g, '<br>');
-    return formatted;
+    return formatMessageTextHelper(text);
   };
 
   const renderMessages = () => {
