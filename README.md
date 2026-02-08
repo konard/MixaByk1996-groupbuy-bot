@@ -10,6 +10,7 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 - **Real-time chat**: WebSocket-based chat for each procurement
 - **Payment integration**: Tochka Bank (Cyclops) - nominal account for secure transactions
 - **Admin Panel**: Full-featured web-based admin panel for managing users, procurements, and payments
+- **High-performance client-side processing**: Rust + WebAssembly for computationally intensive operations
 - **Scalable architecture**: Microservices-based design
 
 ## Architecture
@@ -114,7 +115,52 @@ pytest
 # Bot tests
 cd bot
 pytest ../tests/test_bot_commands.py
+
+# WASM utils tests (Rust)
+cd wasm-utils
+cargo test
 ```
+
+### WebAssembly (WASM) Development
+
+The project uses Rust + WebAssembly for high-performance client-side processing.
+WASM functions provide significant speedup for batch data operations (search, sort,
+aggregation) compared to JavaScript, especially with large datasets.
+
+#### WASM Functions Available
+
+| Function | Description | Use Case |
+|----------|-------------|----------|
+| `batch_process_procurements` | Batch compute progress, format currency, days left | Rendering procurement lists |
+| `search_procurements` | Fuzzy search with weighted relevance scoring | Client-side search filtering |
+| `sort_procurements` | Multi-field sorting (title, amount, deadline, etc.) | Client-side sorting |
+| `aggregate_procurement_stats` | Statistics aggregation (counts, totals, cities) | Dashboard statistics |
+| `batch_process_messages` | Format messages, compute dates, escape HTML | Chat message rendering |
+| `search_messages` | Full-text search within messages | Message search |
+| `format_message_text` | XSS-safe text formatting with URL detection | Chat message display |
+| `validate_procurement_form` | Multi-field form validation | Form submission |
+| `validate_phone` / `validate_email` | Input validation | Registration forms |
+| `format_currency` | Russian ruble formatting with thousands separator | Price display |
+| `get_avatar_color` / `get_initials` | Hash-based avatar colors and initials | User avatars |
+| `benchmark_batch_processing` | Performance measurement | Benchmarking |
+
+#### Building WASM
+
+```bash
+# Install wasm-pack (if not installed)
+curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+# Build WASM package
+cd wasm-utils
+wasm-pack build --target web --out-dir ../frontend-react/src/wasm-pkg
+
+# Run Rust tests
+cargo test
+```
+
+The WASM module is automatically loaded by the React frontend on startup.
+All WASM functions have JavaScript fallbacks — if WASM fails to load,
+the application gracefully falls back to equivalent JS implementations.
 
 ## Production Deployment
 
