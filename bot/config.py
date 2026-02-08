@@ -13,6 +13,9 @@ class BotConfig:
     # Telegram
     telegram_token: str = os.getenv("TELEGRAM_TOKEN", "")
 
+    # VK
+    vk_token: str = os.getenv("VK_TOKEN", "")
+
     # Core API
     core_api_url: str = os.getenv("CORE_API_URL", "http://localhost:8000/api")
     core_api_timeout: int = 30

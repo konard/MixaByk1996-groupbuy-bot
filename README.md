@@ -4,7 +4,7 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 
 ## Features
 
-- **Multi-platform support**: Telegram, WebSocket (extensible to WhatsApp, VK)
+- **Multi-platform support**: Telegram, VK, WebSocket (extensible to WhatsApp)
 - **User management**: Registration with 3 roles (Buyer, Organizer, Supplier)
 - **Procurement system**: Create, join, and manage group purchases
 - **Real-time chat**: WebSocket-based chat for each procurement
@@ -15,25 +15,25 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 ## Architecture
 
 ```
-+-------------------+     +-------------------+
-|   Telegram Bot    |     |   WebSocket Chat  |
-+-------------------+     +-------------------+
-         |                         |
-         v                         v
-+-------------------------------------------+
-|           Message Router / Bot Service    |
-+-------------------------------------------+
-                    |
-                    v
-+-------------------------------------------+
-|              Core API (Django)            |
-|  - Users  - Procurements  - Payments      |
-+-------------------------------------------+
-         |                    |
-         v                    v
-+----------------+    +----------------+
-|   PostgreSQL   |    |     Redis      |
-+----------------+    +----------------+
++-------------------+     +-------------------+     +-------------------+
+|   Telegram Bot    |     |      VK Bot       |     |   WebSocket Chat  |
++-------------------+     +-------------------+     +-------------------+
+         |                         |                         |
+         v                         v                         v
++------------------------------------------------------------------------+
+|                   Message Router / Bot Service                          |
++------------------------------------------------------------------------+
+                                    |
+                                    v
++------------------------------------------------------------------------+
+|                        Core API (Django)                               |
+|              - Users  - Procurements  - Payments                       |
++------------------------------------------------------------------------+
+                    |                                   |
+                    v                                   v
+          +----------------+                   +----------------+
+          |   PostgreSQL   |                   |     Redis      |
+          +----------------+                   +----------------+
 ```
 
 ## Quick Start
@@ -41,7 +41,8 @@ A multi-platform group purchasing bot with support for Telegram, WhatsApp, and W
 ### Prerequisites
 
 - Docker and Docker Compose
-- Telegram Bot Token (from @BotFather)
+- Telegram Bot Token (from @BotFather) - optional, for Telegram integration
+- VK Group Access Token (from VK group settings) - optional, for VK integration
 - Tochka Bank account with Cyclops integration (for payments)
 
 ### Setup
@@ -138,10 +139,59 @@ docker-compose -f docker-compose.two-server.yml up -d websocket-server redis-cha
 
 On Server 2 (API):
 ```bash
-docker-compose -f docker-compose.two-server.yml up -d core bot telegram-adapter postgres redis-api nginx-api
+docker-compose -f docker-compose.two-server.yml up -d core bot telegram-adapter vk-adapter postgres redis-api nginx-api
 ```
 
 Configure `CORE_API_URL` on Server 1 to point to Server 2's API endpoint.
+
+## Platform Integration
+
+### Telegram Integration
+
+The bot supports full Telegram integration with the following features:
+- Commands and text message handling
+- Inline keyboards for interactive menus
+- Payment integration via callback buttons
+- Real-time notifications
+
+**Setup:**
+1. Create a bot via [@BotFather](https://t.me/BotFather)
+2. Get your bot token
+3. Add `TELEGRAM_TOKEN` to your `.env` file
+4. Start the services with `docker-compose up -d`
+
+### VK Integration
+
+The bot supports VK (VKontakte) integration with the same functionality as Telegram:
+- All bot commands work identically in VK
+- Inline keyboards converted to VK format
+- Payment integration
+- Real-time notifications
+
+**Setup:**
+1. Create a VK community (group) or use an existing one
+2. Go to **Settings → API Usage → Access Tokens**
+3. Create a new access token with the following permissions:
+   - Messages (all permissions)
+   - Community management
+4. Enable **Messages** in Community settings → Messages → Community messages status: Enabled
+5. Enable **Bot capabilities** in Messages settings
+6. Add `VK_TOKEN` to your `.env` file with your group access token
+7. Start the services with `docker-compose up -d`
+
+**Important VK Configuration:**
+- Your VK bot must be added to the group's messages
+- Event types must be enabled: `message_new`, `message_event`
+- Callback API URL should point to your server's VK webhook endpoint (if using webhooks)
+- For development/testing, Long Poll API is used automatically
+
+### Multi-Platform User Management
+
+The system automatically handles users across multiple platforms:
+- Each platform user is linked to a single internal user account
+- Platform is identified by `platform` field: `telegram` or `vk`
+- Users maintain their profile, balance, and procurements across all platforms
+- Messages and notifications are delivered to the platform the user is currently using
 
 ### SSL Configuration
 
@@ -290,7 +340,8 @@ API documentation is available at `/api/docs/` when the server is running.
 
 | Variable | Description |
 |----------|-------------|
-| `TELEGRAM_TOKEN` | Telegram Bot API token |
+| `TELEGRAM_TOKEN` | Telegram Bot API token (optional, for Telegram integration) |
+| `VK_TOKEN` | VK Group Access Token (optional, for VK integration) |
 | `DB_NAME` | PostgreSQL database name |
 | `DB_USER` | PostgreSQL user |
 | `DB_PASSWORD` | PostgreSQL password |

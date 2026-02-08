@@ -50,6 +50,18 @@ services:
     networks:
       - groupbuy-network
 
+  # VK adapter
+  vk-adapter:
+    build: ./adapters/vk
+    command: python adapter.py
+    environment:
+      - BOT_SERVICE_URL=http://bot:8001
+      - VK_TOKEN=${VK_TOKEN}
+    depends_on:
+      - bot
+    networks:
+      - groupbuy-network
+
   # React frontend
   frontend-react:
     build: ./frontend-react
