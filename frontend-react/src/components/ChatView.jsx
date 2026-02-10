@@ -1,14 +1,13 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useWebSocket } from '../hooks/useWebSocket';
 import {
   formatTime,
-  formatMessageDate,
   getInitials,
   getAvatarColor,
-  formatMessageTextHelper,
 } from '../utils/helpers';
+import { batchProcessMessages } from '../services/wasm';
 import { BackIcon, MoreIcon, AttachIcon, SendIcon } from './Icons';
 
 function ChatView() {
@@ -87,12 +86,15 @@ function ChatView() {
     sendTyping();
   };
 
-  const formatMessageText = (text) => {
-    return formatMessageTextHelper(text);
-  };
+  // Batch-process all messages in WASM for high performance
+  // This computes date dividers, formats text, escapes HTML, and detects own messages
+  const processedMessages = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    return batchProcessMessages(messages, user?.id || 0);
+  }, [messages, user?.id]);
 
   const renderMessages = () => {
-    if (!messages || messages.length === 0) {
+    if (processedMessages.length === 0) {
       return (
         <div className="p-lg text-center text-muted">
           <p>Нет сообщений</p>
@@ -100,23 +102,19 @@ function ChatView() {
       );
     }
 
-    let lastDate = null;
     const elements = [];
 
-    messages.forEach((msg, index) => {
-      const msgDate = new Date(msg.created_at).toDateString();
-      if (msgDate !== lastDate) {
+    processedMessages.forEach((msg, index) => {
+      // WASM computes date_divider when date group changes
+      if (msg.date_divider) {
         elements.push(
           <div key={`date-${index}`} className="message-date-divider">
-            <span>{formatMessageDate(msg.created_at)}</span>
+            <span>{msg.date_divider}</span>
           </div>
         );
-        lastDate = msgDate;
       }
 
-      const isOwn = user && msg.user && msg.user.id === user.id;
-
-      if (msg.message_type === 'system') {
+      if (msg.is_system) {
         elements.push(
           <div key={msg.id || index} className="message system">
             {msg.text}
@@ -126,16 +124,16 @@ function ChatView() {
         elements.push(
           <div
             key={msg.id || index}
-            className={`message ${isOwn ? 'outgoing' : 'incoming'}`}
+            className={`message ${msg.is_own ? 'outgoing' : 'incoming'}`}
           >
-            {!isOwn && msg.user && (
-              <div className="message-sender">{msg.user.first_name}</div>
+            {!msg.is_own && msg.sender_name && (
+              <div className="message-sender">{msg.sender_name}</div>
             )}
             <div
               className="message-text"
-              dangerouslySetInnerHTML={{ __html: formatMessageText(msg.text) }}
+              dangerouslySetInnerHTML={{ __html: msg.formatted_text }}
             />
-            <div className="message-time">{formatTime(msg.created_at)}</div>
+            <div className="message-time">{msg.formatted_time}</div>
           </div>
         );
       }
