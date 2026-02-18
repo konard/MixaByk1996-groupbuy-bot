@@ -2,8 +2,6 @@
 Registration dialog for new users
 """
 import re
-from enum import Enum
-from typing import Dict, Any, Optional
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery

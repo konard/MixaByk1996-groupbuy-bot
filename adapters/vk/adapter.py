@@ -12,7 +12,6 @@ from typing import Dict, Any, Optional
 import aiohttp
 from vkbottle import API, Bot, Keyboard, KeyboardButtonColor, Text, Callback
 from vkbottle.bot import Message
-from vkbottle.dispatch.rules.base import CommandRule
 
 # Configure logging
 logging.basicConfig(

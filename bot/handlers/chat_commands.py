@@ -124,12 +124,8 @@ async def enter_chat(callback: CallbackQuery):
         await callback.answer("Procurement not found", show_alert=True)
         return
 
-    # Generate WebSocket token
-    token = generate_chat_token(user["id"])
-
-    # Get WebSocket URL from config
-    ws_url = getattr(config, 'websocket_url', 'ws://localhost:8765')
-    chat_url = f"{ws_url}/ws/procurement/{procurement_id}/?token={token}"
+    # Generate WebSocket token (for future WebSocket client use)
+    _ = generate_chat_token(user["id"])
 
     # Get web chat URL (frontend)
     web_url = getattr(config, 'web_app_url', '')

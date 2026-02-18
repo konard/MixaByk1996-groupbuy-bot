@@ -3,7 +3,7 @@ API client for communicating with the Core API
 """
 import aiohttp
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Optional, List
 from config import config
 
 logger = logging.getLogger(__name__)
