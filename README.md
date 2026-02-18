@@ -398,6 +398,85 @@ API documentation is available at `/api/docs/` when the server is running.
 | `TOCHKA_PRIVATE_KEY_PATH` | Path to private key for API signing |
 | `JWT_SECRET` | JWT secret for WebSocket auth |
 
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment.
+
+### Continuous Integration (CI)
+
+The CI pipeline runs automatically on:
+- Every push to the `main` branch
+- Every pull request to the `main` branch
+
+CI checks include:
+- **Python linting**: Ruff linter and formatter for bot and adapter code
+- **Rust build and tests**: Compilation and unit tests for the core-rust backend
+- **WASM build**: Building WebAssembly utilities with wasm-pack
+- **Frontend build**: Node.js build for the React frontend
+- **Docker build**: Validation of all Dockerfile builds
+- **Docker Compose validation**: Syntax check for all compose files
+
+### Continuous Deployment (CD)
+
+The CD pipeline is triggered:
+- On every push to `main` - deploys to staging
+- On version tags (`v*`) - deploys to production
+
+#### Setting Up Deployment
+
+1. **Configure GitHub Environments**:
+   - Go to repository Settings → Environments
+   - Create `staging` and `production` environments
+   - Add environment-specific secrets and protection rules
+
+2. **Configure Secrets**:
+   Add the following secrets in repository Settings → Secrets:
+   - `STAGING_SSH_KEY`: SSH private key for staging server
+   - `STAGING_HOST`: Staging server hostname
+   - `PRODUCTION_SSH_KEY`: SSH private key for production server
+   - `PRODUCTION_HOST`: Production server hostname
+
+3. **Customize Deployment Scripts**:
+   Edit `.github/workflows/cd.yml` to add your deployment commands:
+   ```yaml
+   - name: Deploy to staging
+     run: |
+       ssh -i $SSH_KEY user@$STAGING_HOST "cd /app && docker compose pull && docker compose up -d"
+   ```
+
+### Manual Deployment
+
+For manual deployment to a server:
+
+```bash
+# SSH to server
+ssh user@your-server
+
+# Navigate to project directory
+cd /path/to/groupbuy-bot
+
+# Pull latest changes
+git pull origin main
+
+# Pull and restart containers
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+
+# Run migrations (if needed)
+docker compose -f docker-compose.prod.yml exec core python manage.py migrate
+```
+
+### Creating a Release
+
+1. Update version numbers in relevant files
+2. Create and push a version tag:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+3. The CD pipeline will automatically build and push Docker images
+4. The production deployment will be triggered (if configured)
+
 ## Contributing
 
 1. Fork the repository

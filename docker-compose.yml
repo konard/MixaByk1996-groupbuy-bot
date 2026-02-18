@@ -70,6 +70,23 @@ services:
     volumes:
       - wasm_pkg:/wasm-pkg
 
+  # WebSocket server for real-time chat
+  websocket-server:
+    build: ./infrastructure/websocket
+    command: python chat_server.py
+    environment:
+      - REDIS_URL=redis://redis:6379/2
+      - CORE_API_URL=http://core:8000/api
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - redis
+      - core
+    ports:
+      - "8765:8765"
+    networks:
+      - groupbuy-network
+
   # React frontend (with WASM integration)
   frontend-react:
     build: ./frontend-react
@@ -77,6 +94,7 @@ services:
       - "3000:80"
     depends_on:
       - core
+      - websocket-server
     networks:
       - groupbuy-network
 
