@@ -2,6 +2,7 @@
 VK Adapter for GroupBuy Bot
 Handles VK-specific message routing and formatting
 """
+
 import asyncio
 import logging
 import os
@@ -14,8 +15,7 @@ from vkbottle.bot import Message
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class VKAdapter:
     """Adapter for VK messenger"""
 
     def __init__(self):
-        self.token = os.getenv('VK_TOKEN', '')
-        self.bot_service_url = os.getenv('BOT_SERVICE_URL', 'http://bot:8001')
+        self.token = os.getenv("VK_TOKEN", "")
+        self.bot_service_url = os.getenv("BOT_SERVICE_URL", "http://bot:8001")
 
         if not self.token:
             raise ValueError("VK_TOKEN is not set")
@@ -59,7 +59,7 @@ class VKAdapter:
                 await self.api.messages.send_message_event_answer(
                     event_id=event["object"]["event_id"],
                     user_id=event["object"]["user_id"],
-                    peer_id=event["object"]["peer_id"]
+                    peer_id=event["object"]["peer_id"],
                 )
             except Exception as e:
                 logger.error(f"Error answering callback: {e}")
@@ -68,10 +68,10 @@ class VKAdapter:
         """Convert VK message to standardized format"""
         # Get user info
         user_info = {
-            'first_name': '',
-            'last_name': '',
-            'username': f"id{message.from_id}",
-            'language_code': 'ru'
+            "first_name": "",
+            "last_name": "",
+            "username": f"id{message.from_id}",
+            "language_code": "ru",
         }
 
         try:
@@ -79,21 +79,21 @@ class VKAdapter:
             users = await self.api.users.get(user_ids=[message.from_id])
             if users and len(users) > 0:
                 user = users[0]
-                user_info['first_name'] = user.first_name
-                user_info['last_name'] = user.last_name or ''
-                user_info['username'] = f"id{user.id}"
+                user_info["first_name"] = user.first_name
+                user_info["last_name"] = user.last_name or ""
+                user_info["username"] = f"id{user.id}"
         except Exception as e:
             logger.error(f"Error fetching user info: {e}")
 
         return {
-            'platform': 'vk',
-            'user_id': str(message.from_id),
-            'chat_id': str(message.peer_id),
-            'text': message.text or '',
-            'message_id': str(message.conversation_message_id),
-            'user_info': user_info,
-            'timestamp': datetime.fromtimestamp(message.date).isoformat(),
-            'type': 'message'
+            "platform": "vk",
+            "user_id": str(message.from_id),
+            "chat_id": str(message.peer_id),
+            "text": message.text or "",
+            "message_id": str(message.conversation_message_id),
+            "user_info": user_info,
+            "timestamp": datetime.fromtimestamp(message.date).isoformat(),
+            "type": "message",
         }
 
     async def _standardize_callback(self, event: dict) -> Dict[str, Any]:
@@ -103,10 +103,10 @@ class VKAdapter:
 
         # Get user info
         user_info = {
-            'first_name': '',
-            'last_name': '',
-            'username': f"id{user_id}",
-            'language_code': 'ru'
+            "first_name": "",
+            "last_name": "",
+            "username": f"id{user_id}",
+            "language_code": "ru",
         }
 
         try:
@@ -114,19 +114,19 @@ class VKAdapter:
             users = await self.api.users.get(user_ids=[user_id])
             if users and len(users) > 0:
                 user = users[0]
-                user_info['first_name'] = user.first_name
-                user_info['last_name'] = user.last_name or ''
+                user_info["first_name"] = user.first_name
+                user_info["last_name"] = user.last_name or ""
         except Exception as e:
             logger.error(f"Error fetching user info: {e}")
 
         return {
-            'platform': 'vk',
-            'user_id': str(user_id),
-            'callback_data': event_obj.get("payload"),
-            'message_id': str(event_obj.get("conversation_message_id", "")),
-            'user_info': user_info,
-            'timestamp': datetime.now().isoformat(),
-            'type': 'callback'
+            "platform": "vk",
+            "user_id": str(user_id),
+            "callback_data": event_obj.get("payload"),
+            "message_id": str(event_obj.get("conversation_message_id", "")),
+            "user_info": user_info,
+            "timestamp": datetime.now().isoformat(),
+            "type": "callback",
         }
 
     async def send_message(
@@ -134,7 +134,7 @@ class VKAdapter:
         user_id: str,
         text: str,
         parse_mode: str = None,
-        disable_web_page_preview: bool = False
+        disable_web_page_preview: bool = False,
     ) -> bool:
         """Send message to VK user"""
         try:
@@ -142,7 +142,7 @@ class VKAdapter:
                 user_id=int(user_id),
                 message=text,
                 random_id=0,
-                disable_mentions=True if disable_web_page_preview else False
+                disable_mentions=True if disable_web_page_preview else False,
             )
             return True
         except Exception as e:
@@ -150,11 +150,7 @@ class VKAdapter:
             return False
 
     async def send_message_with_keyboard(
-        self,
-        user_id: str,
-        text: str,
-        keyboard: Dict[str, Any],
-        parse_mode: str = None
+        self, user_id: str, text: str, keyboard: Dict[str, Any], parse_mode: str = None
     ) -> bool:
         """Send message with keyboard"""
         try:
@@ -165,7 +161,7 @@ class VKAdapter:
                 user_id=int(user_id),
                 message=text,
                 keyboard=vk_keyboard.get_json() if vk_keyboard else None,
-                random_id=0
+                random_id=0,
             )
             return True
         except Exception as e:
@@ -174,7 +170,7 @@ class VKAdapter:
 
     def _convert_keyboard(self, keyboard: Dict[str, Any]) -> Optional[Keyboard]:
         """Convert standardized keyboard to VK Keyboard"""
-        buttons = keyboard.get('buttons', [])
+        buttons = keyboard.get("buttons", [])
         if not buttons:
             return None
 
@@ -185,26 +181,28 @@ class VKAdapter:
                 vk_keyboard.row()
 
             for button in row:
-                button_text = button.get('text', '')
-                callback_data = button.get('callback_data', '')
-                url = button.get('url')
+                button_text = button.get("text", "")
+                callback_data = button.get("callback_data", "")
+                url = button.get("url")
 
                 if url:
                     # VK doesn't support inline URL buttons in the same way as Telegram
                     # We'll use callback buttons and handle URLs separately
                     vk_keyboard.add(
                         Callback(button_text, payload={"action": "url", "url": url}),
-                        color=KeyboardButtonColor.PRIMARY
+                        color=KeyboardButtonColor.PRIMARY,
                     )
                 elif callback_data:
                     vk_keyboard.add(
-                        Callback(button_text, payload={"action": "callback", "data": callback_data}),
-                        color=KeyboardButtonColor.PRIMARY
+                        Callback(
+                            button_text,
+                            payload={"action": "callback", "data": callback_data},
+                        ),
+                        color=KeyboardButtonColor.PRIMARY,
                     )
                 else:
                     vk_keyboard.add(
-                        Text(button_text),
-                        color=KeyboardButtonColor.SECONDARY
+                        Text(button_text), color=KeyboardButtonColor.SECONDARY
                     )
 
         return vk_keyboard
@@ -216,10 +214,10 @@ class VKAdapter:
             if users and len(users) > 0:
                 user = users[0]
                 return {
-                    'id': str(user.id),
-                    'first_name': user.first_name,
-                    'last_name': user.last_name or '',
-                    'username': f"id{user.id}",
+                    "id": str(user.id),
+                    "first_name": user.first_name,
+                    "last_name": user.last_name or "",
+                    "username": f"id{user.id}",
                 }
             return None
         except Exception as e:
@@ -230,10 +228,7 @@ class VKAdapter:
         """Process messages from queue and send to bot service"""
         while self.is_running:
             try:
-                message = await asyncio.wait_for(
-                    self.message_queue.get(),
-                    timeout=1.0
-                )
+                message = await asyncio.wait_for(self.message_queue.get(), timeout=1.0)
                 await self._route_message(message)
             except asyncio.TimeoutError:
                 continue
@@ -245,8 +240,7 @@ class VKAdapter:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.bot_service_url}/message',
-                    json=message
+                    f"{self.bot_service_url}/message", json=message
                 ) as response:
                     if response.status != 200:
                         text = await response.text()
@@ -281,5 +275,5 @@ async def main():
         await adapter.stop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

@@ -2,6 +2,7 @@
 Telegram Adapter for GroupBuy Bot
 Handles Telegram-specific message routing and formatting
 """
+
 import asyncio
 import logging
 import os
@@ -14,8 +15,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class TelegramAdapter:
     """Adapter for Telegram messenger"""
 
     def __init__(self):
-        self.token = os.getenv('TELEGRAM_TOKEN', '')
-        self.bot_service_url = os.getenv('BOT_SERVICE_URL', 'http://bot:8001')
+        self.token = os.getenv("TELEGRAM_TOKEN", "")
+        self.bot_service_url = os.getenv("BOT_SERVICE_URL", "http://bot:8001")
 
         if not self.token:
             raise ValueError("TELEGRAM_TOKEN is not set")
@@ -60,36 +60,42 @@ class TelegramAdapter:
     def _standardize_message(self, message: types.Message) -> Dict[str, Any]:
         """Convert Telegram message to standardized format"""
         return {
-            'platform': 'telegram',
-            'user_id': str(message.from_user.id),
-            'chat_id': str(message.chat.id),
-            'text': message.text or '',
-            'message_id': str(message.message_id),
-            'user_info': {
-                'first_name': message.from_user.first_name,
-                'last_name': message.from_user.last_name or '',
-                'username': message.from_user.username or '',
-                'language_code': message.from_user.language_code or 'en'
+            "platform": "telegram",
+            "user_id": str(message.from_user.id),
+            "chat_id": str(message.chat.id),
+            "text": message.text or "",
+            "message_id": str(message.message_id),
+            "user_info": {
+                "first_name": message.from_user.first_name,
+                "last_name": message.from_user.last_name or "",
+                "username": message.from_user.username or "",
+                "language_code": message.from_user.language_code or "en",
             },
-            'timestamp': message.date.isoformat() if message.date else datetime.now().isoformat(),
-            'type': 'message'
+            "timestamp": message.date.isoformat()
+            if message.date
+            else datetime.now().isoformat(),
+            "type": "message",
         }
 
-    def _standardize_callback(self, callback_query: types.CallbackQuery) -> Dict[str, Any]:
+    def _standardize_callback(
+        self, callback_query: types.CallbackQuery
+    ) -> Dict[str, Any]:
         """Convert callback query to standardized format"""
         return {
-            'platform': 'telegram',
-            'user_id': str(callback_query.from_user.id),
-            'callback_data': callback_query.data,
-            'message_id': str(callback_query.message.message_id) if callback_query.message else '',
-            'user_info': {
-                'first_name': callback_query.from_user.first_name,
-                'last_name': callback_query.from_user.last_name or '',
-                'username': callback_query.from_user.username or '',
-                'language_code': callback_query.from_user.language_code or 'en'
+            "platform": "telegram",
+            "user_id": str(callback_query.from_user.id),
+            "callback_data": callback_query.data,
+            "message_id": str(callback_query.message.message_id)
+            if callback_query.message
+            else "",
+            "user_info": {
+                "first_name": callback_query.from_user.first_name,
+                "last_name": callback_query.from_user.last_name or "",
+                "username": callback_query.from_user.username or "",
+                "language_code": callback_query.from_user.language_code or "en",
             },
-            'timestamp': datetime.now().isoformat(),
-            'type': 'callback'
+            "timestamp": datetime.now().isoformat(),
+            "type": "callback",
         }
 
     async def send_message(
@@ -97,7 +103,7 @@ class TelegramAdapter:
         user_id: str,
         text: str,
         parse_mode: str = None,
-        disable_web_page_preview: bool = False
+        disable_web_page_preview: bool = False,
     ) -> bool:
         """Send message to Telegram user"""
         try:
@@ -105,7 +111,7 @@ class TelegramAdapter:
                 chat_id=user_id,
                 text=text,
                 parse_mode=parse_mode,
-                disable_web_page_preview=disable_web_page_preview
+                disable_web_page_preview=disable_web_page_preview,
             )
             return True
         except Exception as e:
@@ -117,7 +123,7 @@ class TelegramAdapter:
         user_id: str,
         text: str,
         keyboard: Dict[str, Any],
-        parse_mode: str = 'Markdown'
+        parse_mode: str = "Markdown",
     ) -> bool:
         """Send message with keyboard"""
         try:
@@ -125,10 +131,7 @@ class TelegramAdapter:
             markup = self._convert_keyboard(keyboard)
 
             await self.bot.send_message(
-                chat_id=user_id,
-                text=text,
-                reply_markup=markup,
-                parse_mode=parse_mode
+                chat_id=user_id, text=text, reply_markup=markup, parse_mode=parse_mode
             )
             return True
         except Exception as e:
@@ -137,7 +140,7 @@ class TelegramAdapter:
 
     def _convert_keyboard(self, keyboard: Dict[str, Any]) -> types.InlineKeyboardMarkup:
         """Convert standardized keyboard to Telegram InlineKeyboardMarkup"""
-        buttons = keyboard.get('buttons', [])
+        buttons = keyboard.get("buttons", [])
         inline_keyboard = []
 
         for row in buttons:
@@ -145,9 +148,9 @@ class TelegramAdapter:
             for button in row:
                 inline_row.append(
                     types.InlineKeyboardButton(
-                        text=button.get('text', ''),
-                        callback_data=button.get('callback_data', ''),
-                        url=button.get('url')
+                        text=button.get("text", ""),
+                        callback_data=button.get("callback_data", ""),
+                        url=button.get("url"),
                     )
                 )
             inline_keyboard.append(inline_row)
@@ -159,10 +162,10 @@ class TelegramAdapter:
         try:
             user = await self.bot.get_chat(user_id)
             return {
-                'id': str(user.id),
-                'first_name': user.first_name,
-                'last_name': user.last_name or '',
-                'username': user.username or '',
+                "id": str(user.id),
+                "first_name": user.first_name,
+                "last_name": user.last_name or "",
+                "username": user.username or "",
             }
         except Exception as e:
             logger.error(f"Error getting Telegram user info: {e}")
@@ -172,10 +175,7 @@ class TelegramAdapter:
         """Process messages from queue and send to bot service"""
         while self.is_running:
             try:
-                message = await asyncio.wait_for(
-                    self.message_queue.get(),
-                    timeout=1.0
-                )
+                message = await asyncio.wait_for(self.message_queue.get(), timeout=1.0)
                 await self._route_message(message)
             except asyncio.TimeoutError:
                 continue
@@ -187,8 +187,7 @@ class TelegramAdapter:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.bot_service_url}/message',
-                    json=message
+                    f"{self.bot_service_url}/message", json=message
                 ) as response:
                     if response.status != 200:
                         text = await response.text()
@@ -223,5 +222,5 @@ async def main():
         await adapter.stop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

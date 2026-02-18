@@ -1,6 +1,7 @@
 """
 Procurement command handlers
 """
+
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
@@ -9,13 +10,16 @@ from aiogram.fsm.state import State, StatesGroup
 
 from api_client import api_client
 from keyboards import (
-    get_procurements_keyboard, get_procurement_detail_keyboard,
-    get_categories_keyboard, get_main_keyboard
+    get_procurements_keyboard,
+    get_procurement_detail_keyboard,
+    get_categories_keyboard,
+    get_main_keyboard,
 )
 
 
 class ProcurementCreationStates(StatesGroup):
     """States for procurement creation"""
+
     waiting_for_title = State()
     waiting_for_description = State()
     waiting_for_category = State()
@@ -29,6 +33,7 @@ class ProcurementCreationStates(StatesGroup):
 
 class JoinProcurementStates(StatesGroup):
     """States for joining procurement"""
+
     waiting_for_quantity = State()
 
 
@@ -48,7 +53,7 @@ async def cmd_procurements(message: Message):
         f"*Active Procurements ({len(procurements)})*\n\n"
         "Select a procurement to view details:",
         parse_mode="Markdown",
-        reply_markup=get_procurements_keyboard(procurements)
+        reply_markup=get_procurements_keyboard(procurements),
     )
 
 
@@ -62,8 +67,7 @@ async def text_procurements(message: Message):
 async def cmd_my_procurements(message: Message):
     """Handle /my_procurements command"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if not user:
@@ -108,18 +112,18 @@ async def cmd_my_procurements(message: Message):
 
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Refresh", callback_data="refresh_my_procurements"),
-            InlineKeyboardButton(text="Stats", callback_data="procurement_stats")
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Refresh", callback_data="refresh_my_procurements"
+                ),
+                InlineKeyboardButton(text="Stats", callback_data="procurement_stats"),
+            ]
         ]
-    ])
-
-    await message.answer(
-        response,
-        parse_mode="Markdown",
-        reply_markup=keyboard
     )
+
+    await message.answer(response, parse_mode="Markdown", reply_markup=keyboard)
 
 
 @router.message(F.text == "My Orders")
@@ -134,8 +138,7 @@ async def view_procurement(callback: CallbackQuery):
     procurement_id = int(callback.data.split("_")[2])
 
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(callback.from_user.id)
+        platform="telegram", platform_user_id=str(callback.from_user.id)
     )
 
     user_id = user["id"] if user else None
@@ -152,9 +155,8 @@ async def view_procurement(callback: CallbackQuery):
         message_text,
         parse_mode="Markdown",
         reply_markup=get_procurement_detail_keyboard(
-            procurement_id,
-            procurement.get("can_join", False)
-        )
+            procurement_id, procurement.get("can_join", False)
+        ),
     )
     await callback.answer()
 
@@ -168,8 +170,7 @@ async def join_procurement(callback: CallbackQuery, state: FSMContext):
     await state.set_state(JoinProcurementStates.waiting_for_quantity)
 
     await callback.message.edit_text(
-        "Enter the quantity you want to order:",
-        reply_markup=None
+        "Enter the quantity you want to order:", reply_markup=None
     )
     await callback.answer()
 
@@ -200,8 +201,7 @@ async def process_join_quantity(message: Message, state: FSMContext):
     amount = quantity * price_per_unit
 
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if not user:
@@ -213,7 +213,7 @@ async def process_join_quantity(message: Message, state: FSMContext):
         procurement_id=procurement_id,
         user_id=user["id"],
         quantity=quantity,
-        amount=amount
+        amount=amount,
     )
 
     await state.clear()
@@ -224,12 +224,12 @@ async def process_join_quantity(message: Message, state: FSMContext):
             f"Quantity: {quantity}\n"
             f"Amount: {amount} RUB\n\n"
             f"You can now access the procurement chat.",
-            reply_markup=get_main_keyboard(user.get("role", "buyer"))
+            reply_markup=get_main_keyboard(user.get("role", "buyer")),
         )
     else:
         await message.answer(
             "Failed to join procurement. Please try again.",
-            reply_markup=get_main_keyboard(user.get("role", "buyer"))
+            reply_markup=get_main_keyboard(user.get("role", "buyer")),
         )
 
 
@@ -255,7 +255,7 @@ async def back_to_procurements(callback: CallbackQuery):
         f"*Active Procurements ({len(procurements)})*\n\n"
         "Select a procurement to view details:",
         parse_mode="Markdown",
-        reply_markup=get_procurements_keyboard(procurements)
+        reply_markup=get_procurements_keyboard(procurements),
     )
     await callback.answer()
 
@@ -263,10 +263,7 @@ async def back_to_procurements(callback: CallbackQuery):
 @router.callback_query(F.data == "filter_city")
 async def filter_by_city(callback: CallbackQuery):
     """Filter procurements by city"""
-    await callback.message.edit_text(
-        "Enter city name to filter:",
-        reply_markup=None
-    )
+    await callback.message.edit_text("Enter city name to filter:", reply_markup=None)
     # Would need state handling for city input
     await callback.answer("Feature coming soon", show_alert=True)
 
@@ -281,8 +278,7 @@ async def filter_by_category(callback: CallbackQuery):
         return
 
     await callback.message.edit_text(
-        "Select category:",
-        reply_markup=get_categories_keyboard(categories)
+        "Select category:", reply_markup=get_categories_keyboard(categories)
     )
     await callback.answer()
 
@@ -291,8 +287,7 @@ async def filter_by_category(callback: CallbackQuery):
 async def cmd_create_procurement(message: Message, state: FSMContext):
     """Handle /create_procurement command"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if not user:
@@ -310,9 +305,8 @@ async def cmd_create_procurement(message: Message, state: FSMContext):
     await state.set_state(ProcurementCreationStates.waiting_for_title)
 
     await message.answer(
-        "*Create New Procurement*\n\n"
-        "Enter the title for your procurement:",
-        parse_mode="Markdown"
+        "*Create New Procurement*\n\nEnter the title for your procurement:",
+        parse_mode="Markdown",
     )
 
 
@@ -391,7 +385,7 @@ async def process_city(message: Message, state: FSMContext):
         "city": city,
         "organizer": data.get("organizer_id"),
         "deadline": "2025-12-31T23:59:59Z",  # Default deadline
-        "unit": "units"
+        "unit": "units",
     }
 
     result = await api_client.create_procurement(procurement_data)
@@ -406,12 +400,12 @@ async def process_city(message: Message, state: FSMContext):
             f"City: {result.get('city', '')}\n\n"
             f"Share with potential participants to start collecting!",
             parse_mode="Markdown",
-            reply_markup=get_main_keyboard("organizer")
+            reply_markup=get_main_keyboard("organizer"),
         )
     else:
         await message.answer(
             "Failed to create procurement. Please try again.",
-            reply_markup=get_main_keyboard("organizer")
+            reply_markup=get_main_keyboard("organizer"),
         )
 
 
@@ -423,7 +417,7 @@ def get_status_emoji(status: str) -> str:
         "stopped": "",
         "payment": "",
         "completed": "",
-        "cancelled": ""
+        "cancelled": "",
     }
     return emoji_map.get(status, "")
 

@@ -1,6 +1,7 @@
 """
 Chat command handlers
 """
+
 import jwt
 from datetime import datetime, timedelta
 from aiogram import Router, F
@@ -16,26 +17,20 @@ router = Router()
 
 def generate_chat_token(user_id: int) -> str:
     """Generate JWT token for WebSocket chat authentication"""
-    secret = getattr(config, 'jwt_secret', 'dev-jwt-secret')
-    payload = {
-        'user_id': user_id,
-        'exp': datetime.utcnow() + timedelta(hours=24)
-    }
-    return jwt.encode(payload, secret, algorithm='HS256')
+    secret = getattr(config, "jwt_secret", "dev-jwt-secret")
+    payload = {"user_id": user_id, "exp": datetime.utcnow() + timedelta(hours=24)}
+    return jwt.encode(payload, secret, algorithm="HS256")
 
 
 @router.message(Command("chat"))
 async def cmd_chat(message: Message):
     """Handle /chat command - show available chats"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if not user:
-        await message.answer(
-            "You are not registered. Use /start to register."
-        )
+        await message.answer("You are not registered. Use /start to register.")
         return
 
     # Get user's procurements (they can chat in procurements they participate in)
@@ -63,21 +58,19 @@ async def cmd_chat(message: Message):
     buttons = []
     for proc in all_procurements[:10]:
         # Get unread count for this chat
-        unread_count = await api_client.get_unread_count(
-            user["id"],
-            proc["id"]
-        )
+        unread_count = await api_client.get_unread_count(user["id"], proc["id"])
 
         btn_text = f"💬 {proc.get('title', 'Unknown')}"
         if unread_count > 0:
             btn_text += f" ({unread_count} new)"
 
-        buttons.append([
-            InlineKeyboardButton(
-                text=btn_text,
-                callback_data=f"enter_chat_{proc['id']}"
-            )
-        ])
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=btn_text, callback_data=f"enter_chat_{proc['id']}"
+                )
+            ]
+        )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -85,7 +78,7 @@ async def cmd_chat(message: Message):
         "*Select a chat to enter:*\n\n"
         "You can chat with other participants in procurements you've joined.",
         parse_mode="Markdown",
-        reply_markup=keyboard
+        reply_markup=keyboard,
     )
 
 
@@ -101,8 +94,7 @@ async def enter_chat(callback: CallbackQuery):
     procurement_id = int(callback.data.split("_")[2])
 
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(callback.from_user.id)
+        platform="telegram", platform_user_id=str(callback.from_user.id)
     )
 
     if not user:
@@ -114,7 +106,7 @@ async def enter_chat(callback: CallbackQuery):
     if not has_access:
         await callback.answer(
             "You don't have access to this chat. Join the procurement first.",
-            show_alert=True
+            show_alert=True,
         )
         return
 
@@ -128,7 +120,7 @@ async def enter_chat(callback: CallbackQuery):
     _ = generate_chat_token(user["id"])
 
     # Get web chat URL (frontend)
-    web_url = getattr(config, 'web_app_url', '')
+    web_url = getattr(config, "web_app_url", "")
     if web_url:
         web_chat_url = f"{web_url}/chat/{procurement_id}"
     else:
@@ -147,12 +139,9 @@ async def enter_chat(callback: CallbackQuery):
     # Add web app button if URL is available
     if web_chat_url:
         chat_info += "1. Click the button below to open in browser\n"
-        buttons.append([
-            InlineKeyboardButton(
-                text="🌐 Open Chat in Browser",
-                url=web_chat_url
-            )
-        ])
+        buttons.append(
+            [InlineKeyboardButton(text="🌐 Open Chat in Browser", url=web_chat_url)]
+        )
 
     chat_info += (
         "2. Or use the Telegram Web App integration\n\n"
@@ -160,23 +149,19 @@ async def enter_chat(callback: CallbackQuery):
     )
 
     # Add refresh button
-    buttons.append([
-        InlineKeyboardButton(
-            text="🔄 Refresh",
-            callback_data=f"refresh_chat_{procurement_id}"
-        ),
-        InlineKeyboardButton(
-            text="⬅️ Back",
-            callback_data="back_to_chat_list"
-        )
-    ])
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="🔄 Refresh", callback_data=f"refresh_chat_{procurement_id}"
+            ),
+            InlineKeyboardButton(text="⬅️ Back", callback_data="back_to_chat_list"),
+        ]
+    )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     await callback.message.edit_text(
-        chat_info,
-        parse_mode="Markdown",
-        reply_markup=keyboard
+        chat_info, parse_mode="Markdown", reply_markup=keyboard
     )
     await callback.answer()
 
@@ -194,8 +179,7 @@ async def back_to_chat_list(callback: CallbackQuery):
     """Go back to chat list"""
     # Reuse cmd_chat logic
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(callback.from_user.id)
+        platform="telegram", platform_user_id=str(callback.from_user.id)
     )
 
     if not user:
@@ -224,21 +208,19 @@ async def back_to_chat_list(callback: CallbackQuery):
 
     buttons = []
     for proc in all_procurements[:10]:
-        unread_count = await api_client.get_unread_count(
-            user["id"],
-            proc["id"]
-        )
+        unread_count = await api_client.get_unread_count(user["id"], proc["id"])
 
         btn_text = f"💬 {proc.get('title', 'Unknown')}"
         if unread_count > 0:
             btn_text += f" ({unread_count} new)"
 
-        buttons.append([
-            InlineKeyboardButton(
-                text=btn_text,
-                callback_data=f"enter_chat_{proc['id']}"
-            )
-        ])
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=btn_text, callback_data=f"enter_chat_{proc['id']}"
+                )
+            ]
+        )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -246,7 +228,7 @@ async def back_to_chat_list(callback: CallbackQuery):
         "*Select a chat to enter:*\n\n"
         "You can chat with other participants in procurements you've joined.",
         parse_mode="Markdown",
-        reply_markup=keyboard
+        reply_markup=keyboard,
     )
     await callback.answer()
 

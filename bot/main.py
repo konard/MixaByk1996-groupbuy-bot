@@ -1,6 +1,7 @@
 """
 Main entry point for the GroupBuy Bot
 """
+
 import asyncio
 import logging
 import sys
@@ -18,10 +19,8 @@ from dialogs import registration
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, config.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ async def main():
     # Initialize bot and dispatcher
     bot = Bot(
         token=config.telegram_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
+        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
     )
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)

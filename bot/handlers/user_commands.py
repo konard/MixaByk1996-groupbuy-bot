@@ -1,6 +1,7 @@
 """
 User command handlers
 """
+
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
@@ -8,8 +9,10 @@ from aiogram.fsm.context import FSMContext
 
 from api_client import api_client
 from keyboards import (
-    get_main_keyboard, get_profile_keyboard,
-    get_balance_keyboard, get_deposit_keyboard
+    get_main_keyboard,
+    get_profile_keyboard,
+    get_balance_keyboard,
+    get_deposit_keyboard,
 )
 from dialogs.registration import start_registration
 
@@ -20,19 +23,17 @@ router = Router()
 async def cmd_start(message: Message, state: FSMContext):
     """Handle /start command"""
     user_exists = await api_client.check_user_exists(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if user_exists:
         user = await api_client.get_user_by_platform(
-            platform="telegram",
-            platform_user_id=str(message.from_user.id)
+            platform="telegram", platform_user_id=str(message.from_user.id)
         )
         role = user.get("role", "buyer") if user else "buyer"
         await message.answer(
             f"Welcome back, {user.get('first_name', 'User')}!",
-            reply_markup=get_main_keyboard(role)
+            reply_markup=get_main_keyboard(role),
         )
     else:
         await start_registration(message, state)
@@ -65,20 +66,17 @@ async def cmd_help(message: Message):
 async def cmd_profile(message: Message):
     """Handle /profile command"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if not user:
-        await message.answer(
-            "You are not registered. Use /start to register."
-        )
+        await message.answer("You are not registered. Use /start to register.")
         return
 
     role_display = {
         "buyer": "Buyer",
         "organizer": "Organizer",
-        "supplier": "Supplier"
+        "supplier": "Supplier",
     }.get(user.get("role"), user.get("role", "Unknown"))
 
     profile_text = (
@@ -92,9 +90,7 @@ async def cmd_profile(message: Message):
     )
 
     await message.answer(
-        profile_text,
-        parse_mode="Markdown",
-        reply_markup=get_profile_keyboard()
+        profile_text, parse_mode="Markdown", reply_markup=get_profile_keyboard()
     )
 
 
@@ -102,14 +98,11 @@ async def cmd_profile(message: Message):
 async def cmd_balance(message: Message):
     """Handle /balance command"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(message.from_user.id)
+        platform="telegram", platform_user_id=str(message.from_user.id)
     )
 
     if not user:
-        await message.answer(
-            "You are not registered. Use /start to register."
-        )
+        await message.answer("You are not registered. Use /start to register.")
         return
 
     balance_data = await api_client.get_user_balance(user["id"])
@@ -126,9 +119,7 @@ async def cmd_balance(message: Message):
         balance_text = f"*Your Balance:* {user.get('balance', 0)} RUB"
 
     await message.answer(
-        balance_text,
-        parse_mode="Markdown",
-        reply_markup=get_balance_keyboard()
+        balance_text, parse_mode="Markdown", reply_markup=get_balance_keyboard()
     )
 
 
@@ -154,10 +145,9 @@ async def text_help(message: Message):
 async def deposit_options(callback: CallbackQuery):
     """Show deposit options"""
     await callback.message.edit_text(
-        "*Deposit to Balance*\n\n"
-        "Select amount to deposit:",
+        "*Deposit to Balance*\n\nSelect amount to deposit:",
         parse_mode="Markdown",
-        reply_markup=get_deposit_keyboard()
+        reply_markup=get_deposit_keyboard(),
     )
     await callback.answer()
 
@@ -170,7 +160,7 @@ async def process_deposit(callback: CallbackQuery):
     if amount_str == "custom":
         await callback.message.edit_text(
             "Please enter the amount you want to deposit (minimum 100 RUB):",
-            reply_markup=None
+            reply_markup=None,
         )
         # Set state for custom amount input
         # This would require FSMContext
@@ -184,8 +174,7 @@ async def process_deposit(callback: CallbackQuery):
         return
 
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(callback.from_user.id)
+        platform="telegram", platform_user_id=str(callback.from_user.id)
     )
 
     if not user:
@@ -193,21 +182,23 @@ async def process_deposit(callback: CallbackQuery):
         return
 
     payment = await api_client.create_payment(
-        user_id=user["id"],
-        amount=amount,
-        description=f"Deposit {amount} RUB"
+        user_id=user["id"], amount=amount, description=f"Deposit {amount} RUB"
     )
 
     if payment and payment.get("confirmation_url"):
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Pay", url=payment["confirmation_url"])],
-            [InlineKeyboardButton(
-                text="Check status",
-                callback_data=f"check_payment_{payment['id']}"
-            )]
-        ])
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Pay", url=payment["confirmation_url"])],
+                [
+                    InlineKeyboardButton(
+                        text="Check status",
+                        callback_data=f"check_payment_{payment['id']}",
+                    )
+                ],
+            ]
+        )
 
         await callback.message.edit_text(
             f"*Payment: {amount} RUB*\n\n"
@@ -216,12 +207,12 @@ async def process_deposit(callback: CallbackQuery):
             f"- Link is valid for 24 hours\n"
             f"- Balance will update automatically after payment",
             parse_mode="Markdown",
-            reply_markup=keyboard
+            reply_markup=keyboard,
         )
     else:
         await callback.message.edit_text(
             "Failed to create payment. Please try again later.",
-            reply_markup=get_balance_keyboard()
+            reply_markup=get_balance_keyboard(),
         )
 
     await callback.answer()
@@ -247,32 +238,33 @@ async def check_payment_status(callback: CallbackQuery):
             f"Time: {payment_status.get('paid_at', '')[:19]}\n\n"
             f"Your balance has been updated.",
             parse_mode="Markdown",
-            reply_markup=get_balance_keyboard()
+            reply_markup=get_balance_keyboard(),
         )
     elif status == "pending":
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text="Check again",
-                callback_data=f"check_payment_{payment_id}"
-            )]
-        ])
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="Check again", callback_data=f"check_payment_{payment_id}"
+                    )
+                ]
+            ]
+        )
 
         await callback.message.edit_text(
             f"*Payment Processing*\n\n"
             f"Amount: {payment_status.get('amount', 0)} RUB\n"
             f"Waiting for bank confirmation...",
             parse_mode="Markdown",
-            reply_markup=keyboard
+            reply_markup=keyboard,
         )
     else:
         await callback.message.edit_text(
-            f"*Payment Failed*\n\n"
-            f"Status: {status}\n\n"
-            f"Please try again.",
+            f"*Payment Failed*\n\nStatus: {status}\n\nPlease try again.",
             parse_mode="Markdown",
-            reply_markup=get_deposit_keyboard()
+            reply_markup=get_deposit_keyboard(),
         )
 
     await callback.answer()
@@ -282,8 +274,7 @@ async def check_payment_status(callback: CallbackQuery):
 async def refresh_balance(callback: CallbackQuery):
     """Refresh balance"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(callback.from_user.id)
+        platform="telegram", platform_user_id=str(callback.from_user.id)
     )
 
     if not user:
@@ -304,9 +295,7 @@ async def refresh_balance(callback: CallbackQuery):
         balance_text = f"*Your Balance:* {user.get('balance', 0)} RUB"
 
     await callback.message.edit_text(
-        balance_text,
-        parse_mode="Markdown",
-        reply_markup=get_balance_keyboard()
+        balance_text, parse_mode="Markdown", reply_markup=get_balance_keyboard()
     )
     await callback.answer("Balance updated")
 
@@ -315,8 +304,7 @@ async def refresh_balance(callback: CallbackQuery):
 async def payment_history(callback: CallbackQuery):
     """Show payment history"""
     user = await api_client.get_user_by_platform(
-        platform="telegram",
-        platform_user_id=str(callback.from_user.id)
+        platform="telegram", platform_user_id=str(callback.from_user.id)
     )
 
     if not user:
@@ -332,11 +320,9 @@ async def payment_history(callback: CallbackQuery):
     history_text = "*Payment History*\n\n"
 
     for i, payment in enumerate(history, 1):
-        status_emoji = {
-            "succeeded": "",
-            "pending": "",
-            "cancelled": ""
-        }.get(payment.get("status", ""), "")
+        status_emoji = {"succeeded": "", "pending": "", "cancelled": ""}.get(
+            payment.get("status", ""), ""
+        )
 
         history_text += (
             f"{i}. {status_emoji} *{payment.get('amount', 0)} RUB*\n"
@@ -346,13 +332,13 @@ async def payment_history(callback: CallbackQuery):
 
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Back", callback_data="refresh_balance")]
-    ])
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Back", callback_data="refresh_balance")]
+        ]
+    )
 
     await callback.message.edit_text(
-        history_text,
-        parse_mode="Markdown",
-        reply_markup=keyboard
+        history_text, parse_mode="Markdown", reply_markup=keyboard
     )
     await callback.answer()

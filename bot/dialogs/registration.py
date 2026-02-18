@@ -1,6 +1,7 @@
 """
 Registration dialog for new users
 """
+
 import re
 
 from aiogram import Router, F
@@ -14,6 +15,7 @@ from keyboards import get_role_keyboard, get_main_keyboard
 
 class RegistrationStates(StatesGroup):
     """Registration dialog states"""
+
     waiting_for_name = State()
     waiting_for_phone = State()
     waiting_for_email = State()
@@ -25,17 +27,17 @@ router = Router()
 
 def validate_name(name: str) -> bool:
     """Validate name format"""
-    return bool(re.match(r'^[\u0400-\u04FF\s]{2,50}$|^[a-zA-Z\s]{2,50}$', name))
+    return bool(re.match(r"^[\u0400-\u04FF\s]{2,50}$|^[a-zA-Z\s]{2,50}$", name))
 
 
 def validate_phone(phone: str) -> bool:
     """Validate phone format"""
-    return bool(re.match(r'^\+?[1-9]\d{10,14}$', phone))
+    return bool(re.match(r"^\+?[1-9]\d{10,14}$", phone))
 
 
 def validate_email(email: str) -> bool:
     """Validate email format"""
-    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
+    return bool(re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email))
 
 
 @router.message(RegistrationStates.waiting_for_name)
@@ -52,8 +54,7 @@ async def process_name(message: Message, state: FSMContext):
     await state.update_data(name=name)
     await state.set_state(RegistrationStates.waiting_for_phone)
     await message.answer(
-        f"Great, {name}!\n\n"
-        "Now please enter your phone number (e.g., +79991234567):"
+        f"Great, {name}!\n\nNow please enter your phone number (e.g., +79991234567):"
     )
 
 
@@ -63,19 +64,15 @@ async def process_phone(message: Message, state: FSMContext):
     phone = message.text.strip()
 
     if not validate_phone(phone):
-        await message.answer(
-            "Please enter a valid phone number (e.g., +79991234567)."
-        )
+        await message.answer("Please enter a valid phone number (e.g., +79991234567).")
         return
 
-    if not phone.startswith('+'):
-        phone = '+' + phone
+    if not phone.startswith("+"):
+        phone = "+" + phone
 
     await state.update_data(phone=phone)
     await state.set_state(RegistrationStates.waiting_for_email)
-    await message.answer(
-        "Thank you! Now please enter your email address:"
-    )
+    await message.answer("Thank you! Now please enter your email address:")
 
 
 @router.message(RegistrationStates.waiting_for_email)
@@ -84,16 +81,13 @@ async def process_email(message: Message, state: FSMContext):
     email = message.text.strip().lower()
 
     if not validate_email(email):
-        await message.answer(
-            "Please enter a valid email address."
-        )
+        await message.answer("Please enter a valid email address.")
         return
 
     await state.update_data(email=email)
     await state.set_state(RegistrationStates.waiting_for_role)
     await message.answer(
-        "Almost done! Please select your role:",
-        reply_markup=get_role_keyboard()
+        "Almost done! Please select your role:", reply_markup=get_role_keyboard()
     )
 
 
@@ -114,7 +108,7 @@ async def process_role(callback: CallbackQuery, state: FSMContext):
         "phone": data.get("phone", ""),
         "email": data.get("email", ""),
         "role": role,
-        "language_code": callback.from_user.language_code or "en"
+        "language_code": callback.from_user.language_code or "en",
     }
 
     result = await api_client.register_user(user_data)
@@ -125,24 +119,22 @@ async def process_role(callback: CallbackQuery, state: FSMContext):
         role_display = {
             "buyer": "Buyer",
             "organizer": "Organizer",
-            "supplier": "Supplier"
+            "supplier": "Supplier",
         }.get(role, role)
 
         await callback.message.edit_text(
             f"Registration complete!\n\n"
             f"You are registered as: {role_display}\n\n"
             f"Use the menu below to navigate.",
-            reply_markup=None
+            reply_markup=None,
         )
         await callback.message.answer(
-            "Welcome to GroupBuy Bot!",
-            reply_markup=get_main_keyboard(role)
+            "Welcome to GroupBuy Bot!", reply_markup=get_main_keyboard(role)
         )
     else:
         await callback.message.edit_text(
-            "Registration failed. Please try again later.\n"
-            "Use /start to restart.",
-            reply_markup=None
+            "Registration failed. Please try again later.\nUse /start to restart.",
+            reply_markup=None,
         )
 
     await callback.answer()
