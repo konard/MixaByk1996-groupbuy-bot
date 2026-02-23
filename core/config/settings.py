@@ -144,6 +144,16 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
 }
 
+# Tochka Bank (Cyclops) Payment Integration
+TOCHKA_API_URL = os.getenv('TOCHKA_API_URL', 'https://pre.tochka.com/api/v1/cyclops')
+TOCHKA_NOMINAL_ACCOUNT = os.getenv('TOCHKA_NOMINAL_ACCOUNT', '')
+TOCHKA_PLATFORM_ID = os.getenv('TOCHKA_PLATFORM_ID', '')
+TOCHKA_PRIVATE_KEY_PATH = os.getenv('TOCHKA_PRIVATE_KEY_PATH', '')
+TOCHKA_PUBLIC_KEY_PATH = os.getenv('TOCHKA_PUBLIC_KEY_PATH', '')
+
+# Payment return URL (after payment completion)
+PAYMENT_RETURN_URL = os.getenv('PAYMENT_RETURN_URL', '')
+
 # Logging
 LOGGING = {
     'version': 1,

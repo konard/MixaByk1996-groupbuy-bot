@@ -8,15 +8,16 @@ from .models import Payment, Transaction
 class PaymentSerializer(serializers.ModelSerializer):
     """Payment serializer"""
     status_display = serializers.ReadOnlyField()
+    provider_display = serializers.CharField(source='get_provider_display', read_only=True)
 
     class Meta:
         model = Payment
         fields = [
             'id', 'user', 'payment_type', 'amount', 'status', 'status_display',
-            'external_id', 'provider', 'confirmation_url',
+            'external_id', 'order_id', 'provider', 'provider_display', 'confirmation_url',
             'procurement', 'description', 'paid_at', 'created_at'
         ]
-        read_only_fields = ['id', 'external_id', 'paid_at', 'created_at']
+        read_only_fields = ['id', 'external_id', 'order_id', 'paid_at', 'created_at']
 
 
 class CreatePaymentSerializer(serializers.Serializer):
@@ -42,7 +43,9 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 
 class WebhookPayloadSerializer(serializers.Serializer):
-    """Serializer for YooKassa webhook payload"""
-    type = serializers.CharField()
-    event = serializers.CharField()
-    object = serializers.DictField()
+    """Serializer for webhook payload (YooKassa/Tochka)"""
+    type = serializers.CharField(required=False)
+    event = serializers.CharField(required=False)
+    eventType = serializers.CharField(required=False)  # Tochka format
+    object = serializers.DictField(required=False)
+    payment = serializers.DictField(required=False)  # Tochka format

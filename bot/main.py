@@ -1,6 +1,7 @@
 """
 Main entry point for the GroupBuy Bot
 """
+
 import asyncio
 import logging
 import sys
@@ -11,17 +12,15 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import config
-from handlers import user_commands, procurement_commands
+from handlers import user_commands, procurement_commands, chat_commands
 from dialogs import registration
 
 
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, config.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ async def main():
     # Initialize bot and dispatcher
     bot = Bot(
         token=config.telegram_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
+        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
     )
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
@@ -45,6 +44,7 @@ async def main():
     # Register routers
     dp.include_router(user_commands.router)
     dp.include_router(procurement_commands.router)
+    dp.include_router(chat_commands.router)
     dp.include_router(registration.router)
 
     logger.info("Starting GroupBuy Bot...")

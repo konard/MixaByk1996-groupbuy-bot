@@ -1,6 +1,6 @@
 """
 Payment models for GroupBuy Bot
-Supports YooKassa integration and internal transactions
+Supports Tochka Bank Cyclops and YooKassa (legacy) integration
 """
 from django.db import models
 from users.models import User
@@ -27,10 +27,15 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
 
+    class Provider(models.TextChoices):
+        TOCHKA = 'tochka', 'Tochka Bank (Cyclops)'
+        YOOKASSA = 'yookassa', 'YooKassa (Legacy)'
+
     # External payment provider info
     external_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    provider = models.CharField(max_length=50, default='yookassa')
+    provider = models.CharField(max_length=50, choices=Provider.choices, default=Provider.TOCHKA)
     confirmation_url = models.URLField(blank=True)
+    order_id = models.CharField(max_length=100, blank=True, help_text='Order ID for Tochka Cyclops')
 
     # Related procurement (if payment is for procurement)
     procurement = models.ForeignKey(

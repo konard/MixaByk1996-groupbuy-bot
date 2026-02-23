@@ -1,6 +1,7 @@
 """
 Bot configuration
 """
+
 import os
 from dataclasses import dataclass
 from typing import Optional
@@ -23,9 +24,14 @@ class BotConfig:
     # Redis
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/1")
 
-    # YooKassa
+    # YooKassa (legacy)
     yookassa_shop_id: str = os.getenv("YOOKASSA_SHOP_ID", "")
     yookassa_secret_key: str = os.getenv("YOOKASSA_SECRET_KEY", "")
+
+    # JWT and WebSocket
+    jwt_secret: str = os.getenv("JWT_SECRET", "dev-jwt-secret")
+    websocket_url: str = os.getenv("WEBSOCKET_URL", "ws://localhost:8765")
+    web_app_url: str = os.getenv("WEB_APP_URL", "http://localhost:3000")
 
     # Bot settings
     polling_interval: float = 0.5
