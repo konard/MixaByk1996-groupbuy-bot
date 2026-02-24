@@ -72,7 +72,7 @@ def get_procurements_keyboard(procurements: list) -> InlineKeyboardMarkup:
 
 
 def get_procurement_detail_keyboard(
-    procurement_id: int, can_join: bool = True
+    procurement_id: int, can_join: bool = True, is_participant: bool = False
 ) -> InlineKeyboardMarkup:
     """Get keyboard for procurement details"""
     buttons = []
@@ -82,6 +82,16 @@ def get_procurement_detail_keyboard(
             [
                 InlineKeyboardButton(
                     text="Join", callback_data=f"join_proc_{procurement_id}"
+                )
+            ]
+        )
+
+    if is_participant:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="Leave procurement",
+                    callback_data=f"leave_proc_{procurement_id}",
                 )
             ]
         )
