@@ -74,11 +74,22 @@ export default function LoginPage() {
         </form>
 
         <div className="admin-login-footer">
-          <p>
-            Для входа используйте учетные данные администратора Django.
-            <br />
-            Создайте администратора: <code>python manage.py createsuperuser</code>
-          </p>
+          <p>Используйте учётные данные суперпользователя.</p>
+          <details className="admin-login-help">
+            <summary>Как создать администратора?</summary>
+            <ol>
+              <li>Подключитесь к серверу по SSH</li>
+              <li>
+                Выполните команду:
+                <pre><code>docker compose exec core python manage.py createsuperuser</code></pre>
+              </li>
+              <li>Введите имя пользователя, email и пароль</li>
+              <li>Войдите в панель с созданными данными</li>
+            </ol>
+            <p>
+              Адрес панели: <strong>{window.location.origin}/admin-panel/</strong>
+            </p>
+          </details>
         </div>
       </div>
     </div>

@@ -95,6 +95,9 @@ async fn main() -> std::io::Result<()> {
             .route("/api/payments/{id}/status/", web::get().to(handlers::payments::get_payment_status))
             // WebSocket endpoint
             .route("/ws/chat/", web::get().to(handlers::websocket::ws_handler))
+            // Health check endpoint
+            .route("/health/", web::get().to(|| async { actix_web::HttpResponse::Ok().body("OK") }))
+            .route("/health", web::get().to(|| async { actix_web::HttpResponse::Ok().body("OK") }))
     })
     .bind((bind_addr, bind_port))?
     .run()

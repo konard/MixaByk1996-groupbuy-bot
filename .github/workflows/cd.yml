@@ -69,28 +69,128 @@ jobs:
           cache-to: type=gha,mode=max
 
   # Deploy to staging (on main branch push)
+  # Requires these GitHub secrets:
+  #   STAGING_SSH_KEY   - SSH private key for staging server
+  #   STAGING_HOST      - Staging server hostname or IP
+  #   STAGING_USER      - SSH user on staging server (default: ubuntu)
+  #   STAGING_APP_DIR   - App directory on server (default: /opt/groupbuy)
   deploy-staging:
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Deploy to staging
+      - name: Check required secrets
         run: |
-          echo "Deploying to staging environment..."
-          # Add your deployment commands here, e.g.:
-          # ssh user@staging-server "cd /app && docker compose pull && docker compose up -d"
-          echo "Deployment placeholder - configure your staging server"
+          if [ -z "${{ secrets.STAGING_SSH_KEY }}" ]; then
+            echo "::warning::STAGING_SSH_KEY secret is not set. Skipping deployment."
+            echo "To enable automatic deployment, add the following secrets in repository Settings → Secrets:"
+            echo "  STAGING_SSH_KEY   - SSH private key for staging server"
+            echo "  STAGING_HOST      - Staging server hostname or IP"
+            echo "  STAGING_USER      - SSH user (default: ubuntu)"
+            echo "  STAGING_APP_DIR   - App directory (default: /opt/groupbuy)"
+            exit 0
+          fi
+          if [ -z "${{ secrets.STAGING_HOST }}" ]; then
+            echo "::error::STAGING_HOST secret is not set."
+            exit 1
+          fi
+
+      - name: Deploy to staging
+        if: ${{ secrets.STAGING_SSH_KEY != '' && secrets.STAGING_HOST != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER || 'ubuntu' }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            APP_DIR="${{ secrets.STAGING_APP_DIR || '/opt/groupbuy' }}"
+            IMAGE_TAG="ghcr.io/${{ github.repository }}"
+
+            echo "=== Deploying to staging ==="
+            cd "$APP_DIR"
+
+            # Pull latest code
+            git pull origin main
+
+            # Pull latest Docker images
+            docker compose -f docker-compose.prod.yml pull
+
+            # Restart services with zero downtime
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Run migrations
+            docker compose -f docker-compose.prod.yml exec -T core python manage.py migrate --noinput 2>/dev/null || true
+
+            # Clean up old images
+            docker image prune -f
+
+            echo "=== Staging deployment complete ==="
+            docker compose -f docker-compose.prod.yml ps
 
   # Deploy to production (on version tag)
+  # Requires these GitHub secrets:
+  #   PRODUCTION_SSH_KEY   - SSH private key for production server
+  #   PRODUCTION_HOST      - Production server hostname or IP
+  #   PRODUCTION_USER      - SSH user on production server (default: ubuntu)
+  #   PRODUCTION_APP_DIR   - App directory on server (default: /opt/groupbuy)
   deploy-production:
     needs: build-and-push
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Deploy to production
+      - name: Check required secrets
         run: |
-          echo "Deploying to production environment..."
-          # Add your production deployment commands here
-          echo "Deployment placeholder - configure your production server"
+          if [ -z "${{ secrets.PRODUCTION_SSH_KEY }}" ]; then
+            echo "::warning::PRODUCTION_SSH_KEY secret is not set. Skipping deployment."
+            echo "To enable automatic production deployment, add the following secrets:"
+            echo "  PRODUCTION_SSH_KEY   - SSH private key for production server"
+            echo "  PRODUCTION_HOST      - Production server hostname or IP"
+            echo "  PRODUCTION_USER      - SSH user (default: ubuntu)"
+            echo "  PRODUCTION_APP_DIR   - App directory (default: /opt/groupbuy)"
+            exit 0
+          fi
+          if [ -z "${{ secrets.PRODUCTION_HOST }}" ]; then
+            echo "::error::PRODUCTION_HOST secret is not set."
+            exit 1
+          fi
+
+      - name: Deploy to production
+        if: ${{ secrets.PRODUCTION_SSH_KEY != '' && secrets.PRODUCTION_HOST != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER || 'ubuntu' }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            APP_DIR="${{ secrets.PRODUCTION_APP_DIR || '/opt/groupbuy' }}"
+            VERSION="${{ github.ref_name }}"
+
+            echo "=== Deploying version $VERSION to production ==="
+            cd "$APP_DIR"
+
+            # Pull latest code for this tag
+            git fetch --tags
+            git checkout "$VERSION"
+
+            # Pull latest Docker images
+            docker compose -f docker-compose.prod.yml pull
+
+            # Create backup before deployment
+            echo "Creating database backup..."
+            docker compose -f docker-compose.prod.yml exec -T postgres \
+              pg_dump -U "$DB_USER" "$DB_NAME" \
+              > "/backups/groupbuy/pre-deploy-$VERSION-$(date +%Y%m%d_%H%M%S).sql" 2>/dev/null || true
+
+            # Restart services with zero downtime
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Run migrations
+            docker compose -f docker-compose.prod.yml exec -T core python manage.py migrate --noinput 2>/dev/null || true
+
+            # Clean up old images
+            docker image prune -f
+
+            echo "=== Production deployment complete: $VERSION ==="
+            docker compose -f docker-compose.prod.yml ps

@@ -46,16 +46,20 @@ async def cmd_help(message: Message):
         "*Available Commands:*\n\n"
         "*Profile:*\n"
         "/start - Start or re-register\n"
-        "/profile - Show your profile\n"
-        "/balance - Show your balance\n\n"
+        "/profile - View and edit your profile\n"
+        "/balance - Check your balance\n\n"
         "*Procurements:*\n"
-        "/procurements - Active procurements\n"
+        "/procurements - Browse active procurements\n"
         "/my\\_procurements - Your procurements\n"
-        "/create\\_procurement - Create new (organizers)\n\n"
+        "/search - Search procurements by keyword\n"
+        "/create\\_procurement - Create new (organizers only)\n\n"
         "*Chat:*\n"
         "/chat - Enter procurement chat\n\n"
         "*Payments:*\n"
-        "/deposit - Deposit to balance\n\n"
+        "/deposit - Top up your balance\n"
+        "/transactions - Payment history\n\n"
+        "*Notifications:*\n"
+        "/notifications - View unread notifications\n\n"
         "*Help:*\n"
         "/help - This help message"
     )
@@ -342,3 +346,128 @@ async def payment_history(callback: CallbackQuery):
         history_text, parse_mode="Markdown", reply_markup=keyboard
     )
     await callback.answer()
+
+
+@router.message(Command("transactions"))
+async def cmd_transactions(message: Message):
+    """Handle /transactions command — show payment history"""
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(message.from_user.id)
+    )
+
+    if not user:
+        await message.answer("You are not registered. Use /start to register.")
+        return
+
+    history = await api_client.get_payment_history(user["id"])
+
+    if not history:
+        await message.answer("No payment history yet.")
+        return
+
+    history_text = "*Payment History*\n\n"
+    for i, payment in enumerate(history, 1):
+        status_emoji = {"succeeded": "", "pending": "", "cancelled": ""}.get(
+            payment.get("status", ""), ""
+        )
+        history_text += (
+            f"{i}. {status_emoji} *{payment.get('amount', 0)} RUB*\n"
+            f"   Status: {payment.get('status_display', payment.get('status', ''))}\n"
+            f"   Date: {payment.get('created_at', '')[:10]}\n\n"
+        )
+
+    await message.answer(
+        history_text, parse_mode="Markdown", reply_markup=get_balance_keyboard()
+    )
+
+
+@router.message(Command("notifications"))
+async def cmd_notifications(message: Message):
+    """Handle /notifications command"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(message.from_user.id)
+    )
+
+    if not user:
+        await message.answer("You are not registered. Use /start to register.")
+        return
+
+    notifications = await api_client.get_notifications(user["id"], unread_only=True)
+
+    if not notifications:
+        await message.answer(
+            "No new notifications.",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Show all", callback_data="notifications_all"
+                        )
+                    ]
+                ]
+            ),
+        )
+        return
+
+    text = f"*Notifications ({len(notifications)} unread)*\n\n"
+    for notif in notifications[:10]:
+        text += f"• {notif.get('text', notif.get('message', ''))}\n"
+        if notif.get("created_at"):
+            text += f"  _{notif['created_at'][:10]}_\n"
+        text += "\n"
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Mark all as read", callback_data="notifications_mark_read"
+                )
+            ],
+            [InlineKeyboardButton(text="Show all", callback_data="notifications_all")],
+        ]
+    )
+    await message.answer(text, parse_mode="Markdown", reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "notifications_all")
+async def notifications_all(callback: CallbackQuery):
+    """Show all notifications"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(callback.from_user.id)
+    )
+
+    if not user:
+        await callback.answer("User not found", show_alert=True)
+        return
+
+    notifications = await api_client.get_notifications(user["id"], unread_only=False)
+
+    if not notifications:
+        await callback.answer("No notifications", show_alert=True)
+        return
+
+    text = f"*All Notifications ({len(notifications)})*\n\n"
+    for notif in notifications[:15]:
+        read_mark = "" if notif.get("is_read") else ""
+        text += f"{read_mark} {notif.get('text', notif.get('message', ''))}\n"
+        if notif.get("created_at"):
+            text += f"  _{notif['created_at'][:10]}_\n"
+        text += "\n"
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Back", callback_data="refresh_balance")]
+        ]
+    )
+    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "notifications_mark_read")
+async def notifications_mark_read(callback: CallbackQuery):
+    """Mark all notifications as read (placeholder)"""
+    await callback.answer("All notifications marked as read.", show_alert=True)

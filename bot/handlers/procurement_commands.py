@@ -37,6 +37,12 @@ class JoinProcurementStates(StatesGroup):
     waiting_for_quantity = State()
 
 
+class SearchProcurementStates(StatesGroup):
+    """States for procurement search"""
+
+    waiting_for_query = State()
+
+
 router = Router()
 
 
@@ -260,12 +266,71 @@ async def back_to_procurements(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "search_procurement")
+async def start_search(callback: CallbackQuery, state: FSMContext):
+    """Start procurement search from inline button"""
+    await state.set_state(SearchProcurementStates.waiting_for_query)
+    await callback.message.edit_text(
+        "*Search Procurements*\n\nEnter a keyword to search by title or city:",
+        parse_mode="Markdown",
+        reply_markup=None,
+    )
+    await callback.answer()
+
+
+@router.message(Command("search"))
+async def cmd_search(message: Message, state: FSMContext):
+    """Handle /search command"""
+    await state.set_state(SearchProcurementStates.waiting_for_query)
+    await message.answer(
+        "*Search Procurements*\n\nEnter a keyword to search by title or city:",
+        parse_mode="Markdown",
+    )
+
+
+@router.message(SearchProcurementStates.waiting_for_query)
+async def process_search_query(message: Message, state: FSMContext):
+    """Process search query"""
+    query = message.text.strip()
+    await state.clear()
+
+    if len(query) < 2:
+        await message.answer("Search query must be at least 2 characters.")
+        return
+
+    procurements = await api_client.get_procurements(status="active")
+    query_lower = query.lower()
+    results = [
+        p
+        for p in procurements
+        if query_lower in p.get("title", "").lower()
+        or query_lower in p.get("city", "").lower()
+        or query_lower in p.get("description", "").lower()
+    ]
+
+    if not results:
+        await message.answer(
+            f'No procurements found for *"{query}"*.\n\nTry /procurements to see all active ones.',
+            parse_mode="Markdown",
+        )
+        return
+
+    await message.answer(
+        f'*Found {len(results)} procurement(s) for "{query}":*\n\nSelect one to view details:',
+        parse_mode="Markdown",
+        reply_markup=get_procurements_keyboard(results),
+    )
+
+
 @router.callback_query(F.data == "filter_city")
-async def filter_by_city(callback: CallbackQuery):
+async def filter_by_city(callback: CallbackQuery, state: FSMContext):
     """Filter procurements by city"""
-    await callback.message.edit_text("Enter city name to filter:", reply_markup=None)
-    # Would need state handling for city input
-    await callback.answer("Feature coming soon", show_alert=True)
+    await state.set_state(SearchProcurementStates.waiting_for_query)
+    await callback.message.edit_text(
+        "Enter city name to filter procurements:",
+        reply_markup=None,
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data == "filter_category")
@@ -281,6 +346,85 @@ async def filter_by_category(callback: CallbackQuery):
         "Select category:", reply_markup=get_categories_keyboard(categories)
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("category_"))
+async def filter_by_selected_category(callback: CallbackQuery):
+    """Show procurements filtered by selected category"""
+    category_id = int(callback.data.split("_")[1])
+    procurements = await api_client.get_procurements(
+        status="active", category=category_id
+    )
+
+    if not procurements:
+        await callback.answer("No procurements in this category", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"*Procurements in this category ({len(procurements)}):*",
+        parse_mode="Markdown",
+        reply_markup=get_procurements_keyboard(procurements),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "refresh_my_procurements")
+async def refresh_my_procurements(callback: CallbackQuery):
+    """Refresh my procurements list"""
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(callback.from_user.id)
+    )
+
+    if not user:
+        await callback.answer("User not found", show_alert=True)
+        return
+
+    result = await api_client.get_user_procurements(user["id"])
+    organized = result.get("organized", []) if result else []
+    participating = result.get("participating", []) if result else []
+
+    response = ""
+    if organized:
+        response += f"*Your Organized ({len(organized)}):*\n"
+        for proc in organized[:5]:
+            status_emoji = get_status_emoji(proc.get("status", ""))
+            response += (
+                f"{status_emoji} *{proc.get('title', '')}*\n"
+                f"  Status: {proc.get('status', '')} · "
+                f"  {proc.get('current_amount', 0)}/{proc.get('target_amount', 0)} ₽\n\n"
+            )
+
+    if participating:
+        response += f"*You're Participating ({len(participating)}):*\n"
+        for proc in participating[:5]:
+            status_emoji = get_status_emoji(proc.get("status", ""))
+            response += (
+                f"{status_emoji} *{proc.get('title', '')}*\n"
+                f"  Your amount: {proc.get('my_amount', 0)} ₽ · "
+                f"  Progress: {proc.get('progress', 0)}%\n\n"
+            )
+
+    if not response:
+        response = "You don't have any procurements."
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Refresh", callback_data="refresh_my_procurements"
+                ),
+                InlineKeyboardButton(
+                    text="Browse all", callback_data="back_to_procurements"
+                ),
+            ]
+        ]
+    )
+    await callback.message.edit_text(
+        response, parse_mode="Markdown", reply_markup=keyboard
+    )
+    await callback.answer("Updated")
 
 
 @router.message(Command("create_procurement"))
@@ -407,6 +551,108 @@ async def process_city(message: Message, state: FSMContext):
             "Failed to create procurement. Please try again.",
             reply_markup=get_main_keyboard("organizer"),
         )
+
+
+@router.callback_query(F.data.startswith("leave_proc_"))
+async def leave_procurement_callback(callback: CallbackQuery):
+    """Confirm and leave a procurement"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    procurement_id = int(callback.data.split("_")[2])
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Yes, leave", callback_data=f"confirm_leave_{procurement_id}"
+                ),
+                InlineKeyboardButton(
+                    text="Cancel", callback_data=f"view_proc_{procurement_id}"
+                ),
+            ]
+        ]
+    )
+    await callback.message.edit_text(
+        "Are you sure you want to leave this procurement?\n\n"
+        "Your reserved amount will be returned to your balance.",
+        reply_markup=keyboard,
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("confirm_leave_"))
+async def confirm_leave_procurement(callback: CallbackQuery):
+    """Execute leave procurement"""
+    procurement_id = int(callback.data.split("_")[2])
+
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(callback.from_user.id)
+    )
+
+    if not user:
+        await callback.answer("User not found", show_alert=True)
+        return
+
+    result = await api_client.leave_procurement(procurement_id, user["id"])
+
+    if result:
+        await callback.message.edit_text(
+            "You have left the procurement.\n\n"
+            "Use /procurements to browse other active procurements.",
+            reply_markup=None,
+        )
+    else:
+        await callback.message.edit_text(
+            "Could not leave procurement. It may have already started processing.\n\n"
+            "Contact support if you need help.",
+            reply_markup=None,
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "procurement_stats")
+async def procurement_stats(callback: CallbackQuery):
+    """Show user procurement statistics"""
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(callback.from_user.id)
+    )
+
+    if not user:
+        await callback.answer("User not found", show_alert=True)
+        return
+
+    result = await api_client.get_user_procurements(user["id"])
+    organized = result.get("organized", []) if result else []
+    participating = result.get("participating", []) if result else []
+
+    total_spent = sum(float(p.get("my_amount", 0)) for p in participating)
+    active_count = sum(
+        1 for p in organized + participating if p.get("status") == "active"
+    )
+    completed_count = sum(
+        1 for p in organized + participating if p.get("status") == "completed"
+    )
+
+    stats_text = (
+        "*Your Procurement Statistics*\n\n"
+        f"Organized: *{len(organized)}*\n"
+        f"Participating: *{len(participating)}*\n"
+        f"Active: *{active_count}*\n"
+        f"Completed: *{completed_count}*\n"
+        f"Total invested: *{total_spent:,.0f} RUB*"
+    )
+
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Back", callback_data="refresh_my_procurements")]
+        ]
+    )
+    await callback.message.edit_text(
+        stats_text, parse_mode="Markdown", reply_markup=keyboard
+    )
+    await callback.answer()
 
 
 def get_status_emoji(status: str) -> str:
