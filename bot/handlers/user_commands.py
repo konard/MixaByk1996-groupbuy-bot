@@ -60,6 +60,8 @@ async def cmd_help(message: Message):
         "/transactions - Payment history\n\n"
         "*Notifications:*\n"
         "/notifications - View unread notifications\n\n"
+        "*Broadcast:*\n"
+        "/broadcast - Send messages to channels and groups\n\n"
         "*Help:*\n"
         "/help - This help message"
     )
