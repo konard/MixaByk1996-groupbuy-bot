@@ -1,8 +1,9 @@
 """
 Tests for broadcast/outreach command handlers
 """
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 class TestBroadcastKeyboards:
@@ -17,9 +18,7 @@ class TestBroadcastKeyboards:
         assert len(keyboard.inline_keyboard) > 0
 
         all_callbacks = [
-            btn.callback_data
-            for row in keyboard.inline_keyboard
-            for btn in row
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
         ]
         assert "broadcast_add_channel" in all_callbacks
         assert "broadcast_list_targets" in all_callbacks
@@ -34,9 +33,7 @@ class TestBroadcastKeyboards:
         assert keyboard is not None
 
         all_callbacks = [
-            btn.callback_data
-            for row in keyboard.inline_keyboard
-            for btn in row
+            btn.callback_data for row in keyboard.inline_keyboard for btn in row
         ]
         assert "broadcast_send_all" in all_callbacks
         assert "broadcast_cancel" in all_callbacks
@@ -48,6 +45,7 @@ class TestBroadcastTargetManagement:
     def setup_method(self):
         """Clear broadcast state before each test"""
         from bot.handlers.broadcast_commands import clear_targets, clear_history
+
         clear_targets()
         clear_history()
 
@@ -69,7 +67,9 @@ class TestBroadcastTargetManagement:
         """Test clearing the target list"""
         import bot.handlers.broadcast_commands as bc
 
-        bc._broadcast_targets.append({"id": -1001111111111, "title": "Test", "username": None, "type": "channel"})
+        bc._broadcast_targets.append(
+            {"id": -1001111111111, "title": "Test", "username": None, "type": "channel"}
+        )
         assert len(bc._broadcast_targets) == 1
 
         bc.clear_targets()
@@ -79,7 +79,14 @@ class TestBroadcastTargetManagement:
         """Test clearing broadcast history"""
         import bot.handlers.broadcast_commands as bc
 
-        bc._broadcast_history.append({"text": "test", "sent_count": 1, "failed_count": 0, "timestamp": "2025-01-01"})
+        bc._broadcast_history.append(
+            {
+                "text": "test",
+                "sent_count": 1,
+                "failed_count": 0,
+                "timestamp": "2025-01-01",
+            }
+        )
         assert len(bc._broadcast_history) == 1
 
         bc.clear_history()
@@ -92,6 +99,7 @@ class TestBroadcastCommand:
     def setup_method(self):
         """Reset broadcast state before each test"""
         from bot.handlers.broadcast_commands import clear_targets, clear_history
+
         clear_targets()
         clear_history()
 
@@ -119,7 +127,12 @@ class TestBroadcastCommand:
         from bot.handlers.broadcast_commands import cmd_broadcast
 
         bc._broadcast_targets.append(
-            {"id": -1001111111111, "title": "Test Channel", "username": "testchannel", "type": "channel"}
+            {
+                "id": -1001111111111,
+                "title": "Test Channel",
+                "username": "testchannel",
+                "type": "channel",
+            }
         )
 
         message = MagicMock()
@@ -140,6 +153,7 @@ class TestChannelVerification:
     def setup_method(self):
         """Reset broadcast state before each test"""
         from bot.handlers.broadcast_commands import clear_targets
+
         clear_targets()
 
     @pytest.mark.asyncio
@@ -221,7 +235,12 @@ class TestChannelVerification:
 
         existing_id = -1001111111111
         bc._broadcast_targets.append(
-            {"id": existing_id, "title": "Existing Channel", "username": "existing", "type": "channel"}
+            {
+                "id": existing_id,
+                "title": "Existing Channel",
+                "username": "existing",
+                "type": "channel",
+            }
         )
 
         message = MagicMock()
@@ -276,6 +295,7 @@ class TestBroadcastSend:
     def setup_method(self):
         """Reset broadcast state before each test"""
         from bot.handlers.broadcast_commands import clear_targets, clear_history
+
         clear_targets()
         clear_history()
 
@@ -286,8 +306,18 @@ class TestBroadcastSend:
         from bot.handlers.broadcast_commands import broadcast_send_all, get_history
 
         bc._broadcast_targets = [
-            {"id": -1001111111111, "title": "Channel 1", "username": "ch1", "type": "channel"},
-            {"id": -1002222222222, "title": "Channel 2", "username": "ch2", "type": "channel"},
+            {
+                "id": -1001111111111,
+                "title": "Channel 1",
+                "username": "ch1",
+                "type": "channel",
+            },
+            {
+                "id": -1002222222222,
+                "title": "Channel 2",
+                "username": "ch2",
+                "type": "channel",
+            },
         ]
 
         callback = MagicMock()
@@ -296,13 +326,14 @@ class TestBroadcastSend:
         callback.answer = AsyncMock()
 
         state = AsyncMock()
-        state.get_data = AsyncMock(return_value={"broadcast_text": "Test broadcast message"})
+        state.get_data = AsyncMock(
+            return_value={"broadcast_text": "Test broadcast message"}
+        )
         state.clear = AsyncMock()
 
         bot = AsyncMock()
         bot.send_message = AsyncMock()
 
-        from aiogram.fsm.state import State
         await broadcast_send_all(callback, state, bot)
 
         # Should have tried to send to both channels
@@ -322,8 +353,18 @@ class TestBroadcastSend:
         from aiogram.exceptions import TelegramForbiddenError
 
         bc._broadcast_targets = [
-            {"id": -1001111111111, "title": "Channel 1", "username": "ch1", "type": "channel"},
-            {"id": -1002222222222, "title": "Channel 2", "username": "ch2", "type": "channel"},
+            {
+                "id": -1001111111111,
+                "title": "Channel 1",
+                "username": "ch1",
+                "type": "channel",
+            },
+            {
+                "id": -1002222222222,
+                "title": "Channel 2",
+                "username": "ch2",
+                "type": "channel",
+            },
         ]
 
         callback = MagicMock()
@@ -337,10 +378,10 @@ class TestBroadcastSend:
 
         bot = AsyncMock()
         # First call succeeds, second raises Forbidden
-        forbidden_error = TelegramForbiddenError(method=MagicMock(), message="Forbidden: bot was kicked")
-        bot.send_message = AsyncMock(
-            side_effect=[None, forbidden_error]
+        forbidden_error = TelegramForbiddenError(
+            method=MagicMock(), message="Forbidden: bot was kicked"
         )
+        bot.send_message = AsyncMock(side_effect=[None, forbidden_error])
 
         await broadcast_send_all(callback, state, bot)
 
@@ -396,6 +437,7 @@ class TestBroadcastHistory:
     def setup_method(self):
         """Reset state before each test"""
         from bot.handlers.broadcast_commands import clear_targets, clear_history
+
         clear_targets()
         clear_history()
 

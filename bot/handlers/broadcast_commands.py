@@ -69,11 +69,7 @@ def get_broadcast_confirm_keyboard(message_preview: str) -> InlineKeyboardMarkup
                     text="Send to all channels", callback_data="broadcast_send_all"
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="Cancel", callback_data="broadcast_cancel"
-                )
-            ],
+            [InlineKeyboardButton(text="Cancel", callback_data="broadcast_cancel")],
         ]
     )
 
@@ -92,7 +88,9 @@ async def cmd_broadcast(message: Message):
         "3. Send to all registered targets at once\n\n"
         "_Note: The bot must be an admin in each channel/chat to send messages._"
     )
-    await message.answer(text, parse_mode="Markdown", reply_markup=get_broadcast_keyboard())
+    await message.answer(
+        text, parse_mode="Markdown", reply_markup=get_broadcast_keyboard()
+    )
 
 
 @router.callback_query(F.data == "broadcast_add_channel")
@@ -302,7 +300,9 @@ async def process_broadcast_message(message: Message, state: FSMContext):
     broadcast_text = message.text or message.caption or ""
 
     if len(broadcast_text.strip()) < 5:
-        await message.answer("Message is too short. Please write at least 5 characters.")
+        await message.answer(
+            "Message is too short. Please write at least 5 characters."
+        )
         return
 
     await state.update_data(broadcast_text=broadcast_text)
@@ -324,7 +324,9 @@ async def process_broadcast_message(message: Message, state: FSMContext):
     )
 
 
-@router.callback_query(F.data == "broadcast_send_all", BroadcastStates.confirm_broadcast)
+@router.callback_query(
+    F.data == "broadcast_send_all", BroadcastStates.confirm_broadcast
+)
 async def broadcast_send_all(callback: CallbackQuery, state: FSMContext, bot: Bot):
     """Execute the broadcast — send message to all targets"""
     data = await state.get_data()
@@ -353,14 +355,10 @@ async def broadcast_send_all(callback: CallbackQuery, state: FSMContext, bot: Bo
             sent_count += 1
             logger.info("Broadcast sent to %s (%s)", target["title"], target["id"])
         except TelegramForbiddenError:
-            logger.warning(
-                "Bot was removed from channel %s", target["title"]
-            )
+            logger.warning("Bot was removed from channel %s", target["title"])
             failed_targets.append(f"{target['title']} (bot removed)")
         except TelegramBadRequest as e:
-            logger.warning(
-                "Failed to send to %s: %s", target["title"], e
-            )
+            logger.warning("Failed to send to %s: %s", target["title"], e)
             failed_targets.append(f"{target['title']} (error: {e})")
         except Exception as e:
             logger.error("Unexpected error sending to %s: %s", target["title"], e)
