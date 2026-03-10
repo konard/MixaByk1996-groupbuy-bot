@@ -244,25 +244,25 @@ GroupBuy Bot — это многофункциональная платформ�
 Платформа построена по принципу микросервисов:
 
 ```
-+-------------------+     +-------------------+     +-------------------+
-|   Telegram Bot    |     |      VK Bot       |     |   WebSocket Chat  |
-+-------------------+     +-------------------+     +-------------------+
-         |                         |                         |
-         v                         v                         v
-+------------------------------------------------------------------------+
-|                   Message Router / Bot Service                          |
-+------------------------------------------------------------------------+
-                                    |
-                                    v
-+------------------------------------------------------------------------+
-|                        Core API (Django)                               |
-|              - Пользователи  - Закупки  - Платежи                     |
-+------------------------------------------------------------------------+
-                    |                                   |
-                    v                                   v
-          +----------------+                   +----------------+
-          |   PostgreSQL   |                   |     Redis      |
-          +----------------+                   +----------------+
++-------------------+  +-------------------+  +-------------------+  +-------------------+
+|   Telegram Bot    |  |      VK Bot       |  | Mattermost Bot    |  |   WebSocket Chat  |
++-------------------+  +-------------------+  +-------------------+  +-------------------+
+         |                      |                      |                        |
+         v                      v                      v                        v
++------------------------------------------------------------------------------------+
+|                        Message Router / Bot Service                                |
++------------------------------------------------------------------------------------+
+                                         |
+                                         v
++------------------------------------------------------------------------------------+
+|                             Core API (Django)                                      |
+|                   - Пользователи  - Закупки  - Платежи                             |
++------------------------------------------------------------------------------------+
+                    |                                         |
+                    v                                         v
+          +----------------+                       +----------------+
+          |   PostgreSQL   |                       |     Redis      |
+          +----------------+                       +----------------+
 ```
 
 **Компоненты системы:**
@@ -271,6 +271,7 @@ GroupBuy Bot — это многофункциональная платформ�
 - **Bot Service** — обработчики команд, FSM, интерактивные клавиатуры
 - **Telegram Adapter** — трансляция протокола для Telegram
 - **VK Adapter** — трансляция протокола для ВКонтакте
+- **Mattermost Adapter** — трансляция протокола для Mattermost
 - **React Frontend** — веб-интерфейс: административная панель и личный кабинет пользователя
 - **WASM Utilities** — высокопроизводительные вычисления на стороне клиента
 
@@ -284,7 +285,7 @@ GroupBuy Bot — это многофункциональная платформ�
 
 ## Features
 
-- **Multi-platform support**: Telegram, VK, WebSocket (extensible to WhatsApp)
+- **Multi-platform support**: Telegram, VK, Mattermost, WebSocket (extensible to other platforms)
 - **User management**: Registration with 3 roles (Buyer, Organizer, Supplier)
 - **Procurement system**: Create, join, and manage group purchases
 - **Real-time chat**: WebSocket-based chat for each procurement
@@ -296,25 +297,25 @@ GroupBuy Bot — это многофункциональная платформ�
 ## Architecture
 
 ```
-+-------------------+     +-------------------+     +-------------------+
-|   Telegram Bot    |     |      VK Bot       |     |   WebSocket Chat  |
-+-------------------+     +-------------------+     +-------------------+
-         |                         |                         |
-         v                         v                         v
-+------------------------------------------------------------------------+
-|                   Message Router / Bot Service                          |
-+------------------------------------------------------------------------+
-                                    |
-                                    v
-+------------------------------------------------------------------------+
-|                        Core API (Django)                               |
-|              - Users  - Procurements  - Payments                       |
-+------------------------------------------------------------------------+
-                    |                                   |
-                    v                                   v
-          +----------------+                   +----------------+
-          |   PostgreSQL   |                   |     Redis      |
-          +----------------+                   +----------------+
++-------------------+  +-------------------+  +-------------------+  +-------------------+
+|   Telegram Bot    |  |      VK Bot       |  | Mattermost Bot    |  |   WebSocket Chat  |
++-------------------+  +-------------------+  +-------------------+  +-------------------+
+         |                      |                      |                        |
+         v                      v                      v                        v
++------------------------------------------------------------------------------------+
+|                        Message Router / Bot Service                                |
++------------------------------------------------------------------------------------+
+                                         |
+                                         v
++------------------------------------------------------------------------------------+
+|                             Core API (Django)                                      |
+|                      - Users  - Procurements  - Payments                           |
++------------------------------------------------------------------------------------+
+                    |                                         |
+                    v                                         v
+          +----------------+                       +----------------+
+          |   PostgreSQL   |                       |     Redis      |
+          +----------------+                       +----------------+
 ```
 
 ## Quick Start
@@ -486,6 +487,44 @@ The bot supports full Telegram integration with the following features:
 3. Add `TELEGRAM_TOKEN` to your `.env` file
 4. Start the services with `docker-compose up -d`
 
+### Mattermost Integration
+
+The bot supports Mattermost integration, allowing users to interact with the GroupBuy platform through any self-hosted Mattermost server.
+
+**How it works:**
+
+The Mattermost adapter uses two Mattermost integration primitives:
+- **Outgoing Webhooks** – Mattermost sends user messages to the adapter's HTTP endpoint (`POST /webhook`).
+- **Incoming Webhooks** – The adapter posts replies back to Mattermost via an incoming webhook URL.
+
+**Setup:**
+
+1. Log in to your Mattermost server as an admin.
+2. Go to **Main Menu → Integrations → Outgoing Webhooks** and create a new webhook:
+   - **Content Type**: `application/x-www-form-urlencoded`
+   - **Channel**: choose a channel or leave blank to handle all channels
+   - **Trigger Words**: e.g. `/start`, `/help` (or leave blank to receive all messages)
+   - **Callback URL**: `http://<your-server>:8002/webhook`
+   - Copy the generated **Token**.
+3. Go to **Integrations → Incoming Webhooks** and create a new webhook:
+   - Choose the channel where bot replies should appear (or use `@username` per-message override)
+   - Copy the generated **Webhook URL**.
+4. Add the following variables to your `.env` file:
+   ```
+   MATTERMOST_URL=https://your-mattermost-server.example.com
+   MATTERMOST_TOKEN=<outgoing-webhook-token>
+   MATTERMOST_WEBHOOK_URL=https://your-mattermost-server.example.com/hooks/<id>
+   ```
+5. Start the services:
+   ```bash
+   docker-compose up -d mattermost-adapter
+   ```
+
+**Important Notes:**
+- The Mattermost adapter listens on port `8002` by default. Make sure this port is accessible from your Mattermost server.
+- All bot commands (`/start`, `/help`, `/procurements`, etc.) work the same way as in Telegram and VK.
+- The adapter is optional – other platform adapters continue to work independently.
+
 ### VK Integration
 
 The bot supports VK (VKontakte) integration with the same functionality as Telegram:
@@ -515,7 +554,7 @@ The bot supports VK (VKontakte) integration with the same functionality as Teleg
 
 The system automatically handles users across multiple platforms:
 - Each platform user is linked to a single internal user account
-- Platform is identified by `platform` field: `telegram` or `vk`
+- Platform is identified by `platform` field: `telegram`, `vk`, or `mattermost`
 - Users maintain their profile, balance, and procurements across all platforms
 - Messages and notifications are delivered to the platform the user is currently using
 
@@ -668,6 +707,9 @@ API documentation is available at `/api/docs/` when the server is running.
 |----------|-------------|
 | `TELEGRAM_TOKEN` | Telegram Bot API token (optional, for Telegram integration) |
 | `VK_TOKEN` | VK Group Access Token (optional, for VK integration) |
+| `MATTERMOST_URL` | Base URL of the Mattermost server (optional, for Mattermost integration) |
+| `MATTERMOST_TOKEN` | Outgoing-webhook token from Mattermost (used to verify incoming requests) |
+| `MATTERMOST_WEBHOOK_URL` | Incoming webhook URL for sending bot replies to Mattermost |
 | `DB_NAME` | PostgreSQL database name |
 | `DB_USER` | PostgreSQL user |
 | `DB_PASSWORD` | PostgreSQL password |

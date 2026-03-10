@@ -69,6 +69,24 @@ services:
     networks:
       - groupbuy-network
 
+  # Mattermost adapter
+  mattermost-adapter:
+    build: ./adapters/mattermost
+    image: groupbuy/mattermost-adapter:latest
+    container_name: groupbuy-mattermost-adapter
+    restart: unless-stopped
+    environment:
+      - BOT_SERVICE_URL=http://bot:8001
+      - MATTERMOST_URL=${MATTERMOST_URL}
+      - MATTERMOST_TOKEN=${MATTERMOST_TOKEN}
+      - MATTERMOST_WEBHOOK_URL=${MATTERMOST_WEBHOOK_URL}
+    ports:
+      - "8002:8002"
+    depends_on:
+      - bot
+    networks:
+      - groupbuy-network
+
   # WebSocket server for real-time chat
   websocket-server:
     build: ./infrastructure/websocket
