@@ -62,6 +62,22 @@ services:
     networks:
       - groupbuy-network
 
+  # Mattermost adapter
+  mattermost-adapter:
+    build: ./adapters/mattermost
+    command: python adapter.py
+    environment:
+      - BOT_SERVICE_URL=http://bot:8001
+      - MATTERMOST_URL=${MATTERMOST_URL}
+      - MATTERMOST_TOKEN=${MATTERMOST_TOKEN}
+      - MATTERMOST_WEBHOOK_URL=${MATTERMOST_WEBHOOK_URL}
+    ports:
+      - "8002:8002"
+    depends_on:
+      - bot
+    networks:
+      - groupbuy-network
+
   # WASM build (produces WebAssembly package from Rust)
   wasm-builder:
     build:
