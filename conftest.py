@@ -11,12 +11,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'core'))
 try:
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
-    # Override database settings before Django setup
-    import django
-    from django.conf import settings
-
-    # Must set before setup
+    # Must set before Django is imported so settings.py doesn't fail on DB URL parsing
     os.environ['DATABASE_URL'] = 'sqlite:///test.db'
+
+    import django  # noqa: F401 - checked for availability below
 
     DJANGO_AVAILABLE = True
 except ImportError:
@@ -28,15 +26,56 @@ def pytest_configure(config):
     if not DJANGO_AVAILABLE:
         return
 
+    import django
     from django.conf import settings
-    settings.DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
+
+    if not settings.configured:
+        settings.configure(
+            DATABASES={
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': ':memory:',
+                }
+            },
+            CACHES={
+                'default': {
+                    'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+                }
+            },
+            INSTALLED_APPS=[
+                'django.contrib.contenttypes',
+                'django.contrib.auth',
+                'rest_framework',
+                'corsheaders',
+                'users',
+                'procurements',
+                'chat',
+                'payments',
+                'admin_api',
+                'ml',
+            ],
+            REST_FRAMEWORK={
+                'DEFAULT_PERMISSION_CLASSES': [
+                    'rest_framework.permissions.AllowAny',
+                ],
+                'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+                'PAGE_SIZE': 20,
+            },
+            DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
+            USE_TZ=True,
+            TIME_ZONE='Europe/Moscow',
+            SECRET_KEY='test-secret-key-for-pytest',
+        )
+        django.setup()
+    else:
+        settings.DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': ':memory:',
+            }
         }
-    }
-    settings.CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        settings.CACHES = {
+            'default': {
+                'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            }
         }
-    }

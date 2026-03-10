@@ -2,13 +2,11 @@
 Views for Payments API
 Supports both Tochka Bank Cyclops and YooKassa (legacy)
 """
-import hashlib
-import hmac
-import json
 import logging
 from decimal import Decimal
 from datetime import datetime
 
+from django.db import models
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -19,7 +17,7 @@ from django.utils import timezone
 from .models import Payment, Transaction
 from .serializers import (
     PaymentSerializer, CreatePaymentSerializer,
-    TransactionSerializer, WebhookPayloadSerializer
+    TransactionSerializer
 )
 from users.models import User
 
@@ -290,15 +288,19 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     def _process_successful_payment(self, payment, payment_object):
         """Process a successful payment"""
+        from django.db.models import F
         with db_transaction.atomic():
             payment.status = Payment.Status.SUCCEEDED
             payment.paid_at = timezone.now()
-            payment.save()
+            payment.save(update_fields=['status', 'paid_at', 'updated_at'])
 
-            # Update user balance
-            user = payment.user
-            user.balance += payment.amount
-            user.save()
+            # Update user balance atomically using F() to avoid race conditions
+            from users.models import User as UserModel
+            UserModel.objects.filter(pk=payment.user_id).update(
+                balance=F('balance') + payment.amount
+            )
+            # Refresh from DB to get the updated balance
+            user = UserModel.objects.get(pk=payment.user_id)
 
             # Create transaction record
             Transaction.objects.create(
@@ -312,6 +314,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     def _process_refund(self, payment, refund_object):
         """Process a refund"""
+        from django.db.models import F
         with db_transaction.atomic():
             # Get refund amount from object
             if 'amount' in refund_object:
@@ -323,12 +326,15 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 refund_amount = payment.amount
 
             payment.status = Payment.Status.REFUNDED
-            payment.save()
+            payment.save(update_fields=['status', 'updated_at'])
 
-            # Update user balance
-            user = payment.user
-            user.balance -= refund_amount
-            user.save()
+            # Update user balance atomically using F() to avoid race conditions
+            from users.models import User as UserModel
+            UserModel.objects.filter(pk=payment.user_id).update(
+                balance=F('balance') - refund_amount
+            )
+            # Refresh from DB to get the updated balance
+            user = UserModel.objects.get(pk=payment.user_id)
 
             # Create transaction record
             Transaction.objects.create(
@@ -405,7 +411,3 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
             'total_refunded': str(abs(refunds)),
             'transaction_count': transactions.count()
         })
-
-
-# Import models for aggregation
-from django.db import models

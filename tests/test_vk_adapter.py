@@ -217,7 +217,6 @@ async def test_route_message():
     """Test message routing to bot service"""
     with patch.dict('os.environ', {'VK_TOKEN': 'test_token'}):
         from adapters.vk.adapter import VKAdapter
-        import aiohttp
 
         adapter = VKAdapter()
 

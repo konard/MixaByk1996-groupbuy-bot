@@ -2,8 +2,6 @@
 Tests for Core API
 """
 import pytest
-from django.test import TestCase
-from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 
@@ -201,6 +199,82 @@ class PaymentAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['status'], 'pending')
+
+    def test_simulate_payment_success_updates_balance(self):
+        """Test that simulating payment success correctly updates user balance"""
+        # Create payment
+        response = self.client.post('/api/payments/', {
+            'user_id': self.user_id,
+            'amount': 500,
+            'description': 'Balance test deposit'
+        }, format='json')
+        payment_id = response.data['id']
+
+        # Simulate success
+        url = f'/api/payments/{payment_id}/simulate_success/'
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['payment']['status'], 'succeeded')
+
+        # Verify user balance was updated
+        from users.models import User
+        user = User.objects.get(id=self.user_id)
+        self.assertEqual(user.balance, 500)
+
+        # Verify a transaction record was created
+        from payments.models import Transaction
+        transaction = Transaction.objects.filter(user_id=self.user_id).first()
+        self.assertIsNotNone(transaction)
+        self.assertEqual(transaction.transaction_type, 'deposit')
+        self.assertEqual(transaction.amount, 500)
+
+
+class UserBalanceAPITests(APITestCase):
+    """Tests for user balance endpoint"""
+
+    def setUp(self):
+        """Set up test data"""
+        response = self.client.post('/api/users/', {
+            'platform': 'telegram',
+            'platform_user_id': '99999',
+            'first_name': 'BalanceTest',
+            'role': 'buyer'
+        }, format='json')
+        self.user_id = response.data['id']
+
+    def test_balance_returns_real_totals(self):
+        """Test that balance endpoint calculates real totals from transactions"""
+        from users.models import User
+        from payments.models import Payment, Transaction
+
+        user = User.objects.get(id=self.user_id)
+
+        # Manually create some transactions
+        payment1 = Payment.objects.create(
+            user=user, payment_type='deposit', amount=1000, status='succeeded'
+        )
+        Transaction.objects.create(
+            user=user,
+            transaction_type='deposit',
+            amount=1000,
+            balance_after=1000,
+            payment=payment1,
+        )
+        user.balance = 700  # After spending 300
+        user.save()
+        Transaction.objects.create(
+            user=user,
+            transaction_type='procurement_join',
+            amount=300,
+            balance_after=700,
+        )
+
+        url = f'/api/users/{self.user_id}/balance/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(float(response.data['balance']), 700)
+        self.assertEqual(float(response.data['total_deposited']), 1000)
+        self.assertEqual(float(response.data['total_spent']), 300)
 
 
 if __name__ == "__main__":

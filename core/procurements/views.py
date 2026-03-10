@@ -4,8 +4,6 @@ Views for Procurements API
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-from django.db.models import Q
 
 from .models import Category, Procurement, Participant
 from .serializers import (
@@ -165,22 +163,19 @@ class ProcurementViewSet(viewsets.ModelViewSet):
         # Get organized procurements
         organized = self.get_queryset().filter(organizer_id=user_id)
 
-        # Get participated procurements
-        participating_ids = Participant.objects.filter(
-            user_id=user_id, is_active=True
-        ).values_list('procurement_id', flat=True)
-        participating = self.get_queryset().filter(id__in=participating_ids)
+        # Fetch all user participants in a single query to avoid N+1
+        user_participants = {
+            p.procurement_id: p
+            for p in Participant.objects.filter(user_id=user_id, is_active=True)
+        }
+        participating = self.get_queryset().filter(id__in=user_participants.keys())
 
         organized_data = ProcurementListSerializer(organized, many=True).data
         participating_data = ProcurementListSerializer(participating, many=True).data
 
-        # Add user's amount for participating procurements
+        # Add user's amount for participating procurements (no extra DB queries)
         for proc_data in participating_data:
-            participant = Participant.objects.filter(
-                procurement_id=proc_data['id'],
-                user_id=user_id,
-                is_active=True
-            ).first()
+            participant = user_participants.get(proc_data['id'])
             if participant:
                 proc_data['my_amount'] = str(participant.amount)
                 proc_data['my_quantity'] = str(participant.quantity)

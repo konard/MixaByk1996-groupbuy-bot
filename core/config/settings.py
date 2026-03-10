@@ -12,9 +12,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# Set DEBUG=False and ALLOWED_HOSTS=your-domain.com in production via environment variables.
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+_default_hosts = '*' if DEBUG else 'localhost,127.0.0.1'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', _default_hosts).split(',')
 
 # Application definition
 INSTALLED_APPS = [
@@ -118,7 +120,7 @@ STATICFILES_DIRS = [
 ]
 
 # Media files
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type

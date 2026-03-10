@@ -4,13 +4,11 @@ Views for Chat API
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Count, Q
 
 from .models import Message, MessageRead, Notification
 from .serializers import (
     MessageSerializer, CreateMessageSerializer,
-    MessageReadSerializer, NotificationSerializer,
-    UnreadCountSerializer
+    NotificationSerializer
 )
 
 

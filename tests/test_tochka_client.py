@@ -2,8 +2,7 @@
 Tests for Tochka Bank Cyclops client
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from decimal import Decimal
+from unittest.mock import patch
 
 
 class TestTochkaCyclopsClient:

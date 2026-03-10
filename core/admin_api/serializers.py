@@ -2,8 +2,7 @@
 Admin API Serializers
 """
 from rest_framework import serializers
-from django.contrib.auth.models import User as DjangoUser
-from users.models import User, UserSession
+from users.models import User
 from procurements.models import Category, Procurement, Participant
 from payments.models import Payment, Transaction
 from chat.models import Message, Notification

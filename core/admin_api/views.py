@@ -11,7 +11,6 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User as DjangoUser
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -19,12 +18,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 
-from users.models import User, UserSession
-from procurements.models import Category, Procurement, Participant
+from users.models import User
+from procurements.models import Category, Procurement
 from payments.models import Payment, Transaction
 from chat.models import Message, Notification
 
-from .permissions import IsAdminUser, IsSuperUser
+from .permissions import IsAdminUser
 from .serializers import (
     DashboardStatsSerializer,
     AdminUserSerializer, AdminUserUpdateSerializer,

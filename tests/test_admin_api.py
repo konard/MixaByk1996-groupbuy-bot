@@ -2,8 +2,6 @@
 Tests for Admin API
 """
 import pytest
-from django.test import TestCase
-from django.urls import reverse
 from django.contrib.auth.models import User as DjangoUser
 from rest_framework.test import APITestCase
 from rest_framework import status

@@ -119,8 +119,8 @@ jobs:
             # Restart services with zero downtime
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Run migrations
-            docker compose -f docker-compose.prod.yml exec -T core python manage.py migrate --noinput 2>/dev/null || true
+            # Note: The core service is a Rust binary that applies DB migrations on startup automatically.
+            # No separate migration step is needed.
 
             # Clean up old images
             docker image prune -f
@@ -186,8 +186,8 @@ jobs:
             # Restart services with zero downtime
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            # Run migrations
-            docker compose -f docker-compose.prod.yml exec -T core python manage.py migrate --noinput 2>/dev/null || true
+            # Note: The core service is a Rust binary that applies DB migrations on startup automatically.
+            # No separate migration step is needed.
 
             # Clean up old images
             docker image prune -f

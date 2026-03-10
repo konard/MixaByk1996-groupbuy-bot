@@ -81,16 +81,25 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def balance(self, request, pk=None):
         """Get user balance with statistics"""
+        from payments.models import Transaction
         user = self.get_object()
 
-        # Get deposit and spending totals from payments (will be implemented)
-        total_deposited = 0  # To be calculated from payments
-        total_spent = 0  # To be calculated from payments
+        # Calculate totals from Transaction records
+        deposits = user.transactions.filter(
+            transaction_type=Transaction.TransactionType.DEPOSIT
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        spent = user.transactions.filter(
+            transaction_type__in=[
+                Transaction.TransactionType.WITHDRAWAL,
+                Transaction.TransactionType.PROCUREMENT_JOIN,
+            ]
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
         data = {
             'balance': user.balance,
-            'total_deposited': total_deposited,
-            'total_spent': total_spent,
+            'total_deposited': abs(deposits),
+            'total_spent': abs(spent),
             'available': user.balance,
         }
         serializer = UserBalanceSerializer(data)

@@ -6,13 +6,12 @@ This client handles payment operations through the Cyclops API.
 
 Documentation: https://docs.tochka.com/cyclops
 """
-import hashlib
 import json
 import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 import requests
 from django.conf import settings

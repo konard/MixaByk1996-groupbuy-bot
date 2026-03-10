@@ -4,7 +4,7 @@ Supports Tochka Bank Cyclops and YooKassa (legacy) integration
 """
 from django.db import models
 from users.models import User
-from procurements.models import Procurement, Participant
+from procurements.models import Procurement
 
 
 class Payment(models.Model):

@@ -2,8 +2,7 @@
 Tests for bot commands
 """
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, patch
 
 
 class TestRegistrationDialog:

@@ -3,7 +3,6 @@ Serializers for Procurements API
 """
 from rest_framework import serializers
 from .models import Category, Procurement, Participant
-from users.serializers import UserSerializer
 
 
 class CategorySerializer(serializers.ModelSerializer):
