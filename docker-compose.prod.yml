@@ -3,10 +3,10 @@ version: '3.8'
 # Production deployment configuration (single server)
 # Before running:
 #   1. Copy .env.example to .env and fill in all variables
-#   2. Place SSL certificates in infrastructure/nginx/ssl/
-#      - fullchain.pem  (certificate + chain)
-#      - privkey.pem    (private key, chmod 600)
-#   3. Run: docker compose -f docker-compose.prod.yml up -d
+#   2. Set DOMAIN=your-domain.com in .env
+#   3. Set CERTBOT_EMAIL=your@email.com in .env
+#   4. Run: bash scripts/init-letsencrypt.sh   (first-time SSL setup)
+#   5. Run: docker compose -f docker-compose.prod.yml up -d
 #
 # Two-server deployment: see docker-compose.two-server.yml
 
@@ -187,6 +187,8 @@ services:
     volumes:
       - ./infrastructure/nginx/nginx-api.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - letsencrypt_data:/etc/letsencrypt:ro
     depends_on:
       core:
         condition: service_healthy
@@ -197,9 +199,24 @@ services:
     networks:
       - groupbuy-network
 
+  # Certbot for automatic Let's Encrypt SSL certificate renewal
+  certbot:
+    image: certbot/certbot:latest
+    container_name: groupbuy-certbot
+    restart: unless-stopped
+    volumes:
+      - letsencrypt_data:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    # Renew certificates twice a day; certbot only acts when < 30 days remain
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    networks:
+      - groupbuy-network
+
 volumes:
   postgres_data:
   redis_data:
+  letsencrypt_data:
+  certbot_webroot:
 
 networks:
   groupbuy-network:
