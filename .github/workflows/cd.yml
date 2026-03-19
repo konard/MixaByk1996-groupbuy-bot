@@ -80,9 +80,9 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Check required secrets
+        id: check-secrets
         run: |
           if [ -z "${{ secrets.PRODUCTION_SSH_KEY }}" ]; then
             echo "::warning::PRODUCTION_SSH_KEY secret is not set. Skipping deployment."
@@ -91,15 +91,17 @@ jobs:
             echo "  PRODUCTION_HOST      - Production server hostname or IP"
             echo "  PRODUCTION_USER      - SSH user (default: ubuntu)"
             echo "  PRODUCTION_APP_DIR   - App directory (default: /opt/groupbuy)"
+            echo "can_deploy=false" >> $GITHUB_OUTPUT
             exit 0
           fi
           if [ -z "${{ secrets.PRODUCTION_HOST }}" ]; then
             echo "::error::PRODUCTION_HOST secret is not set."
             exit 1
           fi
+          echo "can_deploy=true" >> $GITHUB_OUTPUT
 
       - name: Deploy to production via SSH
-        if: ${{ secrets.PRODUCTION_SSH_KEY != '' && secrets.PRODUCTION_HOST != '' }}
+        if: steps.check-secrets.outputs.can_deploy == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PRODUCTION_HOST }}
