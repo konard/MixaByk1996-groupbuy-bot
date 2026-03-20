@@ -133,6 +133,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build mattermost-adapter image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./adapters/mattermost
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # Validate docker-compose configuration
   docker-compose-validate:
     runs-on: ubuntu-latest
