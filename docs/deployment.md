@@ -86,6 +86,42 @@ docker-compose logs bot
 - **API:** http://localhost:8000/api/
 - **React фронтенд:** http://localhost:3000/
 
+## 1.6 Продакшен: доступ по IP-адресу сервера
+
+После запуска `docker-compose -f docker-compose.prod.yml up -d` сервис доступен по IP сервера (без настройки домена и SSL):
+
+- **Фронтенд (админ-панель):** `http://<IP_СЕРВЕРА>/`
+- **API:** `http://<IP_СЕРВЕРА>/api/`
+- **WebSocket:** `ws://<IP_СЕРВЕРА>/ws/chat/`
+- **Health check:** `http://<IP_СЕРВЕРА>/health`
+
+> **Примечание:** При первом запуске без SSL-сертификата nginx автоматически генерирует
+> временный самоподписанный сертификат. Сервис работает по HTTP (порт 80) без ограничений.
+> HTTPS (порт 443) будет использовать самоподписанный сертификат до настройки Let's Encrypt.
+
+### Устранение ошибки «password authentication failed»
+
+Если в логах контейнера `core` видно:
+```
+password authentication failed for user "postgres"
+```
+
+**Причина:** Docker-том `postgres_data` уже существует с другим паролем. PostgreSQL
+игнорирует переменную `POSTGRES_PASSWORD` если том уже инициализирован.
+
+**Решение:**
+```bash
+# Вариант 1: Используйте скрипт (интерактивный режим)
+bash scripts/setup-prod.sh --reset-db
+
+# Вариант 2: Вручную удалите том и перезапустите
+docker compose -f docker-compose.prod.yml down
+docker volume rm groupbuy-bot_postgres_data
+docker compose -f docker-compose.prod.yml up -d
+```
+
+> **ВНИМАНИЕ:** Удаление тома приведёт к потере всех данных в базе!
+
 ## 2. Настройка домена и бесплатного SSL (Let's Encrypt) — продакшен
 
 ### 2.0 Привязка домена к VDS-серверу (ihor-hosting.ru)

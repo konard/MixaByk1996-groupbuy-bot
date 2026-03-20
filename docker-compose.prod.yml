@@ -19,12 +19,16 @@ version: '3.8'
 
 services:
   # Core API (Rust backend)
+  # NOTE: If you see "password authentication failed for user postgres" errors,
+  # the PostgreSQL volume was likely created with a different password.
+  # Fix: docker compose -f docker-compose.prod.yml down && docker volume rm groupbuy-bot_postgres_data
+  # Or use: bash scripts/setup-prod.sh --reset-db
   core:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/core:${IMAGE_TAG:-main}
     container_name: groupbuy-core
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
       - REDIS_URL=redis://redis:6379/0
       - PORT=8000
       - RUST_LOG=${RUST_LOG:-info,groupbuy_api=info}
@@ -37,10 +41,10 @@ services:
       - groupbuy-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 40s
 
   # Bot service (Telegram / VK message handler)
   bot:
@@ -125,14 +129,17 @@ services:
       - groupbuy-network
 
   # PostgreSQL database (tuned for production)
+  # IMPORTANT: POSTGRES_PASSWORD is only used on first initialization of the data volume.
+  # If the volume already exists with a different password, you must delete it:
+  #   docker volume rm groupbuy-bot_postgres_data
   postgres:
     image: postgres:16-alpine
     container_name: groupbuy-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME:-groupbuy}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -181,16 +188,21 @@ services:
       retries: 5
 
   # Nginx reverse proxy with SSL
+  # On first run without SSL certs, a temporary self-signed certificate is generated
+  # so the app is accessible via http://<server-ip> immediately.
+  # Replace with real certs using: bash scripts/init-letsencrypt.sh
   nginx:
     image: nginx:alpine
     container_name: groupbuy-nginx
     restart: unless-stopped
+    entrypoint: ["/docker-entrypoint-custom.sh"]
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./infrastructure/nginx/nginx-api.conf:/etc/nginx/nginx.conf:ro
-      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+      - ./infrastructure/nginx/docker-entrypoint.sh:/docker-entrypoint-custom.sh:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
       - certbot_webroot:/var/www/certbot:ro
       - letsencrypt_data:/etc/letsencrypt:ro
     depends_on:
