@@ -33,6 +33,11 @@ class BotConfig:
     websocket_url: str = os.getenv("WEBSOCKET_URL", "ws://localhost:8765")
     web_app_url: str = os.getenv("WEB_APP_URL", "http://localhost:3000")
 
+    # Bot mode
+    bot_mode: str = os.getenv("BOT_MODE", "polling")  # polling or webhook
+    webhook_host: str = os.getenv("WEBHOOK_HOST", "")
+    webhook_path: str = os.getenv("WEBHOOK_PATH", "/bot/webhook")
+
     # Bot settings
     polling_interval: float = 0.5
     max_workers: int = 10

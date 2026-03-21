@@ -26,6 +26,7 @@ export default function AdminLayout({ children }) {
     { path: '/admin-panel/messages', label: 'Сообщения', icon: '💬' },
     { path: '/admin-panel/reports', label: 'Отчёты', icon: '📈' },
     { path: '/admin-panel/chat', label: 'Чат с юзерами', icon: '🗨️' },
+    { path: '/admin-panel/activity', label: 'Журнал', icon: '📋' },
   ];
 
   const isActive = (path) => {

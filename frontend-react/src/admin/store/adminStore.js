@@ -17,6 +17,7 @@ export const useAdminStore = create((set, get) => ({
 
   // Dashboard state
   dashboardStats: null,
+  analyticsData: null,
 
   // Data state
   users: [],
@@ -97,6 +98,20 @@ export const useAdminStore = create((set, get) => ({
     } catch (error) {
       set({ error: error.message });
       get().addToast('Ошибка загрузки статистики', 'error');
+    } finally {
+      get().stopLoading();
+    }
+  },
+
+  // Actions - Analytics
+  loadAnalytics: async (params = {}) => {
+    get().startLoading();
+    try {
+      const data = await adminApi.getAnalytics(params);
+      set({ analyticsData: data });
+    } catch (error) {
+      set({ error: error.message });
+      get().addToast('Ошибка загрузки аналитики', 'error');
     } finally {
       get().stopLoading();
     }

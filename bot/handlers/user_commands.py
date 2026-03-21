@@ -7,6 +7,8 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
+import time
+
 from api_client import api_client
 from keyboards import (
     get_main_keyboard,
@@ -18,6 +20,8 @@ from keyboards import (
 from dialogs.registration import start_registration
 
 router = Router()
+
+_bot_start_time = time.time()
 
 
 @router.message(Command("start"))
@@ -77,9 +81,40 @@ async def cmd_help(message: Message):
         "*Broadcast:*\n"
         "/broadcast - Send messages to channels and groups\n\n"
         "*Help:*\n"
-        "/help - This help message"
+        "/help - This help message\n"
+        "/status - Bot health status"
     )
     await message.answer(help_text, parse_mode="Markdown")
+
+
+@router.message(Command("status"))
+async def cmd_status(message: Message):
+    """Handle /status command — show bot health"""
+    from config import config as bot_config
+
+    uptime_seconds = int(time.time() - _bot_start_time)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Check API connectivity
+    api_ok = False
+    try:
+        result = await api_client.get_procurements(limit=1)
+        api_ok = result is not None
+    except Exception:
+        api_ok = False
+
+    api_status = "OK" if api_ok else "Unavailable"
+    mode = bot_config.bot_mode.upper()
+
+    status_text = (
+        f"*Bot Status*\n\n"
+        f"*Mode:* {mode}\n"
+        f"*Uptime:* {hours}h {minutes}m {seconds}s\n"
+        f"*API:* {api_status}\n"
+        f"*API URL:* `{bot_config.core_api_url}`"
+    )
+    await message.answer(status_text, parse_mode="Markdown")
 
 
 @router.message(Command("profile"))

@@ -174,6 +174,159 @@ class DashboardView(APIView):
         return Response(serializer.data)
 
 
+class AnalyticsView(APIView):
+    """Advanced analytics endpoint with date range filtering."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        """Get analytics data with optional date filtering."""
+        from datetime import datetime
+        from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+        from procurements.models import Participant
+
+        params = request.query_params
+        now = timezone.now()
+
+        # Parse date range
+        date_from_str = params.get('date_from')
+        date_to_str = params.get('date_to')
+        period = params.get('period', 'day')  # day, week, month
+
+        if date_from_str:
+            try:
+                date_from = datetime.strptime(date_from_str, '%Y-%m-%d')
+                date_from = timezone.make_aware(date_from)
+            except ValueError:
+                date_from = now - timedelta(days=30)
+        else:
+            date_from = now - timedelta(days=30)
+
+        if date_to_str:
+            try:
+                date_to = datetime.strptime(date_to_str, '%Y-%m-%d')
+                date_to = timezone.make_aware(date_to).replace(
+                    hour=23, minute=59, second=59
+                )
+            except ValueError:
+                date_to = now
+        else:
+            date_to = now
+
+        # Choose truncation function based on period
+        trunc_fn = {
+            'day': TruncDate,
+            'week': TruncWeek,
+            'month': TruncMonth,
+        }.get(period, TruncDate)
+
+        # Time series: user registrations
+        user_series = list(
+            User.objects.filter(
+                created_at__gte=date_from, created_at__lte=date_to
+            ).annotate(
+                date=trunc_fn('created_at')
+            ).values('date').annotate(
+                count=Count('id')
+            ).order_by('date')
+        )
+
+        # Time series: revenue
+        revenue_series = list(
+            Payment.objects.filter(
+                status='succeeded',
+                paid_at__gte=date_from,
+                paid_at__lte=date_to,
+            ).annotate(
+                date=trunc_fn('paid_at')
+            ).values('date').annotate(
+                total=Sum('amount'),
+                count=Count('id')
+            ).order_by('date')
+        )
+
+        # Time series: procurements created
+        procurement_series = list(
+            Procurement.objects.filter(
+                created_at__gte=date_from, created_at__lte=date_to
+            ).annotate(
+                date=trunc_fn('created_at')
+            ).values('date').annotate(
+                count=Count('id')
+            ).order_by('date')
+        )
+
+        # Time series: messages sent
+        message_series = list(
+            Message.objects.filter(
+                created_at__gte=date_from, created_at__lte=date_to
+            ).annotate(
+                date=trunc_fn('created_at')
+            ).values('date').annotate(
+                count=Count('id')
+            ).order_by('date')
+        )
+
+        # Top categories
+        top_categories = list(
+            Category.objects.annotate(
+                procurement_count=Count('procurements')
+            ).order_by('-procurement_count')[:10].values(
+                'id', 'name', 'icon', 'procurement_count'
+            )
+        )
+
+        # Top organizers
+        top_organizers = list(
+            User.objects.filter(role='organizer').annotate(
+                procurement_count=Count('organized_procurements')
+            ).order_by('-procurement_count')[:10].values(
+                'id', 'first_name', 'last_name', 'procurement_count'
+            )
+        )
+
+        # Conversion funnel
+        total_users = User.objects.filter(
+            created_at__gte=date_from, created_at__lte=date_to
+        ).count()
+        users_participated = Participant.objects.filter(
+            created_at__gte=date_from, created_at__lte=date_to
+        ).values('user').distinct().count()
+        users_paid = Payment.objects.filter(
+            status='succeeded',
+            created_at__gte=date_from,
+            created_at__lte=date_to,
+        ).values('user').distinct().count()
+
+        # Serialize dates to strings
+        def serialize_series(series, value_key='count'):
+            result = []
+            for item in series:
+                d = item.get('date')
+                date_str = d.isoformat() if d else None
+                entry = {'date': date_str, value_key: item[value_key]}
+                if 'total' in item:
+                    entry['total'] = float(item['total'] or 0)
+                result.append(entry)
+            return result
+
+        return Response({
+            'date_from': date_from.isoformat(),
+            'date_to': date_to.isoformat(),
+            'period': period,
+            'user_registrations': serialize_series(user_series),
+            'revenue': serialize_series(revenue_series),
+            'procurements_created': serialize_series(procurement_series),
+            'messages_sent': serialize_series(message_series),
+            'top_categories': top_categories,
+            'top_organizers': top_organizers,
+            'funnel': {
+                'registered': total_users,
+                'participated': users_participated,
+                'paid': users_paid,
+            },
+        })
+
+
 class AdminUserViewSet(viewsets.ModelViewSet):
     """Admin viewset for User management."""
     queryset = User.objects.all().order_by('-created_at')

@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AdminAuthView,
     DashboardView,
+    AnalyticsView,
     AdminUserViewSet,
     AdminProcurementViewSet,
     AdminPaymentViewSet,
@@ -29,6 +30,7 @@ router.register(r'notifications', AdminNotificationViewSet, basename='admin-noti
 urlpatterns = [
     path('auth/', AdminAuthView.as_view(), name='admin-auth'),
     path('dashboard/', DashboardView.as_view(), name='admin-dashboard'),
+    path('analytics/', AnalyticsView.as_view(), name='admin-analytics'),
     path('chat/admin_message/', AdminChatMessageView.as_view(), name='admin-chat-message'),
     path('', include(router.urls)),
 ]

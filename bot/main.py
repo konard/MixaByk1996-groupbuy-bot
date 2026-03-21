@@ -53,12 +53,37 @@ async def main():
     dp.include_router(broadcast_commands.router)
     dp.include_router(registration.router)
 
-    logger.info("Starting GroupBuy Bot...")
+    logger.info("Starting GroupBuy Bot in %s mode...", config.bot_mode)
 
     try:
-        # Delete webhook and start polling
-        await bot.delete_webhook(drop_pending_updates=True)
-        await dp.start_polling(bot)
+        if config.bot_mode == "webhook" and config.webhook_host:
+            from aiohttp import web
+            from aiogram.webhook.aiohttp_server import (
+                SimpleRequestHandler,
+                setup_application,
+            )
+
+            webhook_url = f"{config.webhook_host}{config.webhook_path}"
+            await bot.set_webhook(webhook_url, drop_pending_updates=True)
+            logger.info("Webhook set to: %s", webhook_url)
+
+            app = web.Application()
+            handler = SimpleRequestHandler(dispatcher=dp, bot=bot)
+            handler.register(app, path=config.webhook_path)
+            setup_application(app, dp, bot=bot)
+
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, "0.0.0.0", 8080)
+            await site.start()
+            logger.info("Webhook server started on port 8080")
+
+            # Keep running
+            await asyncio.Event().wait()
+        else:
+            # Default: long polling
+            await bot.delete_webhook(drop_pending_updates=True)
+            await dp.start_polling(bot)
     finally:
         await bot.session.close()
 
