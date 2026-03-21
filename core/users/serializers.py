@@ -6,7 +6,11 @@ from .models import User, UserSession
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """User serializer for read operations"""
+    """User serializer for read operations.
+
+    ``selfie_file_id`` is intentionally excluded — it is only accessible via
+    the Django admin interface.
+    """
     role_display = serializers.ReadOnlyField()
     full_name = serializers.ReadOnlyField()
 
@@ -27,19 +31,23 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     Only ``phone`` is required.  Name fields are taken from the messenger
     profile and may be empty (users control what personal data they share).
     Email is intentionally not collected at registration time.
+
+    ``selfie_file_id`` is accepted on write (stored for admin review) but is
+    not returned in the response to keep the file_id private.
     """
 
     first_name = serializers.CharField(required=False, allow_blank=True, default='')
     last_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone = serializers.CharField(required=False, allow_blank=True, default='')
     email = serializers.EmailField(required=False, allow_blank=True, default='')
+    selfie_file_id = serializers.CharField(required=False, allow_blank=True, default='', write_only=True)
 
     class Meta:
         model = User
         fields = [
             'id', 'platform', 'platform_user_id', 'username',
             'first_name', 'last_name', 'phone', 'email',
-            'role', 'language_code'
+            'role', 'language_code', 'selfie_file_id'
         ]
         read_only_fields = ['id']
 

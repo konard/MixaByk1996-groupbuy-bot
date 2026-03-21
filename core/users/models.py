@@ -38,6 +38,11 @@ class User(models.Model):
     phone = models.CharField(validators=[phone_regex], max_length=20, blank=True)
     email = models.EmailField(blank=True)
 
+    # Identity verification — selfie taken during registration.
+    # Stored as a Telegram file_id; visible only to admins, never exposed in
+    # regular API responses.
+    selfie_file_id = models.CharField(max_length=255, blank=True)
+
     # Role and balance
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.BUYER)
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)

@@ -40,6 +40,24 @@ class TestRegistrationDialog:
         msg = _REASON_MESSAGES.get("unknown_reason", "")
         assert msg == ""
 
+    def test_registration_states_include_selfie(self):
+        """RegistrationStates must have a waiting_for_selfie state"""
+        from bot.dialogs.registration import RegistrationStates
+
+        assert hasattr(RegistrationStates, "waiting_for_selfie")
+
+    def test_selfie_handlers_registered(self):
+        """Router must expose handlers for photo and /skip_photo during selfie step"""
+        from bot.dialogs.registration import (
+            process_selfie,
+            skip_selfie,
+            selfie_invalid,
+        )
+
+        assert callable(process_selfie)
+        assert callable(skip_selfie)
+        assert callable(selfie_invalid)
+
 
 class TestKeyboards:
     """Tests for keyboard utilities"""

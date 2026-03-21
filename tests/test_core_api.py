@@ -80,6 +80,38 @@ class UserAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['exists'])
 
+    def test_create_user_with_selfie(self):
+        """selfie_file_id is accepted during registration but not returned in the response.
+
+        The selfie is stored for admin review only and must never be exposed
+        through the regular API.
+        """
+        url = '/api/users/'
+        data = {
+            'platform': 'telegram',
+            'platform_user_id': '77777',
+            'phone': '+79991234569',
+            'role': 'buyer',
+            'selfie_file_id': 'AgACAgIAAxkBAAIBsGZ_fake_file_id',
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # selfie_file_id must NOT be present in the response (write-only)
+        self.assertNotIn('selfie_file_id', response.data)
+
+    def test_create_user_without_selfie(self):
+        """Registration must succeed when no selfie_file_id is supplied (no camera)."""
+        url = '/api/users/'
+        data = {
+            'platform': 'telegram',
+            'platform_user_id': '88888',
+            'phone': '+79991234560',
+            'role': 'buyer',
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertNotIn('selfie_file_id', response.data)
+
     def test_get_user_by_platform(self):
         """Test getting user by platform"""
         # First create a user
