@@ -191,6 +191,12 @@ services:
   # On first run without SSL certs, a temporary self-signed certificate is generated
   # so the app is accessible via http://<server-ip> immediately.
   # Replace with real certs using: bash scripts/init-letsencrypt.sh
+  #
+  # NOTE: If you get "failed to bind host port ... address already in use" for port 80 or 443,
+  # another process (e.g. nginx, Apache) is already listening on that port.
+  # Fix: stop the conflicting service first:
+  #   sudo systemctl stop nginx    # or apache2, caddy, etc.
+  # Or use setup-prod.sh which detects and handles port conflicts automatically.
   nginx:
     image: nginx:alpine
     container_name: groupbuy-nginx

@@ -6,6 +6,10 @@
 # предыдущего запуска с другим паролем), PostgreSQL игнорирует переменную
 # POSTGRES_PASSWORD при старте и использует старый пароль из тома.
 #
+# Решает проблему: "failed to bind host port for 0.0.0.0:80 ... address already in use"
+# Причина: порты 80 или 443 уже заняты другим процессом (nginx, Apache и т.д.).
+# Скрипт определяет занятый процесс и предлагает его остановить.
+#
 # Использование:
 #   bash scripts/setup-prod.sh            # интерактивный режим
 #   bash scripts/setup-prod.sh --reset-db # сбросить том postgres и запустить заново
@@ -87,7 +91,97 @@ fi
 
 echo "  [OK] Docker и Docker Compose доступны"
 
-# --- 5. Обнаружение устаревшего тома PostgreSQL ---
+# --- 5. Проверка занятости портов 80 и 443 ---
+# Симптом: "failed to bind host port for 0.0.0.0:80 ... address already in use"
+# Причина: другой процесс (nginx, Apache, Caddy и т.д.) уже слушает этот порт.
+
+check_port() {
+  local port="$1"
+  local pid=""
+  local service_name=""
+
+  # Определяем PID процесса, занявшего порт
+  if command -v ss &>/dev/null; then
+    pid=$(ss -tlnp "sport = :${port}" 2>/dev/null \
+      | grep -oP '(?<=pid=)\d+' | head -1)
+  elif command -v lsof &>/dev/null; then
+    pid=$(lsof -ti ":${port}" -sTCP:LISTEN 2>/dev/null | head -1)
+  elif command -v fuser &>/dev/null; then
+    pid=$(fuser "${port}/tcp" 2>/dev/null | awk '{print $1}')
+  fi
+
+  if [ -z "$pid" ]; then
+    return 0  # Порт свободен
+  fi
+
+  # Определяем имя процесса по PID
+  if [ -f "/proc/${pid}/comm" ]; then
+    service_name=$(cat "/proc/${pid}/comm" 2>/dev/null)
+  else
+    service_name=$(ps -p "$pid" -o comm= 2>/dev/null || echo "неизвестен")
+  fi
+
+  echo ""
+  echo "  [!] Порт ${port} занят процессом '${service_name}' (PID ${pid})."
+  echo "      Это помешает запуску контейнера groupbuy-nginx."
+  echo ""
+  echo "  Выберите действие:"
+  echo "    1) Попытаться остановить '${service_name}' автоматически (systemctl stop / kill)"
+  echo "    2) Пропустить (продолжить — Docker-запуск, вероятно, завершится ошибкой)"
+  echo "    q) Отмена"
+  echo ""
+  read -r -p "  Ваш выбор [1/2/q]: " choice
+  case "$choice" in
+    1)
+      echo "  Пробуем остановить '${service_name}'..."
+      # Сначала пробуем systemctl (systemd-сервисы: nginx, apache2, caddy и т.д.)
+      if systemctl stop "${service_name}" 2>/dev/null; then
+        echo "  [OK] Сервис '${service_name}' остановлен через systemctl."
+      else
+        # Резервный вариант: завершить процесс по PID
+        if kill "$pid" 2>/dev/null; then
+          sleep 1
+          echo "  [OK] Процесс PID ${pid} завершён."
+        else
+          echo "  [!] Не удалось остановить процесс. Попробуйте вручную:"
+          echo "      sudo systemctl stop ${service_name}"
+          echo "      или"
+          echo "      sudo kill ${pid}"
+          echo ""
+          echo "  После освобождения порта запустите скрипт снова."
+          exit 1
+        fi
+      fi
+      ;;
+    q|Q)
+      echo "Отменено."
+      exit 0
+      ;;
+    *)
+      echo "  Продолжаем без освобождения порта ${port}."
+      ;;
+  esac
+}
+
+PORT_80_FREE=true
+PORT_443_FREE=true
+
+if command -v ss &>/dev/null; then
+  ss -tlnp "sport = :80"  2>/dev/null | grep -q LISTEN && PORT_80_FREE=false  || true
+  ss -tlnp "sport = :443" 2>/dev/null | grep -q LISTEN && PORT_443_FREE=false || true
+elif command -v lsof &>/dev/null; then
+  lsof -i :80  -sTCP:LISTEN &>/dev/null && PORT_80_FREE=false  || true
+  lsof -i :443 -sTCP:LISTEN &>/dev/null && PORT_443_FREE=false || true
+fi
+
+[ "$PORT_80_FREE"  = false ] && check_port 80
+[ "$PORT_443_FREE" = false ] && check_port 443
+
+if [ "$PORT_80_FREE" = true ] && [ "$PORT_443_FREE" = true ]; then
+  echo "  [OK] Порты 80 и 443 свободны"
+fi
+
+# --- 6. Обнаружение устаревшего тома PostgreSQL ---
 # Симптом: том существует, но пароль в .env отличается от того,
 # с которым был инициализирован том — PostgreSQL откажет в подключении.
 
@@ -130,10 +224,10 @@ if [ "$RESET_DB" = true ]; then
   echo "  [OK] Том удалён. PostgreSQL будет инициализирован заново."
 fi
 
-# --- 6. Создание директорий для nginx ---
+# --- 7. Создание директорий для nginx ---
 mkdir -p infrastructure/nginx/ssl
 
-# --- 7. Получение SSL-сертификата (если ещё нет) ---
+# --- 8. Получение SSL-сертификата (если ещё нет) ---
 CERT_PATH="infrastructure/nginx/ssl/fullchain.pem"
 if [ ! -f "$CERT_PATH" ]; then
   echo ""
@@ -143,7 +237,7 @@ else
   echo "  [OK] SSL-сертификат уже существует"
 fi
 
-# --- 8. Запуск всех сервисов ---
+# --- 9. Запуск всех сервисов ---
 echo ""
 echo "==> Запуск сервисов..."
 docker compose -f "$COMPOSE_FILE" up -d
