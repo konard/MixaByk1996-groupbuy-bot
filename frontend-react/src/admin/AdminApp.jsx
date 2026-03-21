@@ -15,6 +15,7 @@ import CategoriesPage from './pages/CategoriesPage';
 import MessagesPage from './pages/MessagesPage';
 import ReportsPage from './pages/ReportsPage';
 import AdminChatPage from './pages/AdminChatPage';
+import ActivityLogPage from './pages/ActivityLogPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, checkAuth, isLoading } = useAdminStore();
@@ -112,6 +113,14 @@ export default function AdminApp() {
         element={
           <ProtectedRoute>
             <AdminChatPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="activity"
+        element={
+          <ProtectedRoute>
+            <ActivityLogPage />
           </ProtectedRoute>
         }
       />

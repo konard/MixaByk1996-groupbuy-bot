@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
+import { api } from '../services/api';
 import {
   formatCurrency,
   getInitials,
@@ -18,6 +19,31 @@ import {
 
 function Cabinet() {
   const { user, openDepositModal, openCreateProcurementModal, logout } = useStore();
+  const [userStats, setUserStats] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadStats = async () => {
+      try {
+        const [balance, procurements] = await Promise.all([
+          api.getUserBalance(user.id).catch(() => null),
+          api.getUserProcurements(user.id).catch(() => null),
+        ]);
+        const procs = Array.isArray(procurements)
+          ? procurements
+          : procurements?.results || [];
+        setUserStats({
+          balance: balance || {},
+          procurementsCount: procs.length,
+          activeProcurements: procs.filter((p) => p.status === 'active').length,
+          completedProcurements: procs.filter((p) => p.status === 'completed').length,
+        });
+      } catch {
+        // ignore stats loading errors
+      }
+    };
+    loadStats();
+  }, [user]);
 
   if (!user) {
     return (
@@ -82,6 +108,55 @@ function Cabinet() {
           <button className="btn btn-outline btn-round">Вывести</button>
         </div>
       </div>
+
+      {/* User Analytics */}
+      {userStats && (
+        <div className="cabinet-stats" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '0.75rem',
+          margin: '0 1rem 1rem',
+        }}>
+          <div style={{
+            background: 'var(--bg-secondary, #f0f2f5)',
+            borderRadius: '0.75rem',
+            padding: '0.75rem',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{userStats.procurementsCount}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Закупок</div>
+          </div>
+          <div style={{
+            background: 'var(--bg-secondary, #f0f2f5)',
+            borderRadius: '0.75rem',
+            padding: '0.75rem',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{userStats.activeProcurements}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Активных</div>
+          </div>
+          <div style={{
+            background: 'var(--bg-secondary, #f0f2f5)',
+            borderRadius: '0.75rem',
+            padding: '0.75rem',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{userStats.completedProcurements}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Завершённых</div>
+          </div>
+          <div style={{
+            background: 'var(--bg-secondary, #f0f2f5)',
+            borderRadius: '0.75rem',
+            padding: '0.75rem',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+              {formatCurrency(userStats.balance.total_deposited || 0)}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Пополнено</div>
+          </div>
+        </div>
+      )}
 
       <div className="cabinet-menu">
         {renderRoleItems()}

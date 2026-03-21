@@ -66,6 +66,12 @@ export const adminApi = {
   // Dashboard
   getDashboardStats: () => request('/dashboard/'),
 
+  // Analytics
+  getAnalytics: (params = {}) => {
+    const query = buildQuery(params);
+    return request(`/analytics/?${query}`);
+  },
+
   // Users
   getUsers: (params = {}) => {
     const query = buildQuery(params);

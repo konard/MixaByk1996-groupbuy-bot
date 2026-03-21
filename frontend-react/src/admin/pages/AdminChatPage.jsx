@@ -1,6 +1,7 @@
 /**
  * Admin Chat Page
- * Allows admin to view and participate in user conversations
+ * Two-way messaging with users via system notifications.
+ * Shows admin-sent messages and user's notification history.
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useAdminStore } from '../store/adminStore';
@@ -25,6 +26,14 @@ function formatTime(dateStr) {
   });
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
 export default function AdminChatPage() {
   const { users, loadUsers, addToast } = useAdminStore();
   const [selectedUser, setSelectedUser] = useState(null);
@@ -33,6 +42,7 @@ export default function AdminChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [userOnlineStatus, setUserOnlineStatus] = useState({});
   const messagesEndRef = useRef(null);
   const pollRef = useRef(null);
 
@@ -44,9 +54,47 @@ export default function AdminChatPage() {
     if (!userId) return;
     setLoadingMessages(true);
     try {
-      const response = await adminApi.getMessages({ user: userId, page_size: 50 });
-      const msgs = response.results || response;
-      setMessages(Array.isArray(msgs) ? msgs : []);
+      // Load notifications for this user (admin messages appear as system notifications)
+      const notifResponse = await adminApi.getNotifications({ user: userId, page_size: 50 });
+      const notifications = notifResponse.results || notifResponse;
+
+      // Load user's chat messages
+      const msgResponse = await adminApi.getMessages({ user: userId, page_size: 50 });
+      const chatMessages = msgResponse.results || msgResponse;
+
+      // Combine notifications and messages into unified timeline
+      const combined = [];
+
+      if (Array.isArray(notifications)) {
+        notifications.forEach((n) => {
+          combined.push({
+            id: `notif-${n.id}`,
+            type: 'notification',
+            text: n.message || n.title || '',
+            title: n.title || '',
+            isAdmin: n.notification_type === 'system',
+            created_at: n.created_at,
+            is_read: n.is_read,
+          });
+        });
+      }
+
+      if (Array.isArray(chatMessages)) {
+        chatMessages.forEach((m) => {
+          combined.push({
+            id: `msg-${m.id}`,
+            type: 'message',
+            text: m.text || '',
+            isAdmin: false,
+            created_at: m.created_at,
+            procurement_title: m.procurement_title,
+          });
+        });
+      }
+
+      // Sort by date ascending (oldest first)
+      combined.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      setMessages(combined);
     } catch (err) {
       addToast('Ошибка загрузки сообщений', 'error');
     } finally {
@@ -84,6 +132,7 @@ export default function AdminChatPage() {
       await adminApi.sendAdminMessage(selectedUser.id, inputText.trim());
       setInputText('');
       await loadMessages(selectedUser.id);
+      addToast('Сообщение отправлено', 'success');
     } catch (err) {
       addToast('Ошибка отправки сообщения', 'error');
     } finally {
@@ -102,8 +151,17 @@ export default function AdminChatPage() {
     const q = searchQuery.toLowerCase();
     const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
     const email = (u.email || '').toLowerCase();
-    return name.includes(q) || email.includes(q);
+    const platform = (u.platform || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || platform.includes(q);
   });
+
+  const getUserName = (user) =>
+    user.first_name || user.last_name
+      ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+      : user.email || `Пользователь #${user.id}`;
+
+  // Group messages by date for display
+  let lastDate = '';
 
   return (
     <AdminLayout>
@@ -118,7 +176,7 @@ export default function AdminChatPage() {
             <div className="admin-chat-users-header">
               <input
                 type="text"
-                placeholder="Поиск пользователей..."
+                placeholder="Поиск по имени, email, платформе..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="admin-search-input"
@@ -137,15 +195,25 @@ export default function AdminChatPage() {
                   onClick={() => handleSelectUser(user)}
                 >
                   <div className="admin-chat-avatar">
-                    {getInitials(`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email)}
+                    {getInitials(getUserName(user))}
                   </div>
                   <div className="admin-chat-user-info">
                     <div className="admin-chat-user-name">
-                      {user.first_name || user.last_name
-                        ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                        : user.email || `Пользователь #${user.id}`}
+                      {getUserName(user)}
                     </div>
-                    <div className="admin-chat-user-role">{user.role || 'user'}</div>
+                    <div className="admin-chat-user-role">
+                      {user.platform && <span style={{
+                        display: 'inline-block',
+                        padding: '0 0.375rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.6875rem',
+                        background: 'rgba(37, 99, 235, 0.1)',
+                        color: 'var(--admin-primary)',
+                        marginRight: '0.375rem',
+                      }}>{user.platform}</span>}
+                      {user.role || 'user'}
+                      {user.is_verified && <span title="Верифицирован" style={{ marginLeft: '0.25rem' }}>&#10003;</span>}
+                    </div>
                   </div>
                 </div>
               ))
@@ -161,13 +229,18 @@ export default function AdminChatPage() {
             ) : (
               <>
                 <div className="admin-chat-header">
-                  {selectedUser.first_name || selectedUser.last_name
-                    ? `${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim()
-                    : selectedUser.email || `Пользователь #${selectedUser.id}`}
-                  {' '}
-                  <span style={{ fontWeight: 400, color: 'var(--admin-text-muted)', fontSize: '0.875rem' }}>
-                    ({selectedUser.role})
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div className="admin-chat-avatar" style={{ width: 32, height: 32, fontSize: '0.75rem' }}>
+                      {getInitials(getUserName(selectedUser))}
+                    </div>
+                    <div>
+                      {getUserName(selectedUser)}
+                      <span style={{ fontWeight: 400, color: 'var(--admin-text-muted)', fontSize: '0.8125rem', marginLeft: '0.5rem' }}>
+                        {selectedUser.platform} | {selectedUser.role}
+                        {selectedUser.balance !== undefined && ` | Баланс: ${selectedUser.balance} ₽`}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="admin-chat-messages">
@@ -177,21 +250,51 @@ export default function AdminChatPage() {
                     </div>
                   ) : messages.length === 0 ? (
                     <div style={{ color: 'var(--admin-text-muted)', textAlign: 'center', padding: '2rem' }}>
-                      Нет сообщений. Начните переписку.
+                      Нет сообщений. Напишите пользователю.
                     </div>
                   ) : (
                     messages.map((msg) => {
-                      const isAdmin = msg.is_admin || msg.sender_type === 'admin';
+                      const msgDate = msg.created_at ? msg.created_at.slice(0, 10) : '';
+                      let showDateSeparator = false;
+                      if (msgDate !== lastDate) {
+                        lastDate = msgDate;
+                        showDateSeparator = true;
+                      }
+
                       return (
-                        <div
-                          key={msg.id}
-                          className={`admin-chat-msg ${isAdmin ? 'sent' : 'received'}`}
-                        >
-                          {msg.text}
-                          <div className="admin-chat-msg-meta">
-                            {formatTime(msg.created_at)}
+                        <React.Fragment key={msg.id}>
+                          {showDateSeparator && (
+                            <div style={{
+                              textAlign: 'center',
+                              color: 'var(--admin-text-muted)',
+                              fontSize: '0.75rem',
+                              margin: '0.5rem 0',
+                            }}>
+                              {formatDate(msg.created_at)}
+                            </div>
+                          )}
+                          <div className={`admin-chat-msg ${msg.isAdmin ? 'sent' : 'received'}`}>
+                            {msg.type === 'notification' && msg.title && (
+                              <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.25rem' }}>
+                                {msg.title}
+                              </div>
+                            )}
+                            {msg.text}
+                            {msg.procurement_title && (
+                              <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '0.25rem' }}>
+                                в "{msg.procurement_title}"
+                              </div>
+                            )}
+                            <div className="admin-chat-msg-meta">
+                              {msg.type === 'notification' && !msg.isAdmin && (
+                                <span style={{ marginRight: '0.5rem' }}>
+                                  {msg.is_read ? '(прочитано)' : '(не прочитано)'}
+                                </span>
+                              )}
+                              {formatTime(msg.created_at)}
+                            </div>
                           </div>
-                        </div>
+                        </React.Fragment>
                       );
                     })
                   )}
@@ -213,7 +316,7 @@ export default function AdminChatPage() {
                     disabled={!inputText.trim() || sending}
                     title="Отправить"
                   >
-                    ➤
+                    {sending ? '...' : '➤'}
                   </button>
                 </form>
               </>
