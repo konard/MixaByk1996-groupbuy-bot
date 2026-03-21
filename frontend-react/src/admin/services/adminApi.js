@@ -164,6 +164,13 @@ export const adminApi = {
   toggleMessageDelete: (id) =>
     request(`/messages/${id}/toggle_delete/`, { method: 'POST' }),
 
+  // Admin Chat
+  sendAdminMessage: (userId, text) =>
+    request('/chat/admin_message/', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, text }),
+    }),
+
   // Notifications
   getNotifications: (params = {}) => {
     const query = buildQuery(params);

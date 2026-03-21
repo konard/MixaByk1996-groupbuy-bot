@@ -1161,3 +1161,72 @@ input, textarea, select {
 .typing-indicator span:nth-child(3) {
   animation-delay: 0.4s;
 }
+
+/* ============================================
+   LOGIN TABS & FORM VALIDATION
+   ============================================ */
+
+.login-tabs {
+  display: flex;
+  width: 100%;
+  gap: 0;
+}
+
+.login-tab {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--tg-font-size-base);
+  font-weight: 500;
+  color: var(--tg-text-secondary);
+  cursor: pointer;
+  transition: color var(--tg-transition), border-color var(--tg-transition);
+}
+
+.login-tab.active {
+  color: var(--tg-primary);
+  border-bottom-color: var(--tg-primary);
+}
+
+.login-tab:hover:not(.active) {
+  color: var(--tg-text-primary);
+}
+
+.form-input-error {
+  border-color: var(--tg-error) !important;
+}
+
+.form-field-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-error);
+}
+
+.form-error-banner {
+  background: rgba(223, 63, 64, 0.1);
+  border: 1px solid var(--tg-error);
+  border-radius: var(--tg-radius-md);
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 1rem;
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-error);
+}
+
+.form-hint {
+  margin-top: 0.75rem;
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-text-muted);
+}
+
+.form-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--tg-primary);
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+}

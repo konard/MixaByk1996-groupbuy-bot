@@ -13,6 +13,8 @@ import ProcurementsPage from './pages/ProcurementsPage';
 import PaymentsPage from './pages/PaymentsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import MessagesPage from './pages/MessagesPage';
+import ReportsPage from './pages/ReportsPage';
+import AdminChatPage from './pages/AdminChatPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, checkAuth, isLoading } = useAdminStore();
@@ -94,6 +96,22 @@ export default function AdminApp() {
         element={
           <ProtectedRoute>
             <MessagesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="reports"
+        element={
+          <ProtectedRoute>
+            <ReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="chat"
+        element={
+          <ProtectedRoute>
+            <AdminChatPage />
           </ProtectedRoute>
         }
       />

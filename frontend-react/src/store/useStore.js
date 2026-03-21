@@ -42,6 +42,41 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  login: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      // Try to find user by email or phone
+      let user = null;
+      if (data.email) {
+        try {
+          const response = await api.getUserByEmail(data.email);
+          user = response;
+        } catch (e) {
+          // not found by email
+        }
+      }
+      if (!user && data.phone) {
+        try {
+          const response = await api.getUserByPhone(data.phone);
+          user = response;
+        } catch (e) {
+          // not found by phone
+        }
+      }
+      if (!user) {
+        throw new Error('Пользователь не найден. Проверьте email или телефон.');
+      }
+      localStorage.setItem('userId', user.id);
+      set({ user, isLoading: false, loginModalOpen: false });
+      get().loadProcurements();
+      return user;
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      get().addToast(error.message, 'error');
+      throw error;
+    }
+  },
+
   register: async (data) => {
     set({ isLoading: true, error: null });
     try {

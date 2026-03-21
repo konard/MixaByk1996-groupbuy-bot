@@ -32,6 +32,12 @@ export const api = {
   getUserByPlatform: (platform, platformUserId) =>
     request(`/users/by_platform/?platform=${platform}&platform_user_id=${platformUserId}`),
 
+  getUserByEmail: (email) =>
+    request(`/users/by_email/?email=${encodeURIComponent(email)}`),
+
+  getUserByPhone: (phone) =>
+    request(`/users/by_phone/?phone=${encodeURIComponent(phone)}`),
+
   registerUser: (data) =>
     request('/users/', {
       method: 'POST',

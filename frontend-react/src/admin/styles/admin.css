@@ -939,3 +939,356 @@
     overflow-x: auto;
   }
 }
+
+/* ============================================
+   CHARTS
+   ============================================ */
+
+.admin-charts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.admin-chart-card {
+  flex: 1;
+  min-width: 260px;
+  background: var(--admin-bg);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--admin-border);
+}
+
+.admin-chart-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+.chart-wrapper {
+  width: 100%;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-label {
+  font-size: 0.8125rem;
+  color: var(--admin-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.chart-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--admin-text-muted);
+  font-size: 0.875rem;
+}
+
+.donut-chart-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 120px;
+}
+
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+}
+
+.donut-legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.donut-legend-name {
+  color: var(--admin-text);
+  flex: 1;
+}
+
+.donut-legend-value {
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+}
+
+/* ============================================
+   REPORTS PAGE
+   ============================================ */
+
+.admin-reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-report-card {
+  background: var(--admin-card-bg);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-report-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  border-bottom: 2px solid var(--admin-primary);
+  padding-bottom: 0.5rem;
+}
+
+.admin-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-report-table th,
+.admin-report-table td {
+  padding: 0.5rem 0.25rem;
+  text-align: left;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-report-table th {
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  font-size: 0.8125rem;
+}
+
+.admin-report-table td:last-child {
+  text-align: right;
+  font-weight: 500;
+}
+
+.admin-report-loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-report-section {
+  margin-bottom: 2rem;
+}
+
+/* ============================================
+   ADMIN CHAT
+   ============================================ */
+
+.admin-chat-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: calc(100vh - 160px);
+  min-height: 400px;
+  background: var(--admin-card-bg);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.admin-chat-users {
+  border-right: 1px solid var(--admin-border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-chat-users-header {
+  padding: 1rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--admin-text);
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+}
+
+.admin-chat-user-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--admin-border);
+  transition: background-color 0.15s;
+}
+
+.admin-chat-user-item:hover {
+  background: var(--admin-bg);
+}
+
+.admin-chat-user-item.active {
+  background: rgba(37, 99, 235, 0.08);
+  border-left: 3px solid var(--admin-primary);
+}
+
+.admin-chat-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.admin-chat-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-chat-user-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--admin-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-chat-user-role {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+
+.admin-chat-window {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-chat-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+.admin-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--admin-bg);
+}
+
+.admin-chat-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--admin-text-muted);
+  font-size: 0.875rem;
+}
+
+.admin-chat-msg {
+  max-width: 70%;
+  padding: 0.625rem 0.875rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.admin-chat-msg.sent {
+  background: var(--admin-primary);
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.admin-chat-msg.received {
+  background: var(--admin-card-bg);
+  color: var(--admin-text);
+  align-self: flex-start;
+  border-bottom-left-radius: 0.25rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.admin-chat-msg-meta {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-top: 0.25rem;
+  text-align: right;
+}
+
+.admin-chat-input-area {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--admin-border);
+  display: flex;
+  gap: 0.5rem;
+  background: var(--admin-card-bg);
+}
+
+.admin-chat-input {
+  flex: 1;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 1.5rem;
+  font-size: 0.875rem;
+  resize: none;
+  min-height: 40px;
+  max-height: 120px;
+  font-family: inherit;
+}
+
+.admin-chat-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.admin-chat-send-btn:hover {
+  background: var(--admin-primary-hover);
+}
+
+.admin-chat-send-btn:disabled {
+  background: var(--admin-border);
+  cursor: default;
+}
+
+@media (max-width: 768px) {
+  .admin-chat-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .admin-chat-users {
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--admin-border);
+  }
+}

@@ -1,10 +1,12 @@
 /**
- * Admin Dashboard Page
+ * Admin Dashboard Page with Analytics Charts
  */
 import React, { useEffect } from 'react';
 import { useAdminStore } from '../store/adminStore';
 import AdminLayout from '../components/AdminLayout';
 import StatCard from '../components/StatCard';
+import BarChart from '../components/BarChart';
+import DonutChart from '../components/DonutChart';
 
 const formatNumber = (num) => {
   if (num === undefined || num === null) return '0';
@@ -19,6 +21,11 @@ const formatCurrency = (num) => {
     minimumFractionDigits: 0,
   }).format(num);
 };
+
+function objectToChartData(obj) {
+  if (!obj) return [];
+  return Object.entries(obj).map(([name, value]) => ({ name, value: Number(value) }));
+}
 
 export default function DashboardPage() {
   const { dashboardStats, loadDashboardStats, isLoading } = useAdminStore();
@@ -37,12 +44,29 @@ export default function DashboardPage() {
 
   const stats = dashboardStats || {};
 
+  const usersByRoleData = objectToChartData(stats.users_by_role);
+  const usersByPlatformData = objectToChartData(stats.users_by_platform);
+  const procurementsByStatusData = objectToChartData(stats.procurements_by_status);
+  const paymentsByStatusData = objectToChartData(stats.payments_by_status);
+
+  // Build growth trend from available stats
+  const userGrowthData = [
+    { name: 'Сегодня', value: stats.new_users_today || 0 },
+    { name: 'Неделя', value: stats.new_users_week || 0 },
+    { name: 'Месяц', value: stats.new_users_month || 0 },
+  ];
+
+  const revenueData = [
+    { name: 'Сегодня', value: stats.revenue_today || 0 },
+    { name: 'Неделя', value: stats.revenue_week || 0 },
+  ];
+
   return (
     <AdminLayout>
       <div className="admin-page">
-        <h1 className="admin-page-title">Дашборд</h1>
+        <h1 className="admin-page-title">Дашборд — Аналитика</h1>
 
-        {/* Users Section */}
+        {/* Quick Stats */}
         <section className="admin-section">
           <h2 className="admin-section-title">Пользователи</h2>
           <div className="admin-stat-grid">
@@ -72,34 +96,28 @@ export default function DashboardPage() {
             />
           </div>
 
-          {stats.users_by_role && (
-            <div className="admin-stat-breakdown">
-              <h3>По ролям:</h3>
-              <div className="admin-stat-tags">
-                {Object.entries(stats.users_by_role).map(([role, count]) => (
-                  <span key={role} className="admin-stat-tag">
-                    {role}: {count}
-                  </span>
-                ))}
-              </div>
+          {/* Charts Row */}
+          <div className="admin-charts-row">
+            <div className="admin-chart-card">
+              <h3 className="admin-chart-title">Рост пользователей</h3>
+              <BarChart data={userGrowthData} color="#2563eb" label="" />
             </div>
-          )}
-
-          {stats.users_by_platform && (
-            <div className="admin-stat-breakdown">
-              <h3>По платформам:</h3>
-              <div className="admin-stat-tags">
-                {Object.entries(stats.users_by_platform).map(([platform, count]) => (
-                  <span key={platform} className="admin-stat-tag">
-                    {platform}: {count}
-                  </span>
-                ))}
+            {usersByRoleData.length > 0 && (
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">По ролям</h3>
+                <DonutChart data={usersByRoleData} size={200} />
               </div>
-            </div>
-          )}
+            )}
+            {usersByPlatformData.length > 0 && (
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">По платформам</h3>
+                <DonutChart data={usersByPlatformData} size={200} />
+              </div>
+            )}
+          </div>
         </section>
 
-        {/* Procurements Section */}
+        {/* Procurements */}
         <section className="admin-section">
           <h2 className="admin-section-title">Закупки</h2>
           <div className="admin-stat-grid">
@@ -123,23 +141,23 @@ export default function DashboardPage() {
             />
           </div>
 
-          {stats.procurements_by_status && (
-            <div className="admin-stat-breakdown">
-              <h3>По статусам:</h3>
-              <div className="admin-stat-tags">
-                {Object.entries(stats.procurements_by_status).map(([status, count]) => (
-                  <span key={status} className="admin-stat-tag">
-                    {status}: {count}
-                  </span>
-                ))}
+          {procurementsByStatusData.length > 0 && (
+            <div className="admin-charts-row">
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">По статусам</h3>
+                <BarChart data={procurementsByStatusData} color="#16a34a" />
+              </div>
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">Распределение</h3>
+                <DonutChart data={procurementsByStatusData} size={200} />
               </div>
             </div>
           )}
         </section>
 
-        {/* Payments Section */}
+        {/* Payments */}
         <section className="admin-section">
-          <h2 className="admin-section-title">Платежи</h2>
+          <h2 className="admin-section-title">Платежи и выручка</h2>
           <div className="admin-stat-grid">
             <StatCard
               label="Всего платежей"
@@ -167,21 +185,21 @@ export default function DashboardPage() {
             />
           </div>
 
-          {stats.payments_by_status && (
-            <div className="admin-stat-breakdown">
-              <h3>По статусам:</h3>
-              <div className="admin-stat-tags">
-                {Object.entries(stats.payments_by_status).map(([status, count]) => (
-                  <span key={status} className="admin-stat-tag">
-                    {status}: {count}
-                  </span>
-                ))}
-              </div>
+          <div className="admin-charts-row">
+            <div className="admin-chart-card">
+              <h3 className="admin-chart-title">Динамика выручки</h3>
+              <BarChart data={revenueData} color="#d97706" />
             </div>
-          )}
+            {paymentsByStatusData.length > 0 && (
+              <div className="admin-chart-card">
+                <h3 className="admin-chart-title">Статусы платежей</h3>
+                <DonutChart data={paymentsByStatusData} size={200} />
+              </div>
+            )}
+          </div>
         </section>
 
-        {/* Activity Section */}
+        {/* Activity */}
         <section className="admin-section">
           <h2 className="admin-section-title">Активность</h2>
           <div className="admin-stat-grid">
