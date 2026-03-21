@@ -280,5 +280,70 @@ class TestAPIClient:
             assert result[0]["title"] == "Test 1"
 
 
+class TestDepositCommand:
+    """Tests for the /deposit command"""
+
+    def test_cmd_deposit_handler_exists(self):
+        """cmd_deposit handler must be importable"""
+        from bot.handlers.user_commands import cmd_deposit
+
+        assert callable(cmd_deposit)
+
+    @pytest.mark.asyncio
+    async def test_cmd_deposit_registered_user_shows_deposit_keyboard(self):
+        """/deposit for a registered user should show the deposit keyboard"""
+        from bot.handlers.user_commands import cmd_deposit
+
+        message = AsyncMock()
+        message.from_user.id = 77777
+        state = AsyncMock()
+
+        user = {"id": 1, "first_name": "Alice", "balance": 500, "role": "buyer"}
+
+        with patch(
+            "bot.handlers.user_commands.api_client.get_user_by_platform",
+            new_callable=AsyncMock,
+            return_value=user,
+        ):
+            await cmd_deposit(message, state)
+
+        message.answer.assert_called_once()
+        call_kwargs = message.answer.call_args
+        # Should include the deposit keyboard
+        assert call_kwargs.kwargs.get("reply_markup") is not None or (
+            len(call_kwargs.args) > 1 and call_kwargs.args[1] is not None
+        )
+        text = call_kwargs.args[0] if call_kwargs.args else ""
+        assert "Deposit" in text or "deposit" in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_cmd_deposit_guest_triggers_registration(self):
+        """/deposit for a guest user should trigger registration"""
+        from bot.handlers.user_commands import cmd_deposit
+
+        message = AsyncMock()
+        message.from_user.id = 66666
+        state = AsyncMock()
+        state.set_state = AsyncMock()
+
+        with patch(
+            "bot.handlers.user_commands.api_client.get_user_by_platform",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            await cmd_deposit(message, state)
+
+        # Should start registration (which calls state.set_state)
+        state.set_state.assert_called_once()
+
+    def test_deposit_command_in_help_text(self):
+        """/help text must mention /deposit"""
+        import inspect
+        from bot.handlers.user_commands import cmd_help
+
+        source = inspect.getsource(cmd_help)
+        assert "/deposit" in source
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

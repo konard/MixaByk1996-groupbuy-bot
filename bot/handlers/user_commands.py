@@ -143,6 +143,24 @@ async def cmd_balance(message: Message, state: FSMContext):
     )
 
 
+@router.message(Command("deposit"))
+async def cmd_deposit(message: Message, state: FSMContext):
+    """Handle /deposit command — show deposit options"""
+    user = await api_client.get_user_by_platform(
+        platform="telegram", platform_user_id=str(message.from_user.id)
+    )
+
+    if not user:
+        await start_registration(message, state, reason="balance")
+        return
+
+    await message.answer(
+        "*Deposit to Balance*\n\nSelect amount to deposit:",
+        parse_mode="Markdown",
+        reply_markup=get_deposit_keyboard(),
+    )
+
+
 @router.message(F.text == "Profile")
 async def text_profile(message: Message, state: FSMContext):
     """Handle 'Profile' text button"""
