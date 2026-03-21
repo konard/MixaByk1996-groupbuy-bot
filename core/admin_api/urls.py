@@ -14,6 +14,7 @@ from .views import (
     AdminCategoryViewSet,
     AdminMessageViewSet,
     AdminNotificationViewSet,
+    AdminChatMessageView,
 )
 
 router = DefaultRouter()
@@ -28,5 +29,6 @@ router.register(r'notifications', AdminNotificationViewSet, basename='admin-noti
 urlpatterns = [
     path('auth/', AdminAuthView.as_view(), name='admin-auth'),
     path('dashboard/', DashboardView.as_view(), name='admin-dashboard'),
+    path('chat/admin_message/', AdminChatMessageView.as_view(), name='admin-chat-message'),
     path('', include(router.urls)),
 ]

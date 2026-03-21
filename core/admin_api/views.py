@@ -583,6 +583,44 @@ class AdminMessageViewSet(viewsets.ModelViewSet):
         return Response({'is_deleted': message.is_deleted})
 
 
+class AdminChatMessageView(APIView):
+    """Send a direct admin message to a user as a system notification."""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        """Create a system notification to deliver an admin message to a user."""
+        user_id = request.data.get('user_id')
+        text = request.data.get('text')
+
+        if not user_id or not text:
+            return Response(
+                {'detail': 'user_id and text are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        notification = Notification.objects.create(
+            user=user,
+            notification_type='system',
+            title='Сообщение от администратора',
+            message=text
+        )
+
+        logger.info(f"Admin sent message to user {user_id}: {text[:50]}")
+        return Response({
+            'id': notification.id,
+            'user_id': user_id,
+            'text': text,
+        }, status=status.HTTP_201_CREATED)
+
+
 class AdminNotificationViewSet(viewsets.ModelViewSet):
     """Admin viewset for Notification management."""
     queryset = Notification.objects.all().order_by('-created_at')

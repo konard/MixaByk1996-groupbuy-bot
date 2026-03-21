@@ -45,7 +45,10 @@ async def test_standardize_message():
         mock_user.first_name = "Иван"
         mock_user.last_name = "Петров"
 
-        adapter.api.users.get = AsyncMock(return_value=[mock_user])
+        mock_users_api = MagicMock()
+        mock_users_api.get = AsyncMock(return_value=[mock_user])
+        adapter.api = MagicMock()
+        adapter.api.users = mock_users_api
 
         # Create mock message
         mock_message = MagicMock(spec=Message)
@@ -80,7 +83,10 @@ async def test_standardize_callback():
         mock_user.first_name = "Мария"
         mock_user.last_name = "Иванова"
 
-        adapter.api.users.get = AsyncMock(return_value=[mock_user])
+        mock_users_api = MagicMock()
+        mock_users_api.get = AsyncMock(return_value=[mock_user])
+        adapter.api = MagicMock()
+        adapter.api.users = mock_users_api
 
         # Create mock event
         mock_event = {
@@ -112,7 +118,10 @@ async def test_send_message():
         adapter = VKAdapter()
 
         # Mock VK API send method
-        adapter.api.messages.send = AsyncMock(return_value={'message_id': 123})
+        mock_messages_api = MagicMock()
+        mock_messages_api.send = AsyncMock(return_value={'message_id': 123})
+        adapter.api = MagicMock()
+        adapter.api.messages = mock_messages_api
 
         result = await adapter.send_message(
             user_id="123",
@@ -137,7 +146,10 @@ async def test_send_message_with_keyboard():
         adapter = VKAdapter()
 
         # Mock VK API send method
-        adapter.api.messages.send = AsyncMock(return_value={'message_id': 123})
+        mock_messages_api = MagicMock()
+        mock_messages_api.send = AsyncMock(return_value={'message_id': 123})
+        adapter.api = MagicMock()
+        adapter.api.messages = mock_messages_api
 
         keyboard_data = {
             "buttons": [
@@ -172,7 +184,10 @@ async def test_get_user_info():
         mock_user.first_name = "Петр"
         mock_user.last_name = "Сидоров"
 
-        adapter.api.users.get = AsyncMock(return_value=[mock_user])
+        mock_users_api = MagicMock()
+        mock_users_api.get = AsyncMock(return_value=[mock_user])
+        adapter.api = MagicMock()
+        adapter.api.users = mock_users_api
 
         result = await adapter.get_user_info("789")
 

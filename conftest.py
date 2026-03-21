@@ -47,6 +47,7 @@ def pytest_configure(config):
             INSTALLED_APPS=[
                 'django.contrib.contenttypes',
                 'django.contrib.auth',
+                'django.contrib.sessions',
                 'rest_framework',
                 'corsheaders',
                 'users',
@@ -56,6 +57,11 @@ def pytest_configure(config):
                 'admin_api',
                 'ml',
             ],
+            MIDDLEWARE=[
+                'django.contrib.sessions.middleware.SessionMiddleware',
+                'django.contrib.auth.middleware.AuthenticationMiddleware',
+            ],
+            SESSION_ENGINE='django.contrib.sessions.backends.db',
             REST_FRAMEWORK={
                 'DEFAULT_PERMISSION_CLASSES': [
                     'rest_framework.permissions.AllowAny',
@@ -69,6 +75,11 @@ def pytest_configure(config):
             SECRET_KEY='test-secret-key-for-pytest',
         )
         django.setup()
+        # Run migrations to create tables
+        from django.test.utils import setup_test_environment
+        setup_test_environment()
+        from django.core.management import call_command
+        call_command('migrate', '--run-syncdb', verbosity=0)
     else:
         settings.DATABASES = {
             'default': {
@@ -81,3 +92,5 @@ def pytest_configure(config):
                 'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             }
         }
+        from django.core.management import call_command
+        call_command('migrate', '--run-syncdb', verbosity=0)
