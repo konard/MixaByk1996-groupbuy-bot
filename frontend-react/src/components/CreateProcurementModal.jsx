@@ -20,6 +20,8 @@ function CreateProcurementModal() {
     city: '',
     target_amount: '',
     unit: '',
+    commission_percent: '1',
+    min_quantity: '',
     deadline: '',
   });
 
@@ -41,6 +43,8 @@ function CreateProcurementModal() {
         ...formData,
         organizer: user?.id,
         target_amount: parseFloat(formData.target_amount) || 0,
+        commission_percent: parseFloat(formData.commission_percent) || 1,
+        min_quantity: formData.min_quantity ? parseFloat(formData.min_quantity) : null,
       });
       setFormData({
         title: '',
@@ -49,6 +53,8 @@ function CreateProcurementModal() {
         city: '',
         target_amount: '',
         unit: '',
+        commission_percent: '1',
+        min_quantity: '',
         deadline: '',
       });
     } catch (error) {
@@ -134,13 +140,42 @@ function CreateProcurementModal() {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Единица измерения</label>
+              <label className="form-label">Единица измерения *</label>
               <input
                 type="text"
                 className="form-input"
                 name="unit"
+                required
                 placeholder="кг, шт, л"
                 value={formData.unit}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Комиссия организатора (1–4%) *</label>
+              <input
+                type="number"
+                className="form-input"
+                name="commission_percent"
+                required
+                min="1"
+                max="4"
+                step="0.5"
+                placeholder="1"
+                value={formData.commission_percent}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Минимальное количество товара</label>
+              <input
+                type="number"
+                className="form-input"
+                name="min_quantity"
+                min="1"
+                step="0.01"
+                placeholder="Необязательно"
+                value={formData.min_quantity}
                 onChange={handleChange}
               />
             </div>

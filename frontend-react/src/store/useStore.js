@@ -45,26 +45,27 @@ export const useStore = create((set, get) => ({
   login: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      // Try to find user by email or phone
+      // Try to find user by email or phone (both are now supported by backend)
       let user = null;
       if (data.email) {
         try {
-          const response = await api.getUserByEmail(data.email);
-          user = response;
+          user = await api.getUserByEmail(data.email);
         } catch (e) {
-          // not found by email
+          // not found by email, try phone
         }
       }
       if (!user && data.phone) {
         try {
-          const response = await api.getUserByPhone(data.phone);
-          user = response;
+          const normalizedPhone = data.phone.trim().startsWith('+')
+            ? data.phone.trim()
+            : '+' + data.phone.trim();
+          user = await api.getUserByPhone(normalizedPhone);
         } catch (e) {
-          // not found by phone
+          // not found by phone either
         }
       }
       if (!user) {
-        throw new Error('Пользователь не найден. Проверьте email или телефон.');
+        throw new Error('Пользователь не найден. Проверьте email или телефон, либо зарегистрируйтесь.');
       }
       localStorage.setItem('userId', user.id);
       set({ user, isLoading: false, loginModalOpen: false });
@@ -152,14 +153,83 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  joinProcurement: async (procurementId, amount) => {
+  joinProcurement: async (procurementId, { amount, quantity, notes }) => {
+    const { user } = get();
+    if (!user) {
+      get().addToast('Необходимо войти в систему', 'error');
+      return;
+    }
     try {
-      await api.joinProcurement(procurementId, { amount });
+      await api.joinProcurement(procurementId, {
+        user_id: user.id,
+        amount,
+        quantity: quantity || 1,
+        notes: notes || '',
+      });
       set({ procurementModalOpen: false });
       get().addToast('Вы присоединились к закупке', 'success');
       get().loadProcurements();
     } catch (error) {
-      get().addToast('Ошибка при присоединении', 'error');
+      get().addToast(error.message || 'Ошибка при присоединении', 'error');
+    }
+  },
+
+  leaveProcurement: async (procurementId) => {
+    const { user } = get();
+    if (!user) return;
+    try {
+      await api.leaveProcurement(procurementId, { user_id: user.id });
+      get().addToast('Вы вышли из закупки', 'success');
+      get().loadProcurements();
+    } catch (error) {
+      get().addToast(error.message || 'Ошибка при выходе из закупки', 'error');
+    }
+  },
+
+  stopProcurement: async (procurementId) => {
+    try {
+      const result = await api.stopProcurement(procurementId);
+      get().addToast('Закупка остановлена (стоп-сумма)', 'success');
+      get().loadProcurements();
+      return result;
+    } catch (error) {
+      get().addToast(error.message || 'Ошибка при остановке закупки', 'error');
+    }
+  },
+
+  approveSupplier: async (procurementId, supplierId) => {
+    try {
+      await api.approveSupplier(procurementId, supplierId);
+      get().addToast('Поставщик утверждён', 'success');
+      get().loadProcurements();
+    } catch (error) {
+      get().addToast(error.message || 'Ошибка при утверждении поставщика', 'error');
+    }
+  },
+
+  closeProcurement: async (procurementId) => {
+    try {
+      await api.closeProcurement(procurementId);
+      get().addToast('Закупка закрыта', 'success');
+      set({ procurementModalOpen: false });
+      get().loadProcurements();
+    } catch (error) {
+      get().addToast(error.message || 'Ошибка при закрытии закупки', 'error');
+    }
+  },
+
+  castVote: async (procurementId, supplierId, comment = '') => {
+    const { user } = get();
+    if (!user) return;
+    try {
+      await api.castVote(procurementId, {
+        voter_id: user.id,
+        supplier_id: supplierId,
+        comment,
+      });
+      get().addToast('Голос учтён', 'success');
+    } catch (error) {
+      get().addToast(error.message || 'Ошибка при голосовании', 'error');
     }
   },
 
@@ -193,8 +263,8 @@ export const useStore = create((set, get) => ({
 
     try {
       const message = await api.sendMessage({
-        procurement: currentChat,
-        user: user.id,
+        procurement_id: currentChat,
+        user_id: user.id,
         text,
         message_type: 'text',
       });

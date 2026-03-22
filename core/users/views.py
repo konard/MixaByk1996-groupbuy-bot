@@ -60,6 +60,40 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
+    def by_email(self, request):
+        """Get user by email address"""
+        email = request.query_params.get('email')
+
+        if not email:
+            return Response(
+                {'error': 'email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = get_object_or_404(User, email__iexact=email)
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_phone(self, request):
+        """Get user by phone number"""
+        phone = request.query_params.get('phone')
+
+        if not phone:
+            return Response(
+                {'error': 'phone is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Normalize phone: ensure it starts with +
+        if phone and not phone.startswith('+'):
+            phone = '+' + phone
+
+        user = get_object_or_404(User, phone=phone)
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
     def check_exists(self, request):
         """Check if user exists by platform and platform_user_id"""
         platform = request.query_params.get('platform', 'telegram')

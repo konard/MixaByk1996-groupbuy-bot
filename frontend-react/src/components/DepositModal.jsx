@@ -18,7 +18,7 @@ function DepositModal() {
     setIsLoading(true);
     try {
       await api.createPayment({
-        user: user.id,
+        user_id: user.id,
         amount: depositAmount,
         payment_type: 'deposit',
       });

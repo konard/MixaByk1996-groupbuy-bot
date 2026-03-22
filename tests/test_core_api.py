@@ -131,6 +131,70 @@ class UserAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['first_name'], 'Test')
 
+    def test_get_user_by_email(self):
+        """Test looking up a user by email address"""
+        self.client.post('/api/users/', {
+            'platform': 'websocket',
+            'platform_user_id': 'web-email-test',
+            'first_name': 'EmailUser',
+            'email': 'emailuser@example.com',
+            'role': 'buyer',
+        }, format='json')
+
+        url = '/api/users/by_email/'
+        response = self.client.get(url, {'email': 'emailuser@example.com'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['first_name'], 'EmailUser')
+
+    def test_get_user_by_email_not_found(self):
+        """by_email returns 404 for an unknown address"""
+        response = self.client.get('/api/users/by_email/', {'email': 'nobody@example.com'})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_user_by_email_missing_param(self):
+        """by_email returns 400 when email query param is missing"""
+        response = self.client.get('/api/users/by_email/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_get_user_by_phone(self):
+        """Test looking up a user by phone number"""
+        self.client.post('/api/users/', {
+            'platform': 'websocket',
+            'platform_user_id': 'web-phone-test',
+            'first_name': 'PhoneUser',
+            'phone': '+79991112233',
+            'role': 'buyer',
+        }, format='json')
+
+        url = '/api/users/by_phone/'
+        response = self.client.get(url, {'phone': '+79991112233'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['first_name'], 'PhoneUser')
+
+    def test_get_user_by_phone_without_plus(self):
+        """by_phone should normalise the number and add a leading +"""
+        self.client.post('/api/users/', {
+            'platform': 'websocket',
+            'platform_user_id': 'web-phone-test2',
+            'first_name': 'PhoneUser2',
+            'phone': '+79994445566',
+            'role': 'buyer',
+        }, format='json')
+
+        response = self.client.get('/api/users/by_phone/', {'phone': '79994445566'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['first_name'], 'PhoneUser2')
+
+    def test_get_user_by_phone_not_found(self):
+        """by_phone returns 404 for an unknown number"""
+        response = self.client.get('/api/users/by_phone/', {'phone': '+70000000000'})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_user_by_phone_missing_param(self):
+        """by_phone returns 400 when phone query param is missing"""
+        response = self.client.get('/api/users/by_phone/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class ProcurementAPITests(APITestCase):
     """Tests for Procurement API endpoints"""
