@@ -2,7 +2,7 @@
 Serializers for Procurements API
 """
 from rest_framework import serializers
-from .models import Category, Procurement, Participant
+from .models import Category, Procurement, Participant, SupplierVote
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -26,6 +26,24 @@ class ParticipantSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+class SupplierVoteSerializer(serializers.ModelSerializer):
+    """Serializer for supplier votes"""
+    voter_name = serializers.CharField(source='voter.full_name', read_only=True)
+    supplier_name = serializers.CharField(source='supplier.full_name', read_only=True)
+
+    class Meta:
+        model = SupplierVote
+        fields = ['id', 'procurement', 'voter', 'voter_name', 'supplier', 'supplier_name', 'comment', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class CastVoteSerializer(serializers.Serializer):
+    """Serializer for casting a supplier vote"""
+    voter_id = serializers.IntegerField()
+    supplier_id = serializers.IntegerField()
+    comment = serializers.CharField(required=False, allow_blank=True)
+
+
 class ProcurementListSerializer(serializers.ModelSerializer):
     """Procurement serializer for list view"""
     category_name = serializers.CharField(source='category.name', read_only=True)
@@ -41,7 +59,7 @@ class ProcurementListSerializer(serializers.ModelSerializer):
             'id', 'title', 'category', 'category_name', 'organizer', 'organizer_name',
             'city', 'target_amount', 'current_amount', 'progress',
             'participant_count', 'status', 'deadline', 'days_left',
-            'can_join', 'image_url', 'is_featured'
+            'can_join', 'image_url', 'is_featured', 'commission_percent'
         ]
 
 
@@ -63,7 +81,7 @@ class ProcurementDetailSerializer(serializers.ModelSerializer):
             'organizer', 'organizer_name', 'supplier',
             'city', 'delivery_address',
             'target_amount', 'current_amount', 'stop_at_amount',
-            'unit', 'price_per_unit', 'progress',
+            'unit', 'price_per_unit', 'commission_percent', 'min_quantity', 'progress',
             'status', 'status_display', 'deadline', 'payment_deadline',
             'days_left', 'can_join', 'participant_count',
             'image_url', 'is_featured', 'participants',
@@ -78,11 +96,13 @@ class ProcurementCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Procurement
         fields = [
-            'title', 'description', 'category', 'organizer',
+            'id', 'title', 'description', 'category', 'organizer',
             'city', 'delivery_address',
             'target_amount', 'stop_at_amount', 'unit', 'price_per_unit',
+            'commission_percent', 'min_quantity',
             'deadline', 'payment_deadline', 'image_url'
         ]
+        read_only_fields = ['id']
 
 
 class JoinProcurementSerializer(serializers.Serializer):

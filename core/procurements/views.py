@@ -1,14 +1,16 @@
 """
 Views for Procurements API
 """
+from django.db.models import Count
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Category, Procurement, Participant
+from .models import Category, Procurement, Participant, SupplierVote
 from .serializers import (
     CategorySerializer, ProcurementListSerializer, ProcurementDetailSerializer,
-    ProcurementCreateSerializer, ParticipantSerializer, JoinProcurementSerializer
+    ProcurementCreateSerializer, ParticipantSerializer, JoinProcurementSerializer,
+    SupplierVoteSerializer, CastVoteSerializer,
 )
 
 
@@ -42,6 +44,13 @@ class ProcurementViewSet(viewsets.ModelViewSet):
     - POST /api/procurements/{id}/leave/ - leave a procurement
     - GET /api/procurements/user/{user_id}/ - get user's procurements
     - POST /api/procurements/{id}/check_access/ - check user access
+    - POST /api/procurements/{id}/update_status/ - update status
+    - POST /api/procurements/{id}/cast_vote/ - cast a supplier vote
+    - GET /api/procurements/{id}/vote_results/ - get vote results
+    - POST /api/procurements/{id}/approve_supplier/ - organizer approves supplier
+    - POST /api/procurements/{id}/stop_amount/ - organizer triggers stop-amount
+    - GET /api/procurements/{id}/receipt_table/ - generate receipt table for supplier
+    - POST /api/procurements/{id}/close/ - organizer closes completed procurement
     """
     queryset = Procurement.objects.select_related('category', 'organizer')
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -228,6 +237,209 @@ class ProcurementViewSet(viewsets.ModelViewSet):
         return Response({
             'status': procurement.status,
             'status_display': procurement.status_display
+        })
+
+    # ------------------------------------------------------------------
+    # Supplier voting (docs section 2.3, 2.4, 10.1-10.2)
+    # ------------------------------------------------------------------
+
+    @action(detail=True, methods=['post'])
+    def cast_vote(self, request, pk=None):
+        """Cast a vote for a supplier.
+
+        A participant casts exactly one vote per procurement (unique constraint).
+        The procurement must be in ACTIVE or STOPPED status to allow voting.
+        """
+        procurement = self.get_object()
+
+        if procurement.status not in (Procurement.Status.ACTIVE, Procurement.Status.STOPPED):
+            return Response(
+                {'error': 'Voting is only allowed while the procurement is active or stopped'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = CastVoteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        voter_id = serializer.validated_data['voter_id']
+        supplier_id = serializer.validated_data['supplier_id']
+        comment = serializer.validated_data.get('comment', '')
+
+        # Voter must be a participant or the organizer
+        is_participant = procurement.participants.filter(user_id=voter_id, is_active=True).exists()
+        is_organizer = procurement.organizer_id == voter_id
+        if not is_participant and not is_organizer:
+            return Response(
+                {'error': 'Only participants or the organizer can vote'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Upsert: update existing vote or create new one
+        vote, created = SupplierVote.objects.update_or_create(
+            procurement=procurement,
+            voter_id=voter_id,
+            defaults={'supplier_id': supplier_id, 'comment': comment},
+        )
+
+        return Response(
+            SupplierVoteSerializer(vote).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['get'])
+    def vote_results(self, request, pk=None):
+        """Get aggregated supplier vote results for a procurement."""
+        procurement = self.get_object()
+
+        results = (
+            SupplierVote.objects.filter(procurement=procurement)
+            .values('supplier', 'supplier__first_name', 'supplier__last_name')
+            .annotate(vote_count=Count('id'))
+            .order_by('-vote_count')
+        )
+
+        total_votes = sum(r['vote_count'] for r in results)
+
+        data = []
+        for r in results:
+            supplier_name = f"{r['supplier__first_name']} {r['supplier__last_name']}".strip()
+            data.append({
+                'supplier_id': r['supplier'],
+                'supplier_name': supplier_name,
+                'vote_count': r['vote_count'],
+                'percentage': round(r['vote_count'] / total_votes * 100, 1) if total_votes else 0,
+            })
+
+        return Response({
+            'procurement_id': procurement.id,
+            'total_votes': total_votes,
+            'results': data,
+        })
+
+    # ------------------------------------------------------------------
+    # Organizer actions (docs section 2.2 – slider buttons)
+    # ------------------------------------------------------------------
+
+    @action(detail=True, methods=['post'])
+    def approve_supplier(self, request, pk=None):
+        """Organizer approves (confirms) the winning supplier.
+
+        Sets procurement.supplier to the given supplier_id and transitions
+        the procurement status to PAYMENT so participants can confirm and pay.
+        """
+        procurement = self.get_object()
+        supplier_id = request.data.get('supplier_id')
+
+        if not supplier_id:
+            return Response(
+                {'error': 'supplier_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        procurement.supplier_id = supplier_id
+        procurement.status = Procurement.Status.PAYMENT
+        procurement.save(update_fields=['supplier_id', 'status', 'updated_at'])
+
+        return Response({
+            'message': 'Supplier approved',
+            'supplier_id': supplier_id,
+            'status': procurement.status,
+        })
+
+    @action(detail=True, methods=['post'])
+    def stop_amount(self, request, pk=None):
+        """Organizer triggers stop-amount: closes procurement to new participants.
+
+        Transitions procurement to STOPPED status and notifies confirmed
+        participants that they should confirm their final participation.
+        Any participant that is PENDING is asked to confirm; this endpoint
+        returns the list of confirmed participants so the caller can create
+        the closed chat.
+        """
+        procurement = self.get_object()
+
+        if procurement.status != Procurement.Status.ACTIVE:
+            return Response(
+                {'error': 'Only active procurements can be stopped'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        procurement.status = Procurement.Status.STOPPED
+        procurement.save(update_fields=['status', 'updated_at'])
+
+        confirmed_participants = procurement.participants.filter(is_active=True)
+        serializer = ParticipantSerializer(confirmed_participants, many=True)
+
+        return Response({
+            'message': 'Procurement stopped – participants should confirm participation',
+            'status': procurement.status,
+            'participants': serializer.data,
+        })
+
+    @action(detail=True, methods=['get'])
+    def receipt_table(self, request, pk=None):
+        """Generate receipt table for the supplier.
+
+        Returns a list of confirmed/paid participants with their order details
+        so the organizer can send the summary spreadsheet to the supplier.
+        """
+        procurement = self.get_object()
+
+        participants = procurement.participants.filter(
+            is_active=True,
+            status__in=[Participant.Status.CONFIRMED, Participant.Status.PAID],
+        ).select_related('user')
+
+        rows = []
+        total_amount = 0
+        for p in participants:
+            rows.append({
+                'user_id': p.user_id,
+                'full_name': p.user.full_name,
+                'phone': p.user.phone,
+                'city': procurement.city,
+                'quantity': str(p.quantity),
+                'amount': str(p.amount),
+                'status': p.status,
+                'notes': p.notes,
+            })
+            total_amount += float(p.amount)
+
+        commission = float(procurement.commission_percent) / 100 * total_amount
+
+        return Response({
+            'procurement_id': procurement.id,
+            'procurement_title': procurement.title,
+            'supplier_id': procurement.supplier_id,
+            'unit': procurement.unit,
+            'total_participants': len(rows),
+            'total_amount': round(total_amount, 2),
+            'commission_percent': str(procurement.commission_percent),
+            'commission_amount': round(commission, 2),
+            'rows': rows,
+        })
+
+    @action(detail=True, methods=['post'])
+    def close(self, request, pk=None):
+        """Organizer closes a completed procurement and moves it to history."""
+        procurement = self.get_object()
+
+        if procurement.status not in (
+            Procurement.Status.PAYMENT,
+            Procurement.Status.STOPPED,
+        ):
+            return Response(
+                {'error': 'Only procurements in payment or stopped status can be closed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        procurement.status = Procurement.Status.COMPLETED
+        procurement.save(update_fields=['status', 'updated_at'])
+
+        return Response({
+            'message': 'Procurement closed successfully',
+            'status': procurement.status,
         })
 
 

@@ -230,6 +230,208 @@ class ProcurementAPITests(APITestCase):
         self.assertIn(response.status_code, [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST])
 
 
+class ProcurementProcessTests(APITestCase):
+    """Tests for procurement process endpoints added in issue #74.
+
+    Covers: commission, min_quantity, supplier voting, stop-amount,
+    approve-supplier, receipt table, and close.
+    """
+
+    def setUp(self):
+        # Organizer
+        resp = self.client.post('/api/users/', {
+            'platform': 'telegram', 'platform_user_id': 'org1',
+            'first_name': 'Organizer', 'role': 'organizer'
+        }, format='json')
+        self.organizer_id = resp.data['id']
+
+        # Supplier user
+        resp = self.client.post('/api/users/', {
+            'platform': 'telegram', 'platform_user_id': 'sup1',
+            'first_name': 'Supplier', 'role': 'supplier'
+        }, format='json')
+        self.supplier_id = resp.data['id']
+
+        # Buyer / participant
+        resp = self.client.post('/api/users/', {
+            'platform': 'telegram', 'platform_user_id': 'buy1',
+            'first_name': 'Buyer', 'role': 'buyer'
+        }, format='json')
+        self.buyer_id = resp.data['id']
+
+        # Procurement (active so we can join/vote)
+        resp = self.client.post('/api/procurements/', {
+            'title': 'Process Test Procurement',
+            'description': 'Testing process endpoints',
+            'organizer': self.organizer_id,
+            'city': 'Moscow',
+            'target_amount': 50000,
+            'deadline': '2099-12-31T23:59:59Z',
+            'unit': 'kg',
+            'commission_percent': '2.50',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201, msg=resp.data)
+        self.proc_id = resp.data['id']
+
+        # Activate the procurement so participants can join
+        self.client.post(f'/api/procurements/{self.proc_id}/update_status/', {'status': 'active'}, format='json')
+
+        # Add buyer as participant
+        self.client.post(f'/api/procurements/{self.proc_id}/join/', {
+            'user_id': self.buyer_id, 'quantity': 10, 'amount': 5000
+        }, format='json')
+
+    def test_create_procurement_with_commission(self):
+        """Procurement creation accepts commission_percent field."""
+        resp = self.client.post('/api/procurements/', {
+            'title': 'Commission Test',
+            'description': 'Testing commission field',
+            'organizer': self.organizer_id,
+            'city': 'SPb',
+            'target_amount': 20000,
+            'deadline': '2099-12-31T23:59:59Z',
+            'unit': 'units',
+            'commission_percent': '3.00',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201)
+        # The list/detail serializers should expose commission_percent
+        detail = self.client.get(f'/api/procurements/{resp.data["id"]}/')
+        self.assertIn('commission_percent', detail.data)
+
+    def test_create_procurement_with_min_quantity(self):
+        """Procurement creation accepts optional min_quantity field."""
+        resp = self.client.post('/api/procurements/', {
+            'title': 'MinQty Test',
+            'description': 'Testing min_quantity field',
+            'organizer': self.organizer_id,
+            'city': 'Kazan',
+            'target_amount': 30000,
+            'deadline': '2099-12-31T23:59:59Z',
+            'unit': 'liters',
+            'min_quantity': '100',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201)
+        detail = self.client.get(f'/api/procurements/{resp.data["id"]}/')
+        self.assertEqual(detail.data['min_quantity'], '100.00')
+
+    def test_cast_vote(self):
+        """Participant can cast a vote for a supplier."""
+        url = f'/api/procurements/{self.proc_id}/cast_vote/'
+        resp = self.client.post(url, {
+            'voter_id': self.buyer_id,
+            'supplier_id': self.supplier_id,
+            'comment': 'Good price',
+        }, format='json')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['supplier'], self.supplier_id)
+
+    def test_cast_vote_updates_on_revote(self):
+        """Casting a second vote updates the existing one (no duplicate)."""
+        url = f'/api/procurements/{self.proc_id}/cast_vote/'
+        self.client.post(url, {'voter_id': self.buyer_id, 'supplier_id': self.supplier_id}, format='json')
+
+        # Create a second supplier and revote
+        resp2 = self.client.post('/api/users/', {
+            'platform': 'telegram', 'platform_user_id': 'sup2',
+            'first_name': 'Supplier2', 'role': 'supplier'
+        }, format='json')
+        supplier2_id = resp2.data['id']
+
+        resp = self.client.post(url, {'voter_id': self.buyer_id, 'supplier_id': supplier2_id}, format='json')
+        self.assertEqual(resp.status_code, 200)  # Updated, not created
+        self.assertEqual(resp.data['supplier'], supplier2_id)
+
+    def test_non_participant_cannot_vote(self):
+        """A user who is not a participant or organizer cannot vote."""
+        outsider_resp = self.client.post('/api/users/', {
+            'platform': 'telegram', 'platform_user_id': 'outsider99',
+            'first_name': 'Outsider', 'role': 'buyer'
+        }, format='json')
+        outsider_id = outsider_resp.data['id']
+
+        url = f'/api/procurements/{self.proc_id}/cast_vote/'
+        resp = self.client.post(url, {'voter_id': outsider_id, 'supplier_id': self.supplier_id}, format='json')
+        self.assertEqual(resp.status_code, 403)
+
+    def test_vote_results(self):
+        """vote_results returns aggregated vote counts."""
+        self.client.post(f'/api/procurements/{self.proc_id}/cast_vote/', {
+            'voter_id': self.buyer_id, 'supplier_id': self.supplier_id,
+        }, format='json')
+
+        resp = self.client.get(f'/api/procurements/{self.proc_id}/vote_results/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['total_votes'], 1)
+        self.assertEqual(resp.data['results'][0]['supplier_id'], self.supplier_id)
+        self.assertEqual(resp.data['results'][0]['vote_count'], 1)
+
+    def test_stop_amount_transitions_status(self):
+        """stop_amount action moves an active procurement to stopped."""
+        resp = self.client.post(f'/api/procurements/{self.proc_id}/stop_amount/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['status'], 'stopped')
+        # participants list is included in the response
+        self.assertIn('participants', resp.data)
+
+    def test_stop_amount_requires_active(self):
+        """stop_amount should fail on a non-active procurement."""
+        # First stop it
+        self.client.post(f'/api/procurements/{self.proc_id}/stop_amount/')
+        # Then try again
+        resp = self.client.post(f'/api/procurements/{self.proc_id}/stop_amount/')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_approve_supplier(self):
+        """approve_supplier sets the supplier and moves status to payment."""
+        resp = self.client.post(f'/api/procurements/{self.proc_id}/approve_supplier/', {
+            'supplier_id': self.supplier_id,
+        }, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['supplier_id'], self.supplier_id)
+        self.assertEqual(resp.data['status'], 'payment')
+
+    def test_approve_supplier_requires_supplier_id(self):
+        """approve_supplier without supplier_id returns 400."""
+        resp = self.client.post(f'/api/procurements/{self.proc_id}/approve_supplier/', {}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_receipt_table(self):
+        """receipt_table returns rows for confirmed/paid participants."""
+        # Confirm the participant
+        participant_resp = self.client.get(
+            f'/api/procurements/{self.proc_id}/participants/'
+        )
+        if participant_resp.data:
+            participant_id = participant_resp.data[0]['id']
+            self.client.post(
+                f'/api/procurements/participants/{participant_id}/update_status/',
+                {'status': 'confirmed'}, format='json'
+            )
+
+        resp = self.client.get(f'/api/procurements/{self.proc_id}/receipt_table/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('rows', resp.data)
+        self.assertIn('total_amount', resp.data)
+        self.assertIn('commission_percent', resp.data)
+        self.assertIn('commission_amount', resp.data)
+
+    def test_close_procurement(self):
+        """close action moves payment-status procurement to completed."""
+        # Approve supplier to transition to payment status
+        self.client.post(f'/api/procurements/{self.proc_id}/approve_supplier/', {
+            'supplier_id': self.supplier_id,
+        }, format='json')
+
+        resp = self.client.post(f'/api/procurements/{self.proc_id}/close/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['status'], 'completed')
+
+    def test_close_requires_payment_or_stopped_status(self):
+        """close should fail on an active procurement."""
+        resp = self.client.post(f'/api/procurements/{self.proc_id}/close/')
+        self.assertEqual(resp.status_code, 400)
+
+
 class PaymentAPITests(APITestCase):
     """Tests for Payment API endpoints"""
 
