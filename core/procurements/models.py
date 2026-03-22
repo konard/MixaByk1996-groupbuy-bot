@@ -65,6 +65,14 @@ class Procurement(models.Model):
     )
     unit = models.CharField(max_length=20, default='units', help_text='e.g., kg, pieces, liters')
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    commission_percent = models.DecimalField(
+        max_digits=4, decimal_places=2, default=0,
+        help_text='Organizer commission percentage (1–4%)'
+    )
+    min_quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='Minimum total quantity to launch the procurement'
+    )
 
     # Status and timing
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -176,3 +184,36 @@ class Participant(models.Model):
         super().save(*args, **kwargs)
         # Update procurement totals
         self.procurement.update_current_amount()
+
+
+class SupplierVote(models.Model):
+    """Participant vote for a supplier in a procurement.
+
+    Each participant may cast exactly one vote per procurement (enforced by
+    the unique_together constraint).  The winning supplier is determined by
+    simple majority; ties trigger a second round.
+    """
+
+    procurement = models.ForeignKey(
+        Procurement, on_delete=models.CASCADE, related_name='supplier_votes'
+    )
+    voter = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='supplier_votes_cast'
+    )
+    # The supplier being voted for (a User with role='supplier')
+    supplier = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='supplier_votes_received'
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'supplier_votes'
+        # One vote per participant per procurement
+        unique_together = ['procurement', 'voter']
+        indexes = [
+            models.Index(fields=['procurement', 'supplier']),
+        ]
+
+    def __str__(self):
+        return f"{self.voter} voted for {self.supplier} in {self.procurement.title}"
