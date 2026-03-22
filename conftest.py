@@ -75,9 +75,7 @@ def pytest_configure(config):
             SECRET_KEY='test-secret-key-for-pytest',
         )
         django.setup()
-        # Run migrations to create tables
-        from django.test.utils import setup_test_environment
-        setup_test_environment()
+        # Run migrations to create tables (pytest-django handles setup_test_environment)
         from django.core.management import call_command
         call_command('migrate', '--run-syncdb', verbosity=0)
     else:
