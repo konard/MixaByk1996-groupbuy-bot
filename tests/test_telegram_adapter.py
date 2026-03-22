@@ -68,6 +68,117 @@ class TestTelegramAdapterInit:
 
                     mock_session_cls.assert_called_once_with()
 
+    def test_builtin_proxy_via_use_proxy_flag(self):
+        """When TELEGRAM_USE_PROXY=true the built-in SOCKS5 proxy is used"""
+        env = {"TELEGRAM_TOKEN": "tok", "TELEGRAM_USE_PROXY": "true"}
+        with patch.dict("os.environ", env, clear=True):
+            with patch("adapters.telegram.adapter.AiohttpSession") as mock_session_cls:
+                mock_session_cls.return_value = MagicMock()
+                with patch("adapters.telegram.adapter.Bot"):
+                    from adapters.telegram.adapter import TelegramAdapter
+
+                    adapter = TelegramAdapter()
+
+                    assert adapter.proxy_url == "socks5://telegram-proxy:1080"
+                    mock_session_cls.assert_called_once_with(
+                        proxy="socks5://telegram-proxy:1080"
+                    )
+
+    def test_explicit_proxy_overrides_use_proxy_flag(self):
+        """TELEGRAM_PROXY_URL takes priority over TELEGRAM_USE_PROXY"""
+        env = {
+            "TELEGRAM_TOKEN": "tok",
+            "TELEGRAM_PROXY_URL": "http://my-proxy:8080",
+            "TELEGRAM_USE_PROXY": "true",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            with patch("adapters.telegram.adapter.AiohttpSession") as mock_session_cls:
+                mock_session_cls.return_value = MagicMock()
+                with patch("adapters.telegram.adapter.Bot"):
+                    from adapters.telegram.adapter import TelegramAdapter
+
+                    adapter = TelegramAdapter()
+
+                    assert adapter.proxy_url == "http://my-proxy:8080"
+                    mock_session_cls.assert_called_once_with(proxy="http://my-proxy:8080")
+
+    def test_use_proxy_false_means_direct(self):
+        """TELEGRAM_USE_PROXY=false results in direct connection"""
+        env = {"TELEGRAM_TOKEN": "tok", "TELEGRAM_USE_PROXY": "false"}
+        with patch.dict("os.environ", env, clear=True):
+            with patch("adapters.telegram.adapter.AiohttpSession") as mock_session_cls:
+                mock_session_cls.return_value = MagicMock()
+                with patch("adapters.telegram.adapter.Bot"):
+                    from adapters.telegram.adapter import TelegramAdapter
+
+                    adapter = TelegramAdapter()
+
+                    assert adapter.proxy_url == ""
+                    mock_session_cls.assert_called_once_with()
+
+
+# ---------------------------------------------------------------------------
+# Proxy URL resolution
+# ---------------------------------------------------------------------------
+
+class TestResolveProxyUrl:
+    """Tests for _resolve_proxy_url static method"""
+
+    def test_empty_when_nothing_set(self):
+        with patch.dict("os.environ", {}, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == ""
+
+    def test_explicit_proxy_url(self):
+        env = {"TELEGRAM_PROXY_URL": "socks5://ext:1080"}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == "socks5://ext:1080"
+
+    def test_builtin_proxy_with_true(self):
+        env = {"TELEGRAM_USE_PROXY": "true"}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == "socks5://telegram-proxy:1080"
+
+    def test_builtin_proxy_with_1(self):
+        env = {"TELEGRAM_USE_PROXY": "1"}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == "socks5://telegram-proxy:1080"
+
+    def test_builtin_proxy_with_yes(self):
+        env = {"TELEGRAM_USE_PROXY": "YES"}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == "socks5://telegram-proxy:1080"
+
+    def test_explicit_takes_priority_over_builtin(self):
+        env = {"TELEGRAM_PROXY_URL": "http://ext:8080", "TELEGRAM_USE_PROXY": "true"}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == "http://ext:8080"
+
+    def test_false_means_no_proxy(self):
+        env = {"TELEGRAM_USE_PROXY": "false"}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == ""
+
+    def test_whitespace_proxy_url_ignored(self):
+        env = {"TELEGRAM_PROXY_URL": "  "}
+        with patch.dict("os.environ", env, clear=True):
+            from adapters.telegram.adapter import TelegramAdapter
+
+            assert TelegramAdapter._resolve_proxy_url() == ""
+
 
 # ---------------------------------------------------------------------------
 # Message standardisation

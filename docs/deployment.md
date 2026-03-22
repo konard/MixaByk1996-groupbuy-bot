@@ -534,6 +534,42 @@ docker-compose logs telegram-adapter
 docker-compose exec bot env | grep TELEGRAM
 ```
 
+### Telegram API заблокирован (Россия и т.д.)
+
+Если `api.telegram.org` заблокирован или работает медленно, используйте встроенный SOCKS5-прокси.
+
+**Вариант 1: Встроенный прокси (рекомендуется)**
+
+В проекте есть готовый Docker-контейнер с SOCKS5-прокси (`serjs/go-socks5-proxy`), который
+маршрутизирует трафик к Telegram API через контейнерную сеть.
+
+```bash
+# 1. Включите прокси в .env
+echo "TELEGRAM_USE_PROXY=true" >> .env
+
+# 2. Запустите с профилем proxy
+docker compose --profile proxy up -d
+
+# Для продакшена:
+docker compose -f docker-compose.prod.yml --profile proxy up -d
+```
+
+> **Примечание:** Флаг `--profile proxy` запускает дополнительный контейнер `telegram-proxy`.
+> Без этого флага контейнер прокси не создаётся, даже если `TELEGRAM_USE_PROXY=true`.
+
+**Вариант 2: Внешний прокси**
+
+Если у вас есть собственный прокси-сервер (HTTP или SOCKS5):
+
+```env
+TELEGRAM_PROXY_URL=socks5://user:pass@proxy-host:1080
+```
+
+**Приоритет:**
+1. `TELEGRAM_PROXY_URL` — если задан, используется внешний прокси
+2. `TELEGRAM_USE_PROXY=true` — если задан, используется встроенный прокси (`socks5://telegram-proxy:1080`)
+3. Прямое подключение к `api.telegram.org`
+
 ## 11. Подключение ВКонтакте (VK)
 
 ### 11.1 Как получить VK_TOKEN

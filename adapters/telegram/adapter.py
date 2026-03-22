@@ -31,7 +31,7 @@ class TelegramAdapter:
     def __init__(self):
         self.token = os.getenv("TELEGRAM_TOKEN", "")
         self.bot_service_url = os.getenv("BOT_SERVICE_URL", "http://bot:8001")
-        self.proxy_url = os.getenv("TELEGRAM_PROXY_URL", "")
+        self.proxy_url = self._resolve_proxy_url()
 
         if not self.token:
             raise ValueError("TELEGRAM_TOKEN is not set")
@@ -55,6 +55,26 @@ class TelegramAdapter:
         self.is_running = False
 
         self._register_handlers()
+
+    @staticmethod
+    def _resolve_proxy_url() -> str:
+        """Determine proxy URL from environment variables.
+
+        Priority:
+        1. TELEGRAM_PROXY_URL — explicit external proxy (HTTP or SOCKS5)
+        2. TELEGRAM_USE_PROXY=true — use the built-in Docker SOCKS5 proxy
+           at socks5://telegram-proxy:1080
+        3. Empty string — direct connection
+        """
+        explicit = os.getenv("TELEGRAM_PROXY_URL", "").strip()
+        if explicit:
+            return explicit
+
+        use_builtin = os.getenv("TELEGRAM_USE_PROXY", "").strip().lower()
+        if use_builtin in ("true", "1", "yes"):
+            return "socks5://telegram-proxy:1080"
+
+        return ""
 
     def _register_handlers(self):
         """Register message handlers"""
