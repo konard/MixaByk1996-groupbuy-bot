@@ -72,19 +72,52 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  leaveProcurement: (id) =>
+  leaveProcurement: (id, data) =>
     request(`/procurements/${id}/leave/`, {
       method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   getUserProcurements: (userId) => request(`/procurements/user/${userId}/`),
 
   getCategories: () => request('/procurements/categories/'),
 
+  // Procurement action endpoints
+  stopProcurement: (id) =>
+    request(`/procurements/${id}/stop_amount/`, { method: 'POST' }),
+
+  approveSupplier: (id, supplierId) =>
+    request(`/procurements/${id}/approve_supplier/`, {
+      method: 'POST',
+      body: JSON.stringify({ supplier_id: supplierId }),
+    }),
+
+  closeProcurement: (id) =>
+    request(`/procurements/${id}/close/`, { method: 'POST' }),
+
+  getReceiptTable: (id) => request(`/procurements/${id}/receipt_table/`),
+
+  getVoteResults: (id) => request(`/procurements/${id}/vote_results/`),
+
+  castVote: (id, data) =>
+    request(`/procurements/${id}/cast_vote/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getParticipants: (procurementId) =>
+    request(`/procurements/${procurementId}/participants/`),
+
+  updateParticipantStatus: (participantId, newStatus) =>
+    request(`/procurements/participants/${participantId}/update_status/`, {
+      method: 'POST',
+      body: JSON.stringify({ status: newStatus }),
+    }),
+
   // Chat endpoints
   getMessages: (procurementId, params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return request(`/chat/messages/?procurement=${procurementId}&${query}`);
+    return request(`/chat/messages/?procurement_id=${procurementId}&${query}`);
   },
 
   sendMessage: (data) =>
@@ -93,7 +126,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  getNotifications: (userId) => request(`/chat/notifications/?user=${userId}`),
+  getNotifications: (userId) => request(`/chat/notifications/?user_id=${userId}`),
 
   // Payment endpoints
   createPayment: (data) =>
@@ -103,4 +136,9 @@ export const api = {
     }),
 
   getPaymentStatus: (paymentId) => request(`/payments/${paymentId}/status/`),
+
+  getTransactions: (userId) => request(`/payments/transactions/?user_id=${userId}`),
+
+  // Supplier profile endpoints (stored as user profile extensions)
+  getSuppliers: () => request('/users/?role=supplier'),
 };
