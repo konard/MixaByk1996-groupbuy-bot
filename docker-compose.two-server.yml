@@ -129,6 +129,7 @@ services:
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_PROXY_URL=${TELEGRAM_PROXY_URL:-}
     depends_on:
       - bot
     networks:
