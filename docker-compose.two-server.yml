@@ -120,6 +120,17 @@ services:
     networks:
       - api-network
 
+  # SOCKS5 proxy for Telegram API (useful when api.telegram.org is blocked)
+  # Enable by setting TELEGRAM_USE_PROXY=true in .env
+  telegram-proxy:
+    image: serjs/go-socks5-proxy:latest
+    container_name: groupbuy-telegram-proxy
+    restart: unless-stopped
+    networks:
+      - api-network
+    profiles:
+      - proxy
+
   # Telegram adapter
   telegram-adapter:
     build: ./adapters/telegram
@@ -130,6 +141,7 @@ services:
       - BOT_SERVICE_URL=http://bot:8001
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_PROXY_URL=${TELEGRAM_PROXY_URL:-}
+      - TELEGRAM_USE_PROXY=${TELEGRAM_USE_PROXY:-false}
     depends_on:
       - bot
     networks:
