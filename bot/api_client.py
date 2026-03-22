@@ -16,6 +16,20 @@ class APIClient:
     def __init__(self, base_url: str = None):
         self.base_url = base_url or config.core_api_url
         self.timeout = aiohttp.ClientTimeout(total=config.core_api_timeout)
+        # Persistent session reused across requests to avoid overhead of
+        # creating/closing a TCP connection on every API call.
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        """Return the persistent session, creating it lazily if needed."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(timeout=self.timeout)
+        return self._session
+
+    async def close(self) -> None:
+        """Close the underlying HTTP session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     async def _request(
         self, method: str, endpoint: str, data: Dict = None, params: Dict = None
@@ -24,17 +38,19 @@ class APIClient:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
 
         try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.request(
-                    method=method, url=url, json=data, params=params
-                ) as response:
-                    if response.status >= 400:
-                        text = await response.text()
-                        logger.error(f"API error {response.status}: {text}")
-                        return None
-                    return await response.json()
+            session = self._get_session()
+            async with session.request(
+                method=method, url=url, json=data, params=params
+            ) as response:
+                if response.status >= 400:
+                    text = await response.text()
+                    logger.error(f"API error {response.status}: {text}")
+                    return None
+                return await response.json()
         except aiohttp.ClientError as e:
             logger.error(f"API request failed: {e}")
+            # Invalidate session so the next request opens a fresh connection
+            self._session = None
             return None
         except Exception as e:
             logger.error(f"Unexpected error: {e}")

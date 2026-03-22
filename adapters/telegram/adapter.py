@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 
 import aiohttp
 from aiogram import Bot, Dispatcher, types
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # Configure logging
@@ -19,6 +20,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Retry configuration for Telegram API network errors
+_MAX_RETRY_ATTEMPTS = 5
+_RETRY_BASE_DELAY = 5  # seconds
+
 
 class TelegramAdapter:
     """Adapter for Telegram messenger"""
@@ -26,13 +31,24 @@ class TelegramAdapter:
     def __init__(self):
         self.token = os.getenv("TELEGRAM_TOKEN", "")
         self.bot_service_url = os.getenv("BOT_SERVICE_URL", "http://bot:8001")
+        self.proxy_url = os.getenv("TELEGRAM_PROXY_URL", "")
 
         if not self.token:
             raise ValueError("TELEGRAM_TOKEN is not set")
 
-        self.bot = Bot(token=self.token)
+        # Build bot session with optional proxy
+        if self.proxy_url:
+            logger.info("Using proxy for Telegram: %s", self.proxy_url)
+            session = AiohttpSession(proxy=self.proxy_url)
+        else:
+            session = AiohttpSession()
+
+        self.bot = Bot(token=self.token, session=session)
         self.storage = MemoryStorage()
         self.dp = Dispatcher(storage=self.storage)
+
+        # Persistent aiohttp session for routing messages to the bot service
+        self._http_session: Optional[aiohttp.ClientSession] = None
 
         # Message queue for async processing
         self.message_queue = asyncio.Queue()
@@ -171,6 +187,14 @@ class TelegramAdapter:
             logger.error(f"Error getting Telegram user info: {e}")
             return None
 
+    async def _get_http_session(self) -> aiohttp.ClientSession:
+        """Return a persistent aiohttp session, creating it if needed."""
+        if self._http_session is None or self._http_session.closed:
+            self._http_session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=30)
+            )
+        return self._http_session
+
     async def process_queue(self):
         """Process messages from queue and send to bot service"""
         while self.is_running:
@@ -185,30 +209,58 @@ class TelegramAdapter:
     async def _route_message(self, message: Dict[str, Any]):
         """Route message to bot service"""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.bot_service_url}/message", json=message
-                ) as response:
-                    if response.status != 200:
-                        text = await response.text()
-                        logger.warning(f"Bot service error: {text}")
+            session = await self._get_http_session()
+            async with session.post(
+                f"{self.bot_service_url}/message", json=message
+            ) as response:
+                if response.status != 200:
+                    text = await response.text()
+                    logger.warning(f"Bot service error: {text}")
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP error routing message to bot service: {e}")
         except Exception as e:
             logger.error(f"Error routing message: {e}")
 
     async def start(self):
-        """Start the adapter"""
+        """Start the adapter with retry on network errors."""
         self.is_running = True
 
         # Start queue processor
         asyncio.create_task(self.process_queue())
 
-        # Start polling
-        logger.info("Starting Telegram adapter...")
-        await self.dp.start_polling(self.bot)
+        attempt = 0
+        while True:
+            try:
+                logger.info("Starting Telegram adapter (attempt %d)...", attempt + 1)
+                await self.dp.start_polling(self.bot)
+                # start_polling returned normally — exit the retry loop
+                break
+            except Exception as e:
+                attempt += 1
+                if attempt >= _MAX_RETRY_ATTEMPTS:
+                    logger.error(
+                        "Telegram adapter failed after %d attempts: %s",
+                        _MAX_RETRY_ATTEMPTS,
+                        e,
+                    )
+                    raise
+
+                delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                logger.warning(
+                    "Telegram network error (attempt %d/%d): %s. "
+                    "Retrying in %d seconds...",
+                    attempt,
+                    _MAX_RETRY_ATTEMPTS,
+                    e,
+                    delay,
+                )
+                await asyncio.sleep(delay)
 
     async def stop(self):
         """Stop the adapter"""
         self.is_running = False
+        if self._http_session and not self._http_session.closed:
+            await self._http_session.close()
         await self.bot.session.close()
 
 
