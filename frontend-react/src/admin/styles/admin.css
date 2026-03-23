@@ -910,33 +910,143 @@
   font-size: 0.8125rem;
 }
 
-/* Responsive */
+/* ============================================
+   RESPONSIVE DESIGN — MOBILE
+   ============================================ */
+
+/* Mobile sidebar toggle button (hidden on desktop) */
+.admin-mobile-toggle {
+  display: none;
+}
+
 @media (max-width: 768px) {
+  /* Sidebar: hidden off-screen by default, slides in when open */
   .admin-sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 200;
   }
 
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay behind the open sidebar */
+  .admin-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 199;
+  }
+
+  /* Main content: no left margin on mobile */
   .admin-main {
     margin-left: 0;
+    padding: 1rem;
   }
 
+  /* Hamburger toggle button visible on mobile */
+  .admin-mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 198;
+    width: 44px;
+    height: 44px;
+    border-radius: 0.5rem;
+    background: var(--admin-sidebar-bg);
+    color: var(--admin-sidebar-text);
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Shift page content down so hamburger doesn't overlap heading */
+  .admin-content {
+    padding-top: 3.5rem;
+  }
+
+  /* Stats grid: 2 columns on mobile */
   .admin-stat-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
+  /* Detail grids: single column */
   .admin-detail-grid {
     grid-template-columns: 1fr;
   }
 
+  /* Filter controls: stack vertically */
   .admin-filter-controls {
     flex-direction: column;
   }
 
+  /* Tables: horizontal scroll */
   .admin-table {
     display: block;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Page header: stack title and actions */
+  .admin-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .admin-page-title {
+    font-size: 1.35rem;
+  }
+
+  /* Buttons: comfortable touch targets */
+  .admin-btn,
+  .admin-btn-sm {
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    font-size: 0.9375rem;
+  }
+
+  /* Reports grid: single column */
+  .admin-reports-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Charts: stack charts vertically */
+  .admin-charts-row {
+    flex-direction: column;
+  }
+
+  .admin-chart-card {
+    min-width: 0;
+  }
+
+  /* Section: reduce padding */
+  .admin-section {
+    padding: 1rem;
+  }
+}
+
+/* Extra-small phones */
+@media (max-width: 480px) {
+  .admin-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-main {
+    padding: 0.75rem;
   }
 }
 
@@ -1369,12 +1479,24 @@
 @media (max-width: 768px) {
   .admin-chat-layout {
     grid-template-columns: 1fr;
-    height: auto;
+    height: calc(100vh - 120px);
   }
 
   .admin-chat-users {
-    max-height: 200px;
+    max-height: 180px;
     border-right: none;
     border-bottom: 1px solid var(--admin-border);
+  }
+
+  .admin-chat-window {
+    min-height: 0;
+  }
+
+  .admin-chat-input {
+    font-size: 16px; /* Prevent iOS zoom */
+  }
+
+  .admin-chat-msg {
+    max-width: 85%;
   }
 }

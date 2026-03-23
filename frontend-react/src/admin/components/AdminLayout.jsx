@@ -2,7 +2,7 @@
  * Admin Layout Component
  * Main layout wrapper for admin panel pages
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../store/adminStore';
 import '../styles/admin.css';
@@ -11,11 +11,14 @@ export default function AdminLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { adminUser, logout, toasts, removeToast } = useAdminStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/admin-panel/login');
   };
+
+  const closeSidebar = () => setSidebarOpen(false);
 
   const navItems = [
     { path: '/admin-panel', label: 'Дашборд', icon: '📊' },
@@ -38,7 +41,21 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="admin-layout">
-      <aside className="admin-sidebar">
+      {/* Mobile hamburger button */}
+      <button
+        className="admin-mobile-toggle"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Открыть меню"
+      >
+        ☰
+      </button>
+
+      {/* Sidebar overlay for mobile */}
+      {sidebarOpen && (
+        <div className="admin-sidebar-overlay" onClick={closeSidebar} />
+      )}
+
+      <aside className={`admin-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="admin-sidebar-header">
           <h2>GroupBuy Admin</h2>
         </div>
@@ -48,6 +65,7 @@ export default function AdminLayout({ children }) {
               key={item.path}
               to={item.path}
               className={`admin-nav-item ${isActive(item.path) ? 'active' : ''}`}
+              onClick={closeSidebar}
             >
               <span className="admin-nav-icon">{item.icon}</span>
               <span className="admin-nav-label">{item.label}</span>
