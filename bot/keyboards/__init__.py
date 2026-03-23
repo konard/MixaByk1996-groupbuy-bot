@@ -184,7 +184,7 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_categories_keyboard(categories: list) -> InlineKeyboardMarkup:
-    """Get keyboard for category selection"""
+    """Get keyboard for category selection (browse/filter, uses 'category_' prefix)"""
     buttons = []
     row = []
 
@@ -192,6 +192,32 @@ def get_categories_keyboard(categories: list) -> InlineKeyboardMarkup:
         row.append(
             InlineKeyboardButton(
                 text=cat.get("name", "Unknown"), callback_data=f"category_{cat['id']}"
+            )
+        )
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+
+    if row:
+        buttons.append(row)
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_procurement_category_keyboard(categories: list) -> InlineKeyboardMarkup:
+    """Get keyboard for category selection during procurement creation.
+
+    Uses the 'proc_category_' prefix so these callbacks are handled by the
+    procurement-creation FSM handler and don't collide with the browse filter.
+    """
+    buttons = []
+    row = []
+
+    for cat in categories:
+        row.append(
+            InlineKeyboardButton(
+                text=cat.get("name", "Unknown"),
+                callback_data=f"proc_category_{cat['id']}",
             )
         )
         if len(row) == 2:

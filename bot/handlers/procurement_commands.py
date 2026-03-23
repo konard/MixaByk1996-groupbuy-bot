@@ -13,6 +13,7 @@ from keyboards import (
     get_procurements_keyboard,
     get_procurement_detail_keyboard,
     get_categories_keyboard,
+    get_procurement_category_keyboard,
     get_main_keyboard,
 )
 from dialogs.registration import start_registration
@@ -510,9 +511,32 @@ async def process_description(message: Message, state: FSMContext):
         return
 
     await state.update_data(description=description)
-    await state.set_state(ProcurementCreationStates.waiting_for_target_amount)
 
-    await message.answer("Enter target amount in RUB (minimum 1000):")
+    # Try to fetch categories to offer a selection; fall back to skipping if none.
+    categories = await api_client.get_categories()
+    if categories:
+        await state.set_state(ProcurementCreationStates.waiting_for_category)
+        await message.answer(
+            "Select a category for your procurement:",
+            reply_markup=get_procurement_category_keyboard(categories),
+        )
+    else:
+        # No categories available — skip directly to target amount
+        await state.set_state(ProcurementCreationStates.waiting_for_target_amount)
+        await message.answer("Enter target amount in RUB (minimum 1000):")
+
+
+@router.callback_query(
+    F.data.startswith("proc_category_"),
+    ProcurementCreationStates.waiting_for_category,
+)
+async def process_category_selection(callback: CallbackQuery, state: FSMContext):
+    """Process category selection during procurement creation"""
+    category_id = int(callback.data.split("_")[2])
+    await state.update_data(category=category_id)
+    await state.set_state(ProcurementCreationStates.waiting_for_target_amount)
+    await callback.message.edit_text("Enter target amount in RUB (minimum 1000):")
+    await callback.answer()
 
 
 @router.message(ProcurementCreationStates.waiting_for_target_amount)
@@ -546,6 +570,13 @@ async def process_city(message: Message, state: FSMContext):
 
     data = await state.get_data()
 
+    # Use a deadline one year from today so newly created procurements are joinable
+    from datetime import datetime, timezone, timedelta
+
+    default_deadline = (datetime.now(timezone.utc) + timedelta(days=365)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
     # Create the procurement
     procurement_data = {
         "title": data.get("title"),
@@ -553,9 +584,13 @@ async def process_city(message: Message, state: FSMContext):
         "target_amount": data.get("target_amount"),
         "city": city,
         "organizer": data.get("organizer_id"),
-        "deadline": "2025-12-31T23:59:59Z",  # Default deadline
+        "deadline": default_deadline,
         "unit": "units",
     }
+
+    # Attach category if the user selected one
+    if data.get("category"):
+        procurement_data["category"] = data["category"]
 
     result = await api_client.create_procurement(procurement_data)
 
