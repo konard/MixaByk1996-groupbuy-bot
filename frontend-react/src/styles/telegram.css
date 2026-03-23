@@ -1077,23 +1077,39 @@ input, textarea, select {
     z-index: 100;
     transform: translateX(-100%);
     transition: transform var(--tg-transition);
+    width: 100%;
+    min-width: 100%;
   }
 
   .sidebar.open {
     transform: translateX(0);
   }
 
+  /* Overlay behind open sidebar */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+
   .main-content {
     width: 100%;
+    margin-left: 0;
   }
 
   .message {
-    max-width: 85%;
+    max-width: 88%;
   }
 
   .procurement-card {
-    min-width: 160px;
-    max-width: 160px;
+    min-width: 150px;
+    max-width: 150px;
+  }
+
+  .procurement-slider {
+    padding: var(--tg-spacing-sm) var(--tg-spacing-md);
   }
 
   .mobile-back {
@@ -1101,17 +1117,115 @@ input, textarea, select {
   }
 
   .toast-container {
-    left: 20px;
-    right: 20px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
   }
 
   .toast {
     max-width: none;
   }
+
+  /* Cabinet: full-width padding on mobile */
+  .cabinet {
+    padding: var(--tg-spacing-md);
+  }
+
+  .cabinet-header {
+    gap: var(--tg-spacing-md);
+    margin-bottom: var(--tg-spacing-lg);
+  }
+
+  .cabinet-avatar {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+
+  .cabinet-info h2 {
+    font-size: var(--tg-font-size-xl);
+  }
+
+  .balance-amount {
+    font-size: 22px;
+  }
+
+  .balance-actions {
+    gap: var(--tg-spacing-sm);
+  }
+
+  .balance-actions .btn {
+    flex: 1;
+    min-height: 44px;
+    font-size: var(--tg-font-size-md);
+  }
+
+  .cabinet-menu-item {
+    padding: var(--tg-spacing-md) var(--tg-spacing-lg);
+    min-height: 52px;
+  }
+
+  /* Buttons: minimum touch target */
+  .btn {
+    min-height: 44px;
+    padding: var(--tg-spacing-sm) var(--tg-spacing-lg);
+  }
+
+  .btn-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Header */
+  .header {
+    padding: 0 var(--tg-spacing-sm);
+    gap: var(--tg-spacing-sm);
+  }
+
+  /* Message input area */
+  .message-input-area {
+    padding: var(--tg-spacing-sm);
+  }
+
+  /* Modals: full-width on mobile */
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: var(--tg-radius-lg) var(--tg-radius-lg) 0 0;
+    max-height: 90vh;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+  }
+
+  /* Forms: better touch targets */
+  .form-input,
+  .form-textarea,
+  .form-select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    min-height: 44px;
+  }
+
+  .form-textarea {
+    min-height: 88px;
+  }
+
+  /* Tabs */
+  .tab {
+    padding: var(--tg-spacing-sm) var(--tg-spacing-xs);
+    font-size: var(--tg-font-size-sm);
+    min-height: 44px;
+  }
 }
 
 @media (min-width: 769px) {
   .mobile-back {
+    display: none;
+  }
+
+  .sidebar-overlay {
     display: none;
   }
 }
