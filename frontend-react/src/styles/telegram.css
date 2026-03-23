@@ -1052,6 +1052,66 @@ input, textarea, select {
 .invisible { visibility: hidden; }
 
 /* ============================================
+   SIDEBAR FOOTER (user info + logout)
+   ============================================ */
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  padding: var(--tg-spacing-md) var(--tg-spacing-lg);
+  gap: var(--tg-spacing-sm);
+  border-top: 1px solid var(--tg-border);
+  background-color: var(--tg-bg-primary);
+  flex-shrink: 0;
+}
+
+.sidebar-footer-avatar {
+  width: var(--tg-avatar-sm);
+  height: var(--tg-avatar-sm);
+  border-radius: var(--tg-radius-round);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: var(--tg-font-size-sm);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.sidebar-footer-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar-footer-name {
+  font-size: var(--tg-font-size-base);
+  font-weight: 500;
+  color: var(--tg-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.sidebar-logout-btn {
+  color: var(--tg-error);
+}
+
+.sidebar-logout-btn:hover {
+  background-color: rgba(223, 63, 64, 0.1);
+}
+
+.sidebar-spacer {
+  flex: 1;
+}
+
+/* Mobile header in main content (hidden on desktop) */
+.mobile-header {
+  display: none;
+}
+
+/* ============================================
    WELCOME SCREEN
    ============================================ */
 
@@ -1113,6 +1173,10 @@ input, textarea, select {
   }
 
   .mobile-back {
+    display: flex;
+  }
+
+  .mobile-header {
     display: flex;
   }
 
@@ -1217,6 +1281,117 @@ input, textarea, select {
     padding: var(--tg-spacing-sm) var(--tg-spacing-xs);
     font-size: var(--tg-font-size-sm);
     min-height: 44px;
+  }
+
+  /* Sidebar footer */
+  .sidebar-footer {
+    padding: var(--tg-spacing-sm) var(--tg-spacing-md);
+  }
+
+  /* Welcome screen */
+  .welcome-screen {
+    padding: var(--tg-spacing-lg);
+  }
+
+  .welcome-screen svg {
+    width: 80px;
+    height: 80px;
+  }
+
+  .welcome-screen h2 {
+    font-size: var(--tg-font-size-lg);
+  }
+
+  /* Chat view header */
+  .header .header-title {
+    font-size: var(--tg-font-size-md);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header .header-subtitle {
+    font-size: var(--tg-font-size-xs);
+  }
+
+  /* Procurement slider cards: scroll snap */
+  .slider-container {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .procurement-card {
+    scroll-snap-align: start;
+  }
+
+  /* Cabinet stats grid: single column on very small screens */
+  .cabinet-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Message date divider */
+  .message-date-divider span {
+    font-size: var(--tg-font-size-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra-small screens */
+  .procurement-card {
+    min-width: 130px;
+    max-width: 130px;
+  }
+
+  .procurement-card .procurement-title {
+    font-size: var(--tg-font-size-sm);
+  }
+
+  .procurement-card .procurement-stats {
+    font-size: 10px;
+  }
+
+  .cabinet-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  .cabinet-info h2 {
+    font-size: var(--tg-font-size-lg);
+  }
+
+  .balance-amount {
+    font-size: 18px;
+  }
+
+  .balance-actions {
+    flex-direction: column;
+  }
+
+  .cabinet-stats {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+    margin: 0 0.5rem 0.5rem !important;
+  }
+
+  .modal {
+    border-radius: var(--tg-radius-md) var(--tg-radius-md) 0 0;
+  }
+
+  .modal-header {
+    padding: var(--tg-spacing-md);
+  }
+
+  .modal-body {
+    padding: var(--tg-spacing-md);
+  }
+
+  .modal-footer {
+    padding: var(--tg-spacing-md);
+  }
+
+  .message {
+    max-width: 92%;
   }
 }
 
