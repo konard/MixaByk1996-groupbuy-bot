@@ -7,6 +7,7 @@ import {
   SunIcon,
   MoonIcon,
   SearchIcon,
+  LogoutIcon,
 } from './Icons';
 
 function Sidebar() {
@@ -14,6 +15,7 @@ function Sidebar() {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const {
+    user,
     procurements,
     currentChat,
     unreadCounts,
@@ -23,6 +25,7 @@ function Sidebar() {
     theme,
     toggleTheme,
     setCurrentChat,
+    logout,
   } = useStore();
 
   const filteredProcurements = searchQuery
@@ -52,13 +55,15 @@ function Sidebar() {
           <MenuIcon />
         </button>
         <h1 className="header-title">GroupBuy</h1>
-        <button
-          className="btn btn-icon theme-toggle"
-          aria-label="Toggle theme"
-          onClick={toggleTheme}
-        >
-          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-        </button>
+        {!user && (
+          <button
+            className="btn btn-icon theme-toggle"
+            aria-label="Toggle theme"
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
+        )}
       </header>
 
       <div className="search-bar">
@@ -123,6 +128,37 @@ function Sidebar() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {activeTab === 'cabinet' && <div className="sidebar-spacer" />}
+
+      {/* User footer: theme toggle + logout */}
+      {user && (
+        <div className="sidebar-footer">
+          <div
+            className="sidebar-footer-avatar"
+            style={{ backgroundColor: getAvatarColor(user.first_name || '') }}
+          >
+            {getInitials(user.first_name, user.last_name)}
+          </div>
+          <div className="sidebar-footer-info">
+            <span className="sidebar-footer-name">{user.first_name} {user.last_name || ''}</span>
+          </div>
+          <button
+            className="btn btn-icon theme-toggle"
+            aria-label="Toggle theme"
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
+          <button
+            className="btn btn-icon sidebar-logout-btn"
+            aria-label="Выйти"
+            onClick={logout}
+          >
+            <LogoutIcon />
+          </button>
         </div>
       )}
     </aside>
