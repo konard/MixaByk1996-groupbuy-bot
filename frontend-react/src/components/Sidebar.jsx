@@ -81,7 +81,7 @@ function Sidebar() {
         </button>
         <button
           className={`tab ${activeTab === 'cabinet' ? 'active' : ''}`}
-          onClick={() => navigate('/cabinet')}
+          onClick={() => { navigate('/cabinet'); closeSidebar(); }}
         >
           Кабинет
         </button>
