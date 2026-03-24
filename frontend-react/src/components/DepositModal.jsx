@@ -6,6 +6,7 @@ import { CloseIcon } from './Icons';
 function DepositModal() {
   const { user, depositModalOpen, closeDepositModal, addToast, loadUser } = useStore();
   const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('card');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDeposit = async () => {
@@ -21,6 +22,7 @@ function DepositModal() {
         user_id: user.id,
         amount: depositAmount,
         payment_type: 'deposit',
+        payment_method: paymentMethod,
       });
       addToast('Платеж создан. Ожидайте подтверждения.', 'success');
       closeDepositModal();
@@ -58,6 +60,18 @@ function DepositModal() {
               onChange={(e) => setAmount(e.target.value)}
               min="100"
             />
+          </div>
+          <div className="form-group" style={{ marginTop: '0.75rem' }}>
+            <label className="form-label">Способ оплаты *</label>
+            <select
+              className="form-input form-select"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+            >
+              <option value="card">Банковская карта</option>
+              <option value="wallet">Электронный кошелёк</option>
+              <option value="transfer">Банковский перевод</option>
+            </select>
           </div>
           <p className="text-secondary text-sm mt-md">
             Минимальная сумма пополнения: 100 руб.

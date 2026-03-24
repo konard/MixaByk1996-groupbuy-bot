@@ -25,6 +25,7 @@ function ProcurementModal() {
   const [amount, setAmount] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
+  const [joinCity, setJoinCity] = useState('');
   const [activeTab, setActiveTab] = useState('info');
   const [voteResults, setVoteResults] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
@@ -46,6 +47,7 @@ function ProcurementModal() {
     setAmount('');
     setQuantity('1');
     setNotes('');
+    setJoinCity('');
     setVoteResults(null);
     setSelectedSupplierId('');
   }, [procurementModalOpen, selectedProcurement?.id]);
@@ -85,7 +87,11 @@ function ProcurementModal() {
       addToast('Введите сумму участия', 'error');
       return;
     }
-    await joinProcurement(selectedProcurement.id, { amount: joinAmount, quantity: joinQuantity, notes });
+    if (!joinCity.trim()) {
+      addToast('Введите город получения товара', 'error');
+      return;
+    }
+    await joinProcurement(selectedProcurement.id, { amount: joinAmount, quantity: joinQuantity, notes, city: joinCity });
   };
 
   const handleLeave = async () => {
@@ -112,6 +118,17 @@ function ProcurementModal() {
     if (!window.confirm('Закрыть закупку и перенести в историю?')) return;
     await closeProcurement(selectedProcurement.id);
   };
+
+  const handleSendReceiptTable = async () => {
+    try {
+      await api.getReceiptTable(selectedProcurement.id);
+      addToast('Таблица чеков отправлена поставщику', 'success');
+    } catch {
+      addToast('Ошибка отправки таблицы чеков', 'error');
+    }
+  };
+
+  const canSendReceiptTable = isOrganizer && selectedProcurement && ['payment', 'stopped'].includes(selectedProcurement.status);
 
   const handleCastVote = async () => {
     if (!selectedSupplierId) {
@@ -238,6 +255,16 @@ function ProcurementModal() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       min="0"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Город получения товара *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Москва"
+                      value={joinCity}
+                      onChange={(e) => setJoinCity(e.target.value)}
                     />
                   </div>
                   <div className="form-group">
@@ -385,6 +412,12 @@ function ProcurementModal() {
             <button className="btn btn-outline btn-round" onClick={handleStop}
               style={{ color: 'var(--warning-color, #f57c00)', borderColor: 'var(--warning-color, #f57c00)' }}>
               Стоп-сумма
+            </button>
+          )}
+          {canSendReceiptTable && (
+            <button className="btn btn-outline btn-round" onClick={handleSendReceiptTable}
+              style={{ color: 'var(--primary-color, #3390ec)', borderColor: 'var(--primary-color, #3390ec)' }}>
+              Отправить таблицу чеков
             </button>
           )}
           {canClose && (
