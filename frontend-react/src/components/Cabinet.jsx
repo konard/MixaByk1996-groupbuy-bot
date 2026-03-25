@@ -28,8 +28,9 @@ import CreateRequestModal from './CreateRequestModal';
 import ClosingDocumentsModal from './ClosingDocumentsModal';
 
 // Category slider items per role
+const SUPPLIER_CATEGORY_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты'];
 const ORGANIZER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты'];
-const BUYER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Жилье', 'Публичные чаты'];
+const BUYER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Жилье', 'Соревнования', 'Публичные чаты'];
 
 function CategorySlider({ items, onSelect }) {
   return (
@@ -271,6 +272,9 @@ function Cabinet() {
           ))}
         </div>
       </div>
+
+      {/* Category slider */}
+      <CategorySlider items={SUPPLIER_CATEGORY_ITEMS} onSelect={handleCategorySelect} />
 
       {/* Page buttons */}
       <div className="cabinet-menu">
@@ -597,8 +601,8 @@ function Cabinet() {
           <span className="cabinet-menu-text">Поиск</span>
         </div>
 
-        {/* Категории недвижимости / авто / стройка */}
-        {['Жилье', 'Авто', 'Стройка', 'Движимость'].map((cat) => (
+        {/* Категории */}
+        {['Жилье', 'Авто', 'Стройка', 'Движимость', 'Фермерские продукты', 'Деликатесы', 'Памперсы', 'Средства по уходу'].map((cat) => (
           <div
             key={cat}
             className="cabinet-menu-item"
