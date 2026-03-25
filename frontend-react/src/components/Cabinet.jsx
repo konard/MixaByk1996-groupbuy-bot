@@ -30,7 +30,7 @@ import ClosingDocumentsModal from './ClosingDocumentsModal';
 // Category slider items per role
 const SUPPLIER_CATEGORY_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты'];
 const ORGANIZER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты'];
-const BUYER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Жилье', 'Соревнования', 'Публичные чаты'];
+const BUYER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Жилье', 'Соревнования'];
 
 function CategorySlider({ items, onSelect }) {
   return (
@@ -207,7 +207,7 @@ function Cabinet() {
   };
 
   const handleCategorySelect = (category) => {
-    addToast(`Категория: ${category}`, 'info');
+    navigate(`/in-development?section=${encodeURIComponent(category)}`);
   };
 
   if (!user) {
@@ -260,12 +260,12 @@ function Cabinet() {
           gap: '0.5rem',
           scrollbarWidth: 'none',
         }}>
-          {['Новости', 'Подписки', 'Акции', 'Обновления'].map((item) => (
+          {['Новости', 'Подписки'].map((item) => (
             <button
               key={item}
               className="btn btn-outline btn-round"
               style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-              onClick={() => addToast(`${item}: раздел в разработке`, 'info')}
+              onClick={() => navigate(`/in-development?section=${encodeURIComponent(item)}`)}
             >
               {item}
             </button>
@@ -337,7 +337,7 @@ function Cabinet() {
         )}
         <div
           className="cabinet-menu-item"
-          onClick={() => addToast('В ожидании: раздел в разработке', 'info')}
+          onClick={() => navigate('/in-development?section=%D0%92%20%D0%BE%D0%B6%D0%B8%D0%B4%D0%B0%D0%BD%D0%B8%D0%B8')}
         >
           <HistoryIcon />
           <span className="cabinet-menu-text">В ожидании</span>
@@ -367,7 +367,7 @@ function Cabinet() {
             )}
           </div>
         )}
-        <div className="cabinet-menu-item" onClick={() => addToast('Раздел "Приглашения и сообщения" в разработке', 'info')}>
+        <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Приглашения и сообщения')}`)}>
           <MailIcon />
           <span className="cabinet-menu-text">Приглашения и сообщения</span>
         </div>
@@ -437,15 +437,15 @@ function Cabinet() {
             <SearchIcon className="cabinet-menu-icon" />
             <span className="cabinet-menu-text">Поиск</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => addToast('Бот Авито: в разработке', 'info')}>
+          <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Бот Авито')}`)}>
             <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>А</span>
             <span className="cabinet-menu-text">Бот Авито</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => addToast('Бот ВКонтакте: в разработке', 'info')}>
+          <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Бот ВКонтакте')}`)}>
             <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ВК</span>
             <span className="cabinet-menu-text">Бот ВК</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => addToast('Бот Telegram: в разработке', 'info')}>
+          <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Бот Telegram')}`)}>
             <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>TG</span>
             <span className="cabinet-menu-text">Бот телега</span>
           </div>
@@ -574,11 +574,11 @@ function Cabinet() {
             </span>
           )}
         </div>
-        <div className="cabinet-menu-item" onClick={() => addToast('Подписки: раздел в разработке', 'info')}>
+        <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Подписки')}`)}>
           <HistoryIcon />
           <span className="cabinet-menu-text">Подписки</span>
         </div>
-        <div className="cabinet-menu-item" onClick={() => addToast('Сообщения: раздел в разработке', 'info')}>
+        <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Сообщения')}`)}>
           <MailIcon />
           <span className="cabinet-menu-text">Сообщения</span>
         </div>
@@ -606,7 +606,7 @@ function Cabinet() {
           <div
             key={cat}
             className="cabinet-menu-item"
-            onClick={() => addToast(`${cat}: раздел в разработке`, 'info')}
+            onClick={() => navigate(`/in-development?section=${encodeURIComponent(cat)}`)}
           >
             <HomeIcon />
             <span className="cabinet-menu-text">{cat}</span>
