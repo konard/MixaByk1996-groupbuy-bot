@@ -90,6 +90,7 @@ function Cabinet() {
   const [createRequestOpen, setCreateRequestOpen] = useState(false);
   const [closingDocsOpen, setClosingDocsOpen] = useState(false);
   const [selectedOrderTableId, setSelectedOrderTableId] = useState(null);
+  const [roleSwitchOpen, setRoleSwitchOpen] = useState(false);
 
   const [myProcurements, setMyProcurements] = useState(null);
   const [myRequests, setMyRequests] = useState([]);
@@ -208,6 +209,24 @@ function Cabinet() {
 
   const handleCategorySelect = (category) => {
     navigate(`/in-development?section=${encodeURIComponent(category)}`);
+  };
+
+  const handleRoleSwitch = async (newRole) => {
+    if (newRole === user.role) {
+      setRoleSwitchOpen(false);
+      return;
+    }
+    try {
+      await api.updateUser(user.id, { role: newRole });
+      // Reload user to get updated role
+      const updated = await api.getUser(user.id);
+      // Update store user directly via zustand setter
+      useStore.setState({ user: updated });
+      setRoleSwitchOpen(false);
+      addToast(`Роль изменена на: ${getRoleText(newRole)}`, 'success');
+    } catch {
+      addToast('Ошибка смены роли', 'error');
+    }
   };
 
   if (!user) {
@@ -729,7 +748,44 @@ function Cabinet() {
           </h2>
           <div className="cabinet-role">{getRoleText(user.role)}</div>
         </div>
+        <button
+          className="btn btn-outline btn-round"
+          style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.3rem 0.7rem', whiteSpace: 'nowrap' }}
+          onClick={() => setRoleSwitchOpen(true)}
+          title="Сменить роль"
+        >
+          Сменить роль
+        </button>
       </div>
+
+      {/* Role switch modal */}
+      {roleSwitchOpen && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setRoleSwitchOpen(false)}>
+          <div className="modal" style={{ maxWidth: '320px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Сменить роль</h3>
+              <button className="modal-close" onClick={() => setRoleSwitchOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {[
+                { value: 'buyer', label: 'Покупатель' },
+                { value: 'organizer', label: 'Организатор' },
+                { value: 'supplier', label: 'Поставщик' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  className={`btn btn-round ${user.role === value ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ width: '100%', textAlign: 'left', padding: '0.6rem 1rem' }}
+                  onClick={() => handleRoleSwitch(value)}
+                >
+                  {label}
+                  {user.role === value && ' (текущая)'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="cabinet-balance">
         <div className="balance-label">Баланс</div>

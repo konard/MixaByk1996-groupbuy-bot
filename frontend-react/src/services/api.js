@@ -141,4 +141,22 @@ export const api = {
 
   // Supplier profile endpoints (stored as user profile extensions)
   getSuppliers: () => request('/users/?role=supplier'),
+
+  // Chat voting endpoints
+  getChatVote: (procurementId) => request(`/procurements/${procurementId}/chat_vote/`).catch(() => null),
+
+  castChatVote: (procurementId, data) =>
+    request(`/procurements/${procurementId}/cast_vote/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  closeChatVote: (procurementId, userId) =>
+    request(`/procurements/${procurementId}/close_vote/`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }).catch(() => ({ fallback: true })),
+
+  getVoteCloseStatus: (procurementId) =>
+    request(`/procurements/${procurementId}/vote_close_status/`).catch(() => null),
 };
