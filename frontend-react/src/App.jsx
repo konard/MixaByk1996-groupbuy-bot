@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import ChatList from './components/ChatList';
 import ChatView from './components/ChatView';
 import Cabinet from './components/Cabinet';
+import UnderDevelopmentPage from './components/UnderDevelopmentPage';
 import LoginModal from './components/LoginModal';
 import ProcurementModal from './components/ProcurementModal';
 import CreateProcurementModal from './components/CreateProcurementModal';
@@ -45,6 +46,7 @@ function MainApp() {
           <Route path="/" element={<ChatList />} />
           <Route path="/chat/:procurementId" element={<ChatView />} />
           <Route path="/cabinet" element={<Cabinet />} />
+          <Route path="/in-development" element={<UnderDevelopmentPage />} />
         </Routes>
       </Layout>
       <LoginModal />
