@@ -2,6 +2,17 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { getInitials, getAvatarColor, formatTime } from '../utils/helpers';
+
+/**
+ * Truncate text to the first N words, appending "…" if truncated.
+ */
+function firstWords(text, n) {
+  if (!text) return '';
+  const words = text.trim().split(/\s+/);
+  if (words.length <= n) return text;
+  return words.slice(0, n).join(' ') + '…';
+}
+
 import {
   MenuIcon,
   SunIcon,
@@ -119,7 +130,9 @@ function Sidebar() {
                     </span>
                   </div>
                   <div className="chat-message">
-                    {procurement.participant_count || 0} участников • {procurement.progress || 0}%
+                    {procurement.description
+                      ? firstWords(procurement.description, 16)
+                      : `${procurement.participant_count || 0} участников • ${procurement.progress || 0}%`}
                   </div>
                 </div>
                 {unreadCounts[procurement.id] > 0 && (

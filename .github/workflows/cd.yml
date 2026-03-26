@@ -22,6 +22,8 @@ jobs:
         include:
           - context: ./core-rust
             image: core
+          - context: ./core
+            image: django-admin
           - context: ./bot
             image: bot
           - context: ./infrastructure/websocket

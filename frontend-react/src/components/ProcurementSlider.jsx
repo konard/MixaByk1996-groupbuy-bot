@@ -3,6 +3,16 @@ import { useStore } from '../store/useStore';
 import { formatCurrency } from '../utils/helpers';
 import { batchProcessProcurements } from '../services/wasm';
 
+/**
+ * Truncate text to the first N words, appending "…" if truncated.
+ */
+function firstWords(text, n) {
+  if (!text) return '';
+  const words = text.trim().split(/\s+/);
+  if (words.length <= n) return text;
+  return words.slice(0, n).join(' ') + '…';
+}
+
 function ProcurementSlider() {
   const { procurements, selectProcurement } = useStore();
 
@@ -37,7 +47,17 @@ function ProcurementSlider() {
             className="procurement-card"
             onClick={() => handleCardClick(procurement)}
           >
-            <div className="procurement-title">{procurement.title}</div>
+            {procurement.image_url && (
+              <img
+                className="procurement-card-image"
+                src={procurement.image_url}
+                alt={procurement.title}
+                loading="lazy"
+              />
+            )}
+            <div className="procurement-title">
+              {firstWords(procurement.title, 8)}
+            </div>
             <div className="procurement-info">{procurement.city || 'Город не указан'}</div>
             <div className="procurement-progress">
               <div

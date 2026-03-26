@@ -18,6 +18,33 @@ version: '3.8'
 #   IMAGE_TAG=main
 
 services:
+  # Django Admin API (Python backend for /api/admin/* endpoints and admin panel)
+  # To create a superuser for the admin panel, run:
+  #   docker compose -f docker-compose.prod.yml exec django-admin python manage.py createsuperuser
+  django-admin:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/django-admin:${IMAGE_TAG:-main}
+    container_name: groupbuy-django-admin
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-change-this-in-production}
+      - DEBUG=False
+      - ALLOWED_HOSTS=${DOMAIN:-localhost},127.0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/admin/auth/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
   # Core API (Rust backend)
   # NOTE: If you see "password authentication failed for user postgres" errors,
   # the PostgreSQL volume was likely created with a different password.
@@ -227,6 +254,8 @@ services:
     depends_on:
       core:
         condition: service_healthy
+      django-admin:
+        condition: service_started
       websocket-server:
         condition: service_started
       frontend-react:
