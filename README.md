@@ -350,7 +350,10 @@ Note: Database migrations are applied automatically when the core service starts
 
 5. Create admin user:
 ```bash
+# Development:
 docker-compose exec core python manage.py createsuperuser
+# Production:
+docker compose -f docker-compose.prod.yml exec django-admin python manage.py createsuperuser
 ```
 
 ## Development
@@ -582,7 +585,10 @@ The application includes a full-featured admin panel for managing all aspects of
 
 1. **Create an admin user** (if not already created):
 ```bash
+# Development:
 docker-compose exec core python manage.py createsuperuser
+# Production:
+docker compose -f docker-compose.prod.yml exec django-admin python manage.py createsuperuser
 ```
 
 2. **Access the admin panel** at `/admin-panel/` in your browser

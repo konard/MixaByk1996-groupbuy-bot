@@ -376,14 +376,24 @@ input, textarea, select {
   box-shadow: var(--tg-shadow-medium);
 }
 
+.procurement-card-image {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--tg-radius-sm, 4px);
+  margin-bottom: var(--tg-spacing-xs);
+  display: block;
+}
+
 .procurement-title {
   font-size: var(--tg-font-size-base);
   font-weight: 500;
   color: var(--tg-text-primary);
   margin-bottom: var(--tg-spacing-xs);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .procurement-info {
