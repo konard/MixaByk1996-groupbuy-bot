@@ -6,8 +6,6 @@
 # On Server 1 (Chat): docker-compose -f docker-compose.two-server.yml up websocket-server redis-chat nginx-chat
 # On Server 2 (API):  docker-compose -f docker-compose.two-server.yml up core bot telegram-adapter mattermost-adapter postgres redis-api nginx-api
 
-version: '3.8'
-
 services:
   # ============================================
   # SERVER 1: Chat Services
