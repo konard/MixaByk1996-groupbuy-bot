@@ -11,9 +11,10 @@ function Layout({ children }) {
   const isChatView = location.pathname.startsWith('/chat/');
 
   useEffect(() => {
-    if (user) {
-      loadProcurements();
-    } else {
+    // Always load procurements so guests can browse and the slider is visible.
+    // The login modal is shown only when there is no saved userId at all.
+    loadProcurements();
+    if (!user) {
       const userId = localStorage.getItem('userId');
       if (!userId) {
         openLoginModal();

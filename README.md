@@ -499,6 +499,8 @@ The bot supports Mattermost integration, allowing users to interact with the Gro
 The Mattermost adapter uses two Mattermost integration primitives:
 - **Outgoing Webhooks** – Mattermost sends user messages to the adapter's HTTP endpoint (`POST /webhook`).
 - **Incoming Webhooks** – The adapter posts replies back to Mattermost via an incoming webhook URL.
+- **Slash Commands** – Users can trigger bot commands with `/command` syntax directly from the Mattermost input box.
+- **Interactive Buttons** – The bot sends messages with clickable action buttons (equivalent to Telegram inline keyboards).
 
 **Setup:**
 
@@ -512,21 +514,47 @@ The Mattermost adapter uses two Mattermost integration primitives:
 3. Go to **Integrations → Incoming Webhooks** and create a new webhook:
    - Choose the channel where bot replies should appear (or use `@username` per-message override)
    - Copy the generated **Webhook URL**.
-4. Add the following variables to your `.env` file:
+4. (Optional but recommended) Go to **Integrations → Bot Accounts** and create a bot account for the GroupBuy bot:
+   - Copy the generated **Personal Access Token** — this enables Direct Message replies and richer user lookups.
+5. Add the following variables to your `.env` file:
    ```
    MATTERMOST_URL=https://your-mattermost-server.example.com
    MATTERMOST_TOKEN=<outgoing-webhook-token>
    MATTERMOST_WEBHOOK_URL=https://your-mattermost-server.example.com/hooks/<id>
+   MATTERMOST_BOT_TOKEN=<bot-personal-access-token>   # optional, enables DM replies
    ```
-5. Start the services:
+6. Start the services:
    ```bash
    docker-compose up -d mattermost-adapter
    ```
 
+**Available commands (identical to Telegram):**
+
+| Command | Description |
+|---|---|
+| `/start` | Start the bot, see welcome message and main menu |
+| `/help` | List all available commands |
+| `/procurements` | Browse active procurements |
+| `/my_procurements` | View procurements you joined or created |
+| `/search` | Search procurements by keyword |
+| `/create_procurement` | Create a new procurement (organizers only) |
+| `/profile` | View and edit your profile |
+| `/balance` | Check your balance |
+| `/deposit` | Top up your balance |
+| `/transactions` | Payment history |
+| `/notifications` | View unread notifications |
+| `/chat` | Enter a procurement chat |
+| `/status` | Show bot health status |
+
+**Interactive buttons:**
+
+In Telegram the bot uses inline keyboard buttons. In Mattermost the same buttons are rendered as **message attachment actions** (clickable buttons below the message). Clicking a button in Mattermost triggers the same logic as tapping the equivalent Telegram button — for example, viewing procurement details, joining a procurement, or going back to the list.
+
 **Important Notes:**
 - The Mattermost adapter listens on port `8002` by default. Make sure this port is accessible from your Mattermost server.
-- All bot commands (`/start`, `/help`, `/procurements`, etc.) work the same way as in Telegram and VK.
-- The adapter is optional – other platform adapters continue to work independently.
+- All bot commands and interactive flows work the same way as in Telegram — registration, joining procurements, payment, notifications, etc.
+- When `MATTERMOST_BOT_TOKEN` is set the bot sends replies as **Direct Messages** to each user. Without it, replies go to the channel configured in the incoming webhook.
+- The adapter is optional – other platform adapters (Telegram, VK) continue to work independently.
 
 ### VK Integration
 
