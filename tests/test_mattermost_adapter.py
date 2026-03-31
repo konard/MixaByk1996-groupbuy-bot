@@ -734,3 +734,94 @@ async def test_send_endpoint_invalid_json(adapter_env):
             headers={"Content-Type": "application/json"},
         )
         assert resp.status == 400
+
+
+# ---------------------------------------------------------------------------
+# MATTERMOST_ADAPTER_URL configuration
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_adapter_url_default():
+    """When MATTERMOST_ADAPTER_URL is not set the default points to the internal Docker hostname."""
+    with patch.dict("os.environ", BASE_ENV, clear=True):
+        from adapters.mattermost.adapter import MattermostAdapter
+
+        adapter = MattermostAdapter()
+        assert adapter.adapter_url == "http://mattermost-adapter:8002"
+
+
+@pytest.mark.asyncio
+async def test_adapter_url_custom():
+    """When MATTERMOST_ADAPTER_URL is set it overrides the default."""
+    custom_url = "http://192.168.1.10:8002"
+    with patch.dict(
+        "os.environ",
+        {**BASE_ENV, "MATTERMOST_ADAPTER_URL": custom_url},
+        clear=True,
+    ):
+        from adapters.mattermost.adapter import MattermostAdapter
+
+        adapter = MattermostAdapter()
+        assert adapter.adapter_url == custom_url
+
+
+@pytest.mark.asyncio
+async def test_adapter_url_trailing_slash_stripped():
+    """Trailing slash in MATTERMOST_ADAPTER_URL is stripped."""
+    with patch.dict(
+        "os.environ",
+        {**BASE_ENV, "MATTERMOST_ADAPTER_URL": "http://192.168.1.10:8002/"},
+        clear=True,
+    ):
+        from adapters.mattermost.adapter import MattermostAdapter
+
+        adapter = MattermostAdapter()
+        assert adapter.adapter_url == "http://192.168.1.10:8002"
+
+
+@pytest.mark.asyncio
+async def test_reply_url_uses_adapter_url():
+    """reply_url in standardised messages is built from MATTERMOST_ADAPTER_URL."""
+    custom_url = "http://203.0.113.42:8002"
+    with patch.dict(
+        "os.environ",
+        {**BASE_ENV, "MATTERMOST_ADAPTER_URL": custom_url},
+        clear=True,
+    ):
+        from adapters.mattermost.adapter import MattermostAdapter
+
+        adapter = MattermostAdapter()
+        data = {
+            "token": "test_token",
+            "user_id": "u1",
+            "user_name": "alice",
+            "text": "/start",
+            "channel_id": "c1",
+            "channel_name": "general",
+            "post_id": "p1",
+            "team_id": "t1",
+            "team_domain": "acme",
+            "trigger_word": "",
+        }
+        msg = adapter._standardize_message(data)
+        assert msg["reply_url"] == f"{custom_url}/send", (
+            "reply_url must use MATTERMOST_ADAPTER_URL so the bot service can "
+            "POST replies back to the adapter on a different server"
+        )
+
+        slash_data = {
+            "token": "test_token",
+            "user_id": "u2",
+            "user_name": "bob",
+            "command": "/help",
+            "text": "",
+            "channel_id": "c2",
+            "channel_name": "direct",
+            "team_id": "t2",
+            "team_domain": "example",
+        }
+        slash_msg = adapter._standardize_slash(slash_data)
+        assert slash_msg["reply_url"] == f"{custom_url}/send", (
+            "reply_url in slash commands must also use MATTERMOST_ADAPTER_URL"
+        )

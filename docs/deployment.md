@@ -637,17 +637,181 @@ curl "https://api.vk.com/method/groups.getById?access_token=YOUR_TOKEN&v=5.131"
 
 ---
 
-## 12. Интеграция с Cyclops (Точка Банк)
+## 12. Подключение Mattermost
+
+GroupBuy Bot поддерживает Mattermost через адаптер, который транслирует сообщения между Mattermost и внутренним Bot Service.
+
+### 12.1 Архитектура интеграции
+
+```
+Mattermost                GroupBuy Bot Server
+─────────────             ──────────────────────────────────────────
+Пользователь              mattermost-adapter (порт 8002)
+    │                             │
+    │  POST /webhook или /slash   │  POST /message
+    │ ─────────────────────────► │ ──────────────────────► bot:8001
+    │                             │                              │
+    │                             │  POST /send (reply_url)      │
+    │                             │ ◄────────────────────────────│
+    │  POST incoming webhook      │
+    │ ◄────────────────────────── │
+```
+
+### 12.2 Переменные окружения
+
+Добавьте в `.env`:
+
+```env
+# Токен, который Mattermost отправляет в каждом запросе (токен проверки)
+MATTERMOST_TOKEN=your-mattermost-outgoing-webhook-token
+
+# URL входящего вебхука Mattermost для отправки ответов боту
+MATTERMOST_WEBHOOK_URL=https://your-mattermost.com/hooks/your-incoming-webhook-id
+
+# Публичный URL адаптера (по нему Bot Service отправляет ответы обратно в адаптер)
+# Внутри одного Docker (по умолчанию): http://mattermost-adapter:8002
+# Если Mattermost на другом сервере — укажите публичный адрес этого сервера:
+MATTERMOST_ADAPTER_URL=http://<IP_ВАШЕГО_СЕРВЕРА>:8002
+
+# Необязательно: персональный токен бота для REST API (DM и поиск пользователей)
+# MATTERMOST_BOT_TOKEN=your-mattermost-bot-personal-access-token
+# MATTERMOST_URL=https://your-mattermost.com
+```
+
+### 12.3 Настройка Mattermost
+
+#### Шаг 1. Включите вебхуки в настройках Mattermost
+
+1. Войдите в Mattermost как системный администратор.
+2. Перейдите в **System Console → Integrations**.
+3. Включите:
+   - **Enable Incoming Webhooks** — для получения ответов от бота.
+   - **Enable Outgoing Webhooks** — для отправки сообщений боту (или используйте Slash Commands).
+   - **Enable Slash Commands** — альтернативный способ отправки команд.
+
+#### Шаг 2. Создайте входящий вебхук (Incoming Webhook)
+
+Это URL, по которому бот будет отправлять ответы в Mattermost.
+
+1. Перейдите в **Main Menu → Integrations → Incoming Webhooks**.
+2. Нажмите **Add Incoming Webhook**.
+3. Выберите канал для ответов бота (например `town-square` или создайте отдельный).
+4. Нажмите **Save** и скопируйте сгенерированный URL.
+5. Добавьте URL в `.env`:
+   ```env
+   MATTERMOST_WEBHOOK_URL=https://your-mattermost.com/hooks/xxxxxxxxxxxxxxxxxxx
+   ```
+
+#### Шаг 3. Создайте исходящий вебхук (Outgoing Webhook)
+
+Это позволяет Mattermost отправлять сообщения пользователей на адаптер бота.
+
+1. Перейдите в **Main Menu → Integrations → Outgoing Webhooks**.
+2. Нажмите **Add Outgoing Webhook**.
+3. Заполните:
+   - **Channel:** канал для мониторинга (или оставьте пустым — все каналы).
+   - **Trigger Words:** слова-триггеры (например `!buy`, `!help`) или оставьте пустым.
+   - **Callback URLs:** `http://<IP_ВАШЕГО_СЕРВЕРА>:8002/webhook`
+4. Нажмите **Save** и скопируйте **Token**.
+5. Добавьте токен в `.env`:
+   ```env
+   MATTERMOST_TOKEN=ваш-скопированный-токен
+   ```
+
+#### Шаг 4 (альтернатива). Создайте Slash Command
+
+Slash Commands работают так же, но запускаются командами `/команда`.
+
+1. Перейдите в **Main Menu → Integrations → Slash Commands**.
+2. Нажмите **Add Slash Command**.
+3. Заполните:
+   - **Command Trigger Word:** `groupbuy` (команда будет `/groupbuy`).
+   - **Request URL:** `http://<IP_ВАШЕГО_СЕРВЕРА>:8002/slash`
+   - **Request Method:** POST
+4. Нажмите **Save** и скопируйте **Token**.
+5. Добавьте токен в `.env` (тот же `MATTERMOST_TOKEN`):
+   ```env
+   MATTERMOST_TOKEN=ваш-скопированный-токен
+   ```
+
+> **Важно:** Исходящий вебхук и Slash Command могут использовать **один и тот же** `MATTERMOST_TOKEN`.
+
+### 12.4 Запуск адаптера
+
+```bash
+# Один сервер
+docker-compose up -d mattermost-adapter
+
+# Два сервера (на сервере с API/Bot)
+docker-compose -f docker-compose.two-server.yml up -d mattermost-adapter
+
+# Продакшен
+docker compose -f docker-compose.prod.yml up -d mattermost-adapter
+```
+
+### 12.5 Проверка работы
+
+```bash
+# 1. Убедитесь, что адаптер запущен
+docker-compose ps mattermost-adapter
+# Должно быть: Up
+
+# 2. Проверьте health endpoint
+curl http://localhost:8002/health
+# Ожидаемый ответ: {"status": "ok"}
+
+# 3. Проверьте логи адаптера
+docker-compose logs mattermost-adapter
+
+# 4. Проверьте логи бота
+docker-compose logs bot
+```
+
+### 12.6 Почему бот не отвечает — типичные проблемы
+
+| Симптом | Причина | Решение |
+|---------|---------|---------|
+| Нет ответа на команды | Неверный `MATTERMOST_TOKEN` | Сравните токен в `.env` с токеном в настройках вебхука Mattermost |
+| 403 Forbidden в логах | Токен не совпадает | Пересоздайте вебхук и обновите `MATTERMOST_TOKEN` |
+| Адаптер не получает сообщения | Mattermost не может достучаться до адаптера | Убедитесь, что порт 8002 открыт на сервере и URL вебхука указан правильно |
+| Бот получает, но не отвечает | `MATTERMOST_ADAPTER_URL` настроен неправильно | Установите `MATTERMOST_ADAPTER_URL=http://<IP_ВАШЕГО_СЕРВЕРА>:8002` в `.env` |
+| Ответ идёт, но не в тот канал | `MATTERMOST_WEBHOOK_URL` ведёт не в тот канал | Проверьте, какой канал выбран во входящем вебхуке Mattermost |
+| Адаптер запускается с ошибкой | `MATTERMOST_TOKEN` или `MATTERMOST_WEBHOOK_URL` не заданы | Проверьте `.env` файл |
+
+### 12.7 Типовая конфигурация для другого сервера
+
+Если Mattermost установлен на **отдельном сервере** (например по инструкции из trueconf.ru), нужна такая конфигурация:
+
+**На сервере с GroupBuy Bot** (`.env`):
+```env
+# Токен из исходящего вебхука / slash command Mattermost
+MATTERMOST_TOKEN=токен-из-mattermost
+
+# URL входящего вебхука Mattermost (для отправки ответов)
+MATTERMOST_WEBHOOK_URL=https://mattermost.your-domain.com/hooks/xxxxxxxxxxx
+
+# Публичный адрес адаптера — тот IP/домен, с которого бот отправляет ответы
+# Это адрес текущего сервера (где запущен groupbuy-bot)
+MATTERMOST_ADAPTER_URL=http://<IP_ЭТОГО_СЕРВЕРА>:8002
+```
+
+**В Mattermost** (на другом сервере):
+- Outgoing Webhook / Slash Command URL: `http://<IP_СЕРВЕРА_С_БОТОМ>:8002/webhook`
+- Токен из Mattermost → `MATTERMOST_TOKEN` в `.env`
+
+---
+
+## 13. Интеграция с Cyclops (Точка Банк)
 
 Проект использует сервис **Cyclops** от Точка Банка для обработки платежей через номинальный счёт.
 
-### 12.1 Предварительные требования
+### 13.1 Предварительные требования
 
 - Расчётный счёт в Точка Банке
 - Согласованные документы (оферта, закрывающие документы)
 - Статический IP-адрес сервера (для Pre-слоя)
 
-### 12.2 Генерация ключей
+### 13.2 Генерация ключей
 
 ```bash
 # Создать директорию для ключей
@@ -667,7 +831,7 @@ chmod 644 /opt/groupbuy/keys/tochka_public.pem
 
 > **Важно:** Для Pre и Prod слоёв используются **разные** пары ключей!
 
-### 12.3 Настройка переменных окружения
+### 13.3 Настройка переменных окружения
 
 Добавьте в `.env`:
 
@@ -680,7 +844,7 @@ TOCHKA_PRIVATE_KEY_PATH=/opt/groupbuy/keys/tochka_private.pem
 TOCHKA_PUBLIC_KEY_PATH=/opt/groupbuy/keys/tochka_public.pem
 ```
 
-### 12.4 Проверка связи с API
+### 13.4 Проверка связи с API
 
 ```bash
 # Тест echo-запроса (требуется подпись)
@@ -689,7 +853,7 @@ curl -X POST $TOCHKA_API_URL \
   -d '{"jsonrpc":"2.0","method":"echo","params":{"text":"test"},"id":"1"}'
 ```
 
-### 12.5 Процесс подключения
+### 13.5 Процесс подключения
 
 1. **Pre-слой (тестирование)**:
    - Отправить IP-адрес и публичный ключ в техподдержку
@@ -702,7 +866,7 @@ curl -X POST $TOCHKA_API_URL \
    - Подписать акты
    - Получить данные площадки на Prod
 
-### 12.6 Устранение неполадок Cyclops
+### 13.6 Устранение неполадок Cyclops
 
 | Ошибка | Причина | Решение |
 |--------|---------|---------|
@@ -711,7 +875,7 @@ curl -X POST $TOCHKA_API_URL \
 | `4408` | Документ не загружен | Дождаться загрузки (до 5 мин) |
 | `4436` | Ошибка комплаенс | Платёж не прошёл проверку 115-ФЗ |
 
-### 12.7 Документация
+### 13.7 Документация
 
 - [Техническое задание на настройку сервера](./SERVER-SETUP-TZ.md)
 - [Документация Cyclops](https://docs.tochka.com/cyclops)
