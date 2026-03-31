@@ -618,3 +618,119 @@ async def test_action_endpoint(adapter_env):
     msg = await adapter.message_queue.get()
     assert msg["type"] == "callback"
     assert msg["callback_data"] == "join_procurement:99"
+
+
+# ---------------------------------------------------------------------------
+# reply_url in standardised messages
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_standardize_message_includes_reply_url(adapter_env):
+    """Outgoing-webhook standardised message must include a reply_url."""
+    from adapters.mattermost.adapter import MattermostAdapter
+
+    adapter = MattermostAdapter()
+    data = {
+        "token": "test_token",
+        "user_id": "u1",
+        "user_name": "alice",
+        "text": "/start",
+        "channel_id": "c1",
+        "channel_name": "general",
+        "post_id": "p1",
+        "team_id": "t1",
+        "team_domain": "acme",
+        "trigger_word": "",
+    }
+    result = adapter._standardize_message(data)
+    assert "reply_url" in result, "reply_url must be present so bot service can reply"
+    assert result["reply_url"].endswith("/send"), "reply_url must point to the /send endpoint"
+
+
+@pytest.mark.asyncio
+async def test_standardize_slash_includes_reply_url(adapter_env):
+    """Slash-command standardised message must include a reply_url."""
+    from adapters.mattermost.adapter import MattermostAdapter
+
+    adapter = MattermostAdapter()
+    data = {
+        "token": "test_token",
+        "user_id": "u2",
+        "user_name": "bob",
+        "command": "/help",
+        "text": "",
+        "channel_id": "c2",
+        "channel_name": "direct",
+        "team_id": "t2",
+        "team_domain": "example",
+    }
+    result = adapter._standardize_slash(data)
+    assert "reply_url" in result, "reply_url must be present in slash command messages"
+    assert result["reply_url"].endswith("/send")
+
+
+# ---------------------------------------------------------------------------
+# /send endpoint
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_send_endpoint_delivers_message(adapter_env):
+    """POST /send must forward the text to Mattermost and return 200."""
+    from adapters.mattermost.adapter import MattermostAdapter
+
+    adapter = MattermostAdapter()
+    # Patch send_message so no real HTTP call is made
+    adapter.send_message = AsyncMock(return_value=True)
+
+    async with TestClient(TestServer(adapter.app)) as client:
+        resp = await client.post(
+            "/send", json={"user_id": "u1", "text": "Hello from bot!"}
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "ok"
+
+    adapter.send_message.assert_called_once_with("u1", "Hello from bot!")
+
+
+@pytest.mark.asyncio
+async def test_send_endpoint_missing_fields(adapter_env):
+    """POST /send returns 400 when user_id or text is missing."""
+    from adapters.mattermost.adapter import MattermostAdapter
+
+    adapter = MattermostAdapter()
+    async with TestClient(TestServer(adapter.app)) as client:
+        resp = await client.post("/send", json={"user_id": "u1"})
+        assert resp.status == 400
+
+
+@pytest.mark.asyncio
+async def test_send_endpoint_mattermost_failure(adapter_env):
+    """POST /send returns 502 when the Mattermost delivery fails."""
+    from adapters.mattermost.adapter import MattermostAdapter
+
+    adapter = MattermostAdapter()
+    adapter.send_message = AsyncMock(return_value=False)
+
+    async with TestClient(TestServer(adapter.app)) as client:
+        resp = await client.post(
+            "/send", json={"user_id": "u1", "text": "Hi"}
+        )
+        assert resp.status == 502
+
+
+@pytest.mark.asyncio
+async def test_send_endpoint_invalid_json(adapter_env):
+    """POST /send returns 400 for non-JSON bodies."""
+    from adapters.mattermost.adapter import MattermostAdapter
+
+    adapter = MattermostAdapter()
+    async with TestClient(TestServer(adapter.app)) as client:
+        resp = await client.post(
+            "/send",
+            data=b"not json",
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status == 400

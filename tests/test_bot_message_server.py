@@ -3,7 +3,7 @@ Tests for the bot adapter message server (port 8001) and APIClient session fix.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, call
 from aiohttp.test_utils import TestClient, TestServer
 from aiohttp import web
 
@@ -161,3 +161,112 @@ class TestAPIClientSession:
         await client.close()
 
         mock_session.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Command dispatch and reply forwarding
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_http_session(posted_payloads: list) -> MagicMock:
+    """
+    Build a mock aiohttp.ClientSession that records POST calls.
+
+    ``posted_payloads`` is a shared list that each POST call appends to so the
+    test can inspect what was sent.
+    """
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.text = AsyncMock(return_value="")
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
+
+    def _post(url, json=None, **kwargs):
+        posted_payloads.append({"url": url, "json": json})
+        return mock_resp
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+    mock_session.post = MagicMock(side_effect=_post)
+    return mock_session
+
+
+@pytest.mark.asyncio
+async def test_mattermost_start_command_sends_reply():
+    """
+    When a /start command arrives from a Mattermost adapter with a reply_url,
+    the bot must POST a non-empty reply back to that reply_url.
+
+    This is the core regression test for issue #106: the bot was silently
+    discarding all messages from the Mattermost adapter instead of processing
+    commands and sending replies.
+    """
+    app = await _make_test_app()
+    posted_payloads: list = []
+    mock_session = _make_mock_http_session(posted_payloads)
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        async with TestClient(TestServer(app)) as client:
+            payload = {
+                "platform": "mattermost",
+                "user_id": "user123",
+                "chat_id": "chan456",
+                "text": "/start",
+                "type": "message",
+                "reply_url": "http://mattermost-adapter:8002/send",
+            }
+            resp = await client.post("/message", json=payload)
+            assert resp.status == 200
+
+    # The bot must have POSTed a reply to the reply_url
+    reply_calls = [p for p in posted_payloads if p["url"] == "http://mattermost-adapter:8002/send"]
+    assert reply_calls, (
+        "Bot did not POST any reply to the adapter reply_url. "
+        "The Mattermost bot ignores all commands — this is the bug from issue #106."
+    )
+    reply_body = reply_calls[0]["json"]
+    assert reply_body.get("text"), "Reply text must not be empty"
+    assert reply_body.get("user_id") == "user123"
+
+
+@pytest.mark.asyncio
+async def test_mattermost_help_command_sends_reply():
+    """/help from a Mattermost adapter must trigger a reply back to reply_url."""
+    app = await _make_test_app()
+    posted_payloads: list = []
+    mock_session = _make_mock_http_session(posted_payloads)
+
+    with patch("aiohttp.ClientSession", return_value=mock_session):
+        async with TestClient(TestServer(app)) as client:
+            payload = {
+                "platform": "mattermost",
+                "user_id": "user999",
+                "chat_id": "chan001",
+                "text": "/help",
+                "type": "message",
+                "reply_url": "http://mattermost-adapter:8002/send",
+            }
+            resp = await client.post("/message", json=payload)
+            assert resp.status == 200
+
+    reply_calls = [p for p in posted_payloads if p["url"] == "http://mattermost-adapter:8002/send"]
+    assert reply_calls, "Bot must reply to /help command via reply_url"
+    assert reply_calls[0]["json"].get("text")
+
+
+@pytest.mark.asyncio
+async def test_non_mattermost_message_no_reply_url_still_ok():
+    """Messages without a reply_url (e.g. non-Mattermost) still return 200."""
+    app = await _make_test_app()
+    async with TestClient(TestServer(app)) as client:
+        payload = {
+            "platform": "vk",
+            "user_id": "789",
+            "text": "/help",
+            "type": "message",
+        }
+        resp = await client.post("/message", json=payload)
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "ok"

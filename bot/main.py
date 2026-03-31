@@ -36,13 +36,102 @@ _bot: Bot = None
 _dp: Dispatcher = None
 
 
+async def _send_adapter_reply(reply_url: str, user_id: str, text: str) -> None:
+    """POST a reply back to the platform adapter that sent the original message."""
+    import aiohttp
+
+    payload = {"user_id": user_id, "text": text}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(reply_url, json=payload) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    logger.warning(
+                        "Adapter reply_url returned %d: %s", resp.status, body
+                    )
+    except Exception as exc:
+        logger.error("Failed to POST reply to adapter reply_url %s: %s", reply_url, exc)
+
+
+def _build_command_reply(text: str, user_info: Dict[str, Any]) -> str:
+    """
+    Return a plain-text reply for the given command text.
+
+    Handles the slash commands that the bot exposes, producing the same
+    informational responses that Telegram users receive.  This is intentionally
+    simple — it mirrors the text from the aiogram handlers in handlers/ without
+    requiring a full aiogram dispatcher round-trip for non-Telegram platforms.
+    """
+    cmd = text.strip().split()[0].lower() if text.strip() else ""
+    # Normalise both "/start" and "start" forms
+    if cmd.startswith("/"):
+        cmd = cmd[1:]
+
+    first_name = user_info.get("first_name", "") or user_info.get("username", "User")
+
+    if cmd == "start":
+        return (
+            f"Welcome to GroupBuy Bot, {first_name}!\n\n"
+            "You can browse active procurements without registering.\n"
+            "Registration is only needed when you want to join a procurement or write in a chat.\n\n"
+            "Available commands:\n"
+            "/help - List all commands\n"
+            "/procurements - Browse active procurements\n"
+            "/profile - View your profile\n"
+            "/balance - Check your balance"
+        )
+
+    if cmd == "help":
+        return (
+            "Available Commands:\n\n"
+            "Profile:\n"
+            "/start - Start or re-register\n"
+            "/profile - View and edit your profile\n"
+            "/balance - Check your balance\n\n"
+            "Procurements:\n"
+            "/procurements - Browse active procurements\n"
+            "/my_procurements - Your procurements\n"
+            "/search - Search procurements by keyword\n"
+            "/create_procurement - Create new (organizers only)\n\n"
+            "Chat:\n"
+            "/chat - Enter procurement chat\n\n"
+            "Payments:\n"
+            "/deposit - Top up your balance\n"
+            "/transactions - Payment history\n\n"
+            "Notifications:\n"
+            "/notifications - View unread notifications\n\n"
+            "Help:\n"
+            "/help - This help message\n"
+            "/status - Bot health status"
+        )
+
+    if cmd == "status":
+        return "Bot is running."
+
+    if cmd in ("procurements", "my_procurements", "profile", "balance",
+               "deposit", "transactions", "notifications", "chat",
+               "search", "create_procurement", "broadcast"):
+        return (
+            f"Command /{cmd} received. "
+            "Please use the web interface or Telegram to access the full functionality."
+        )
+
+    if text.strip():
+        return (
+            "I received your message. "
+            "Use /help to see available commands."
+        )
+
+    return ""
+
+
 async def handle_adapter_message(request: web.Request) -> web.Response:
     """
     HTTP endpoint that receives messages from platform adapters (VK, Mattermost).
 
-    Adapter services POST a standardised message dict here; this handler
-    builds an aiogram-compatible Update and feeds it through the dispatcher
-    so that all existing handlers work transparently for every platform.
+    Adapter services POST a standardised message dict here.  When the payload
+    includes a ``reply_url`` field the bot processes the command and POSTs the
+    reply back to that URL so the adapter can forward it to the user.
     """
     try:
         data: Dict[str, Any] = await request.json()
@@ -54,17 +143,18 @@ async def handle_adapter_message(request: web.Request) -> web.Response:
     user_id = data.get("user_id", "")
     text = data.get("text", "")
     msg_type = data.get("type", "message")
+    reply_url = data.get("reply_url", "")
+    user_info: Dict[str, Any] = data.get("user_info", {})
 
     logger.info(
         "Received %s message from platform=%s user=%s", msg_type, platform, user_id
     )
 
-    # For non-Telegram platforms the bot cannot send replies directly.
-    # Route the message to the appropriate handler and reply via the adapter.
-    # Current implementation logs the event; a full cross-platform reply
-    # mechanism would require a reply callback URL from the adapter.
-    if msg_type == "message" and text:
+    if msg_type in ("message", "slash_command") and text and reply_url:
         logger.debug("Adapter message text: %s", text[:100])
+        reply_text = _build_command_reply(text, user_info)
+        if reply_text:
+            await _send_adapter_reply(reply_url, user_id, reply_text)
 
     return web.json_response({"status": "ok"})
 
