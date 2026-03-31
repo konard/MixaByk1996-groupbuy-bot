@@ -108,19 +108,26 @@ def _build_command_reply(text: str, user_info: Dict[str, Any]) -> str:
     if cmd == "status":
         return "Bot is running."
 
-    if cmd in ("procurements", "my_procurements", "profile", "balance",
-               "deposit", "transactions", "notifications", "chat",
-               "search", "create_procurement", "broadcast"):
+    if cmd in (
+        "procurements",
+        "my_procurements",
+        "profile",
+        "balance",
+        "deposit",
+        "transactions",
+        "notifications",
+        "chat",
+        "search",
+        "create_procurement",
+        "broadcast",
+    ):
         return (
             f"Command /{cmd} received. "
             "Please use the web interface or Telegram to access the full functionality."
         )
 
     if text.strip():
-        return (
-            "I received your message. "
-            "Use /help to see available commands."
-        )
+        return "I received your message. Use /help to see available commands."
 
     return ""
 
