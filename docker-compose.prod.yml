@@ -20,6 +20,8 @@ version: '3.8'
 services:
   # Django Admin API (Python backend for /api/admin/* endpoints and admin panel)
   # To create a superuser for the admin panel, run:
+  #   bash scripts/create-superuser.sh
+  # Or directly via Docker:
   #   docker compose -f docker-compose.prod.yml exec django-admin python manage.py createsuperuser
   django-admin:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/django-admin:${IMAGE_TAG:-main}
