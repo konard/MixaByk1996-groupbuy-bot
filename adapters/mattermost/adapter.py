@@ -453,10 +453,15 @@ class MattermostAdapter:
                 callback_data = button.get("callback_data", "")
                 url = button.get("url", "")
 
+                # The integration URL must be reachable by the Mattermost server.
+                # When Mattermost runs on a different host, bot_service_url
+                # (e.g. http://bot:8001) is not publicly accessible.  Use the
+                # adapter's own public URL instead — the adapter already exposes
+                # the /mattermost_action route and forwards the action to the bot.
                 action: dict[str, Any] = {
                     "name": button_text,
                     "integration": {
-                        "url": f"{self.bot_service_url}/mattermost_action",
+                        "url": f"{self.adapter_url}/mattermost_action",
                         "context": {"action": callback_data or url},
                     },
                 }

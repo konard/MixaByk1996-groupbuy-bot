@@ -86,7 +86,43 @@ docker-compose logs bot
 - **API:** http://localhost:8000/api/
 - **React фронтенд:** http://localhost:3000/
 
-## 1.6 Продакшен: доступ по IP-адресу сервера
+### 1.6 Вход в административную панель
+
+После запуска сервисов административная панель Django доступна по адресу:
+
+- **Разработка:** http://localhost:8000/api/admin/
+- **Продакшен:** https://\<DOMAIN\>/api/admin/
+
+**Автоматическое создание суперпользователя (продакшен)**
+
+При запуске `docker compose -f docker-compose.prod.yml up -d` контейнер `django-admin`
+автоматически создаёт суперпользователя, если заданы переменные окружения:
+
+```env
+DJANGO_SUPERUSER_USERNAME=admin        # имя пользователя (по умолчанию: admin)
+DJANGO_SUPERUSER_PASSWORD=ваш_пароль   # ОБЯЗАТЕЛЬНО — без этого создание пропускается
+DJANGO_SUPERUSER_EMAIL=admin@your-domain.com
+```
+
+Добавьте эти переменные в `.env` перед первым запуском.
+Если суперпользователь уже существует, скрипт пропускает создание (идемпотентен).
+
+**Создание суперпользователя вручную**
+
+Если `DJANGO_SUPERUSER_PASSWORD` не задан или нужно сбросить пароль:
+
+```bash
+# Интерактивный режим (задаёт username, email, password по запросу)
+bash scripts/create-superuser.sh
+
+# Неинтерактивный режим (для CI/CD)
+DJANGO_SUPERUSER_USERNAME=admin \
+DJANGO_SUPERUSER_PASSWORD=secret123 \
+DJANGO_SUPERUSER_EMAIL=admin@example.com \
+bash scripts/create-superuser.sh --non-interactive
+```
+
+## 1.8 Продакшен: доступ по IP-адресу сервера
 
 После запуска `docker-compose -f docker-compose.prod.yml up -d` сервис доступен по IP сервера (без настройки домена и SSL):
 
@@ -775,6 +811,7 @@ docker-compose logs bot
 | 403 Forbidden в логах | Токен не совпадает | Пересоздайте вебхук и обновите `MATTERMOST_TOKEN` |
 | Адаптер не получает сообщения | Mattermost не может достучаться до адаптера | Убедитесь, что порт 8002 открыт на сервере и URL вебхука указан правильно |
 | Бот получает, но не отвечает | `MATTERMOST_ADAPTER_URL` настроен неправильно | Установите `MATTERMOST_ADAPTER_URL=http://<IP_ВАШЕГО_СЕРВЕРА>:8002` в `.env` |
+| Кнопки в сообщениях не работают | Mattermost не может достучаться до внутреннего адреса бота | Убедитесь, что `MATTERMOST_ADAPTER_URL` указывает на публичный адрес сервера с адаптером |
 | Ответ идёт, но не в тот канал | `MATTERMOST_WEBHOOK_URL` ведёт не в тот канал | Проверьте, какой канал выбран во входящем вебхуке Mattermost |
 | Адаптер запускается с ошибкой | `MATTERMOST_TOKEN` или `MATTERMOST_WEBHOOK_URL` не заданы | Проверьте `.env` файл |
 

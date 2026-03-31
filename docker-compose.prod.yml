@@ -19,10 +19,10 @@ version: '3.8'
 
 services:
   # Django Admin API (Python backend for /api/admin/* endpoints and admin panel)
-  # To create a superuser for the admin panel, run:
+  # A superuser is created automatically on first start when DJANGO_SUPERUSER_PASSWORD
+  # is set in .env.  Login at https://<DOMAIN>/api/admin/ with those credentials.
+  # To create a superuser manually (or reset the password), run:
   #   bash scripts/create-superuser.sh
-  # Or directly via Docker:
-  #   docker compose -f docker-compose.prod.yml exec django-admin python manage.py createsuperuser
   django-admin:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/django-admin:${IMAGE_TAG:-main}
     container_name: groupbuy-django-admin
@@ -33,6 +33,10 @@ services:
       - SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-change-this-in-production}
       - DEBUG=False
       - ALLOWED_HOSTS=${DOMAIN:-localhost},127.0.0.1
+      # Auto-superuser creation: set a password to enable, leave empty to skip.
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@localhost}
     depends_on:
       postgres:
         condition: service_healthy
