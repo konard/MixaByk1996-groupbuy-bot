@@ -33,6 +33,7 @@ def pytest_configure(config):
     if not settings.configured:
         settings.configure(
             ROOT_URLCONF='conftest_urls',
+            ALLOWED_HOSTS=['testserver', 'localhost', '127.0.0.1'],
             DATABASES={
                 'default': {
                     'ENGINE': 'django.db.backends.sqlite3',
