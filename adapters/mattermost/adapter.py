@@ -52,6 +52,11 @@ class MattermostAdapter:
         self.bot_service_url: str = os.getenv(
             "BOT_SERVICE_URL", "http://bot:8001"
         ).rstrip("/")
+        # Public base URL of this adapter service, used as the reply_url sent to
+        # the bot service so it can POST replies back here.
+        self.adapter_url: str = os.getenv(
+            "MATTERMOST_ADAPTER_URL", "http://mattermost-adapter:8002"
+        ).rstrip("/")
 
         if not self.token:
             raise ValueError("MATTERMOST_TOKEN is not set")
@@ -74,11 +79,38 @@ class MattermostAdapter:
         self.app.router.add_post("/webhook", self._handle_webhook)
         self.app.router.add_post("/slash", self._handle_slash)
         self.app.router.add_post("/mattermost_action", self._handle_action)
+        self.app.router.add_post("/send", self._handle_send)
         self.app.router.add_get("/health", self._handle_health)
 
     async def _handle_health(self, request: web.Request) -> web.Response:
         """Health-check endpoint."""
         return web.json_response({"status": "ok"})
+
+    async def _handle_send(self, request: web.Request) -> web.Response:
+        """
+        Receive a reply from the bot service and forward it to Mattermost.
+
+        The bot service POSTs ``{"user_id": <str>, "text": <str>}`` here after
+        processing a command that arrived via ``/webhook`` or ``/slash``.
+        This is the reply path that makes the Mattermost bot actually respond
+        to user commands.
+        """
+        try:
+            data = await request.json()
+        except Exception as exc:
+            logger.error("Failed to parse /send request: %s", exc)
+            return web.Response(status=400, text="Bad Request")
+
+        user_id = data.get("user_id", "")
+        text = data.get("text", "")
+
+        if not user_id or not text:
+            return web.Response(status=400, text="Missing user_id or text")
+
+        success = await self.send_message(user_id, text)
+        if success:
+            return web.json_response({"status": "ok"})
+        return web.Response(status=502, text="Failed to deliver message to Mattermost")
 
     async def _handle_webhook(self, request: web.Request) -> web.Response:
         """
@@ -203,6 +235,9 @@ class MattermostAdapter:
             },
             "timestamp": datetime.now().isoformat(),
             "type": "message",
+            # reply_url allows the bot service to POST the reply back to this
+            # adapter, which then forwards it to Mattermost.
+            "reply_url": f"{self.adapter_url}/send",
         }
 
     def _standardize_slash(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -232,6 +267,7 @@ class MattermostAdapter:
             },
             "timestamp": datetime.now().isoformat(),
             "type": "slash_command",
+            "reply_url": f"{self.adapter_url}/send",
         }
 
     def _standardize_action(self, data: dict[str, Any]) -> dict[str, Any]:
