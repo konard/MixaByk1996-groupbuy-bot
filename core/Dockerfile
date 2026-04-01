@@ -19,6 +19,10 @@ COPY . .
 # Create staticfiles directory
 RUN mkdir -p staticfiles
 
+# Copy and enable the startup entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 8000
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+ENTRYPOINT ["/entrypoint.sh"]
