@@ -494,6 +494,8 @@ The bot supports full Telegram integration with the following features:
 
 The bot supports Mattermost integration, allowing users to interact with the GroupBuy platform through any self-hosted Mattermost server.
 
+> **Подробное руководство по настройке (на русском):** [docs/mattermost-setup.md](./docs/mattermost-setup.md)
+
 **How it works:**
 
 The Mattermost adapter uses two Mattermost integration primitives:
