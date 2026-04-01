@@ -56,10 +56,10 @@ class WebSocketManager {
   handleMessage(data) {
     switch (data.type) {
       case 'message':
-        this.emit('message', data.message);
+        this.emit('message', data);
         break;
       case 'typing':
-        this.emit('typing', data.user);
+        this.emit('typing', data);
         break;
       case 'user_joined':
         this.emit('user_joined', data.user);
@@ -81,12 +81,12 @@ class WebSocketManager {
     }
   }
 
-  sendTyping() {
-    this.send({ type: 'typing' });
+  sendTyping(isTyping = true) {
+    this.send({ type: 'typing', is_typing: isTyping });
   }
 
-  sendMessage(message) {
-    this.send({ type: 'message', message });
+  sendMessage(text) {
+    this.send({ type: 'message', text });
   }
 
   on(event, callback) {

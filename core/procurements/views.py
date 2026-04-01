@@ -6,7 +6,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Category, Procurement, Participant, SupplierVote
+from .models import Category, Procurement, Participant, SupplierVote, VoteCloseRequest
 from .serializers import (
     CategorySerializer, ProcurementListSerializer, ProcurementDetailSerializer,
     ProcurementCreateSerializer, ParticipantSerializer, JoinProcurementSerializer,
@@ -315,6 +315,67 @@ class ProcurementViewSet(viewsets.ModelViewSet):
             'procurement_id': procurement.id,
             'total_votes': total_votes,
             'results': data,
+        })
+
+    @action(detail=True, methods=['post'])
+    def close_vote(self, request, pk=None):
+        """Record that a participant wants to close the supplier vote.
+
+        Each active participant or organizer can submit this once.  Returns
+        how many have confirmed so far and the total number of participants.
+        """
+        procurement = self.get_object()
+        user_id = request.data.get('user_id')
+
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Must be a participant or organizer
+        is_participant = procurement.participants.filter(user_id=user_id, is_active=True).exists()
+        is_organizer = procurement.organizer_id == int(user_id)
+        if not is_participant and not is_organizer:
+            return Response(
+                {'error': 'Only participants or the organizer can close the vote'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        VoteCloseRequest.objects.get_or_create(
+            procurement=procurement,
+            user_id=user_id,
+        )
+
+        closed_by = list(
+            VoteCloseRequest.objects.filter(procurement=procurement)
+            .values_list('user_id', flat=True)
+        )
+        total_participants = procurement.participants.filter(is_active=True).count()
+
+        return Response({
+            'procurement_id': procurement.id,
+            'closed_by': closed_by,
+            'close_count': len(closed_by),
+            'total_participants': total_participants,
+        })
+
+    @action(detail=True, methods=['get'])
+    def vote_close_status(self, request, pk=None):
+        """Get the current vote-close confirmation status for a procurement."""
+        procurement = self.get_object()
+
+        closed_by = list(
+            VoteCloseRequest.objects.filter(procurement=procurement)
+            .values_list('user_id', flat=True)
+        )
+        total_participants = procurement.participants.filter(is_active=True).count()
+
+        return Response({
+            'procurement_id': procurement.id,
+            'closed_by': closed_by,
+            'close_count': len(closed_by),
+            'total_participants': total_participants,
         })
 
     # ------------------------------------------------------------------
