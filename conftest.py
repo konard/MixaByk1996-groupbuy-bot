@@ -64,6 +64,9 @@ def pytest_configure(config):
             ],
             SESSION_ENGINE='django.contrib.sessions.backends.db',
             REST_FRAMEWORK={
+                'DEFAULT_AUTHENTICATION_CLASSES': [
+                    'rest_framework.authentication.SessionAuthentication',
+                ],
                 'DEFAULT_PERMISSION_CLASSES': [
                     'rest_framework.permissions.AllowAny',
                 ],
