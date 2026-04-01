@@ -22,16 +22,20 @@ python manage.py migrate --noinput
 echo "==> Collecting static files..."
 python manage.py collectstatic --noinput --clear
 
+echo "==> Loading initial data fixtures..."
+python manage.py loaddata initial_categories --app procurements 2>/dev/null && \
+    echo "    Categories loaded." || echo "    Categories already loaded or fixture skipped."
+
 # Auto-create superuser when credentials are provided via environment variables.
-# Uses a short Python snippet so the check-and-create is atomic and idempotent.
+# Uses django.contrib.auth.models.User explicitly — the admin panel authenticates
+# against Django's built-in auth system, not the custom users.User model.
 if [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
     SUPERUSER_USERNAME="${DJANGO_SUPERUSER_USERNAME:-admin}"
     SUPERUSER_EMAIL="${DJANGO_SUPERUSER_EMAIL:-admin@localhost}"
 
     echo "==> Ensuring superuser '${SUPERUSER_USERNAME}' exists..."
     python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
+from django.contrib.auth.models import User
 if not User.objects.filter(username='${SUPERUSER_USERNAME}').exists():
     User.objects.create_superuser(
         username='${SUPERUSER_USERNAME}',

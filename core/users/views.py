@@ -20,6 +20,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     Endpoints:
     - GET /api/users/ - list all users
+    - GET /api/users/?role=supplier - filter by role
     - POST /api/users/ - create new user (register)
     - GET /api/users/{id}/ - get user details
     - PUT /api/users/{id}/ - update user
@@ -38,6 +39,16 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ['update', 'partial_update']:
             return UserProfileUpdateSerializer
         return UserSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+        platform = self.request.query_params.get('platform')
+        if platform:
+            queryset = queryset.filter(platform=platform)
+        return queryset
 
     @action(detail=False, methods=['get'])
     def by_platform(self, request):
