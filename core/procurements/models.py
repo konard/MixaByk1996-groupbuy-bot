@@ -217,3 +217,29 @@ class SupplierVote(models.Model):
 
     def __str__(self):
         return f"{self.voter} voted for {self.supplier} in {self.procurement.title}"
+
+
+class VoteCloseRequest(models.Model):
+    """Tracks which participants have confirmed closing the supplier vote.
+
+    The vote is considered closed when all active participants have submitted
+    a close request for the procurement.
+    """
+
+    procurement = models.ForeignKey(
+        Procurement, on_delete=models.CASCADE, related_name='vote_close_requests'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='vote_close_requests'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'vote_close_requests'
+        unique_together = ['procurement', 'user']
+        indexes = [
+            models.Index(fields=['procurement']),
+        ]
+
+    def __str__(self):
+        return f"{self.user} requested close vote in {self.procurement.title}"
