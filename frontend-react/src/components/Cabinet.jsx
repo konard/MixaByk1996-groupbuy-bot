@@ -29,8 +29,11 @@ import ClosingDocumentsModal from './ClosingDocumentsModal';
 
 // Category slider items per role
 const SUPPLIER_CATEGORY_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты'];
-const ORGANIZER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты'];
+const ORGANIZER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Общение', 'Публичные чаты', 'Делегаты'];
 const BUYER_SLIDER_ITEMS = ['Биржа', 'Езда', 'Быт', 'Отдых', 'Жилье', 'Соревнования'];
+
+// Slider items that should navigate to chat instead of the under-development page
+const CHAT_SLIDER_ITEMS = new Set(['Общение', 'Публичные чаты', 'Делегаты']);
 
 function CategorySlider({ items, onSelect }) {
   return (
@@ -208,7 +211,11 @@ function Cabinet() {
   };
 
   const handleCategorySelect = (category) => {
-    navigate(`/in-development?section=${encodeURIComponent(category)}`);
+    if (CHAT_SLIDER_ITEMS.has(category)) {
+      navigate('/');
+    } else {
+      navigate(`/in-development?section=${encodeURIComponent(category)}`);
+    }
   };
 
   const handleRoleSwitch = async (newRole) => {
@@ -477,6 +484,10 @@ function Cabinet() {
           }}>
             <RequestsIcon />
             <span className="cabinet-menu-text">Чаты</span>
+          </div>
+          <div className="cabinet-menu-item" onClick={() => navigate('/')}>
+            <RequestsIcon />
+            <span className="cabinet-menu-text">Делегаты</span>
           </div>
 
           {/* Закупки в стадии оплаты */}
