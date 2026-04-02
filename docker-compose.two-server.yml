@@ -5,6 +5,15 @@
 # Usage:
 # On Server 1 (Chat): docker-compose -f docker-compose.two-server.yml up websocket-server redis-chat nginx-chat
 # On Server 2 (API):  docker-compose -f docker-compose.two-server.yml up core bot telegram-adapter mattermost-adapter postgres redis-api nginx-api
+#
+# If Mattermost is deployed on a SEPARATE (third) server:
+#   1. Set MATTERMOST_URL=https://<mattermost-server-ip-or-domain> in .env
+#   2. Set MATTERMOST_ADAPTER_URL=http://<SERVER2_PUBLIC_IP>:8002 in .env
+#      (Mattermost will POST webhook/slash-command/button payloads to this address)
+#   3. Open port 8002 on Server 2 in your firewall so Mattermost can reach it:
+#        ufw allow 8002/tcp
+#   4. Set MATTERMOST_TOKEN and MATTERMOST_WEBHOOK_URL from your Mattermost admin panel
+#   5. Optionally set MATTERMOST_BOT_TOKEN for direct-message support
 
 version: '3.8'
 
