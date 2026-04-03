@@ -1,0 +1,399 @@
+version: "3.9"
+
+networks:
+  microservices:
+    driver: bridge
+
+volumes:
+  postgres_gateway_data:
+  postgres_auth_data:
+  postgres_purchase_data:
+  postgres_payment_data:
+  postgres_chat_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+  clickhouse_data:
+  centrifugo_data:
+  minio_data:
+
+services:
+  # ─────────────────────────────────────────────
+  # Infrastructure
+  # ─────────────────────────────────────────────
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    ports:
+      - "29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - microservices
+
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_password
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-purchase:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: purchase_db
+      POSTGRES_USER: purchase_user
+      POSTGRES_PASSWORD: purchase_password
+    volumes:
+      - postgres_purchase_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U purchase_user -d purchase_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-payment:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_password
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-chat:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: chat_db
+      POSTGRES_USER: chat_user
+      POSTGRES_PASSWORD: chat_password
+    volumes:
+      - postgres_chat_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat_user -d chat_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    environment:
+      CLICKHOUSE_DB: chat_history
+      CLICKHOUSE_USER: clickhouse_user
+      CLICKHOUSE_PASSWORD: clickhouse_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    volumes:
+      - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
+    command: centrifugo -c /centrifugo/config.json
+    ports:
+      - "8000:8000"
+      - "9001:9001"
+    networks:
+      - microservices
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  # ─────────────────────────────────────────────
+  # Application Services
+  # ─────────────────────────────────────────────
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: super_secret_jwt_key_change_in_production
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PURCHASE_SERVICE_URL: http://purchase-service:4002
+      PAYMENT_SERVICE_URL: http://payment-service:4003
+      CHAT_SERVICE_URL: http://chat-service:4004
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: redis_password
+      RATE_LIMIT_RPM: 60
+      CORS_ORIGINS: "http://localhost:3001,http://localhost:3002"
+    depends_on:
+      - redis
+      - auth-service
+      - purchase-service
+      - payment-service
+      - chat-service
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "4001:4001"
+    environment:
+      PORT: 4001
+      DATABASE_URL: postgresql://auth_user:auth_password@postgres-auth:5432/auth_db
+      REDIS_URL: redis://:redis_password@redis:6379
+      JWT_SECRET: super_secret_jwt_key_change_in_production
+      JWT_REFRESH_SECRET: super_secret_refresh_key_change_in_production
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_ROUNDS: 10
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  purchase-service:
+    build:
+      context: ./services/purchase-service
+      dockerfile: Dockerfile
+    ports:
+      - "4002:4002"
+    environment:
+      PORT: 4002
+      DATABASE_URL: postgresql://purchase_user:purchase_password@postgres-purchase:5432/purchase_db
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: purchase-service
+      KAFKA_GROUP_ID: purchase-group
+    depends_on:
+      postgres-purchase:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    ports:
+      - "4003:4003"
+    environment:
+      PORT: 4003
+      DATABASE_URL: postgresql://payment_user:payment_password@postgres-payment:5432/payment_db
+      KAFKA_BROKERS: kafka:9092
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      YOOKASSA_SHOP_ID: placeholder_shop_id
+      YOOKASSA_SECRET_KEY: placeholder_secret
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  chat-service:
+    build:
+      context: ./services/chat-service
+      dockerfile: Dockerfile
+    ports:
+      - "4004:4004"
+    environment:
+      PORT: 4004
+      DATABASE_URL: postgresql://chat_user:chat_password@postgres-chat:5432/chat_db
+      CENTRIFUGO_URL: http://centrifugo:8000
+      CENTRIFUGO_API_KEY: centrifugo_api_key
+      CLICKHOUSE_DSN: clickhouse://clickhouse_user:clickhouse_password@clickhouse:9000/chat_history
+    depends_on:
+      postgres-chat:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    ports:
+      - "4005:4005"
+    environment:
+      PORT: 4005
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: notification-group
+      CENTRIFUGO_URL: http://centrifugo:8000
+      CENTRIFUGO_API_KEY: centrifugo_api_key
+      SMTP_HOST: smtp.example.com
+      SMTP_PORT: 587
+      SMTP_USER: notifications@example.com
+      SMTP_PASS: smtp_password
+      FCM_SERVER_KEY: fcm_server_key_placeholder
+    depends_on:
+      - kafka
+      - centrifugo
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "4006:4006"
+    environment:
+      PORT: 4006
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: analytics-group
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minio_admin
+      S3_SECRET_KEY: minio_password
+      S3_BUCKET: analytics-reports
+      CLICKHOUSE_DSN: clickhouse://clickhouse_user:clickhouse_password@clickhouse:9000/chat_history
+    depends_on:
+      - kafka
+      - minio
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Monitoring
+  # ─────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/dashboard.json:/var/lib/grafana/dashboards/main.json
+    ports:
+      - "3001:3000"
+    networks:
+      - microservices
+    depends_on:
+      - prometheus
+    restart: unless-stopped
