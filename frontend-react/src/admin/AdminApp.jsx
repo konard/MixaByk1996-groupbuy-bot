@@ -16,6 +16,10 @@ import MessagesPage from './pages/MessagesPage';
 import ReportsPage from './pages/ReportsPage';
 import AdminChatPage from './pages/AdminChatPage';
 import ActivityLogPage from './pages/ActivityLogPage';
+import ReputationPage from './pages/ReputationPage';
+import ComplaintsPage from './pages/ComplaintsPage';
+import EscrowPage from './pages/EscrowPage';
+import SearchAnalyticsPage from './pages/SearchAnalyticsPage';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, checkAuth, isLoading } = useAdminStore();
@@ -121,6 +125,38 @@ export default function AdminApp() {
         element={
           <ProtectedRoute>
             <ActivityLogPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="reputation"
+        element={
+          <ProtectedRoute>
+            <ReputationPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="complaints"
+        element={
+          <ProtectedRoute>
+            <ComplaintsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="escrow"
+        element={
+          <ProtectedRoute>
+            <EscrowPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="search-analytics"
+        element={
+          <ProtectedRoute>
+            <SearchAnalyticsPage />
           </ProtectedRoute>
         }
       />

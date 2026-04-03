@@ -1,6 +1,24 @@
-# GroupBuy Bot
+# GroupBuy Bot v4.0
 
-A multi-platform group purchasing bot with support for Telegram, WhatsApp, and WebSocket-based chat.
+A scalable microservices platform for organizing group purchases, supporting 10M+ users across Telegram, WhatsApp, and WebSocket-based chat.
+
+## Architecture (v4.0)
+
+| Service | Technology | Purpose |
+|---------|-----------|---------|
+| Gateway | Go (gorilla/mux) | API routing, rate limiting, JWT, CORS |
+| Auth | NestJS | JWT auth, 2FA (TOTP), registration |
+| Purchase | NestJS + Kafka | Purchases, voting, commission, sagas |
+| Payment | Go | Wallets, holds, escrow, commission |
+| Chat | Go + Centrifugo | WebSocket chat, message history |
+| Analytics | Python (FastAPI) | Reports, ML recommendations |
+| Notification | Node.js | Push, email, Telegram/WhatsApp bots |
+| Search | Go + Elasticsearch | Fuzzy search, saved filters |
+| Reputation | NestJS | Reviews, ratings, arbitration |
+
+Key features: organizer commission (0-10%), escrow for large purchases, 2FA, auto-rollback (Argo Rollouts), smart search with typo tolerance, reputation system with auto-blocking.
+
+See [Deployment Guide](docs/DEPLOYMENT-v4.md) for full setup instructions.
 
 ---
 

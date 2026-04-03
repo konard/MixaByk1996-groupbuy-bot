@@ -55,6 +55,15 @@ class CreatePurchaseDto {
   category?: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  commissionPercent?: number;
+
+  @IsOptional()
+  @IsNumber()
+  escrowThreshold?: number;
+
+  @IsOptional()
   @IsDateString()
   deadlineAt?: string;
 }

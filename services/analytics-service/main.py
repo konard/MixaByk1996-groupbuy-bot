@@ -43,13 +43,28 @@ TOPICS = [
     "purchase.created",
     "purchase.voting.started",
     "purchase.voting.closed",
+    "purchase.voting.tie",
     "purchase.vote.cast",
     "purchase.vote.changed",
     "purchase.candidate.added",
+    "purchase.cancelled",
     "payment.topup.completed",
     "payment.hold.created",
     "payment.committed",
     "payment.released",
+    "commission.held",
+    "commission.committed",
+    "commission.released",
+    "escrow.created",
+    "escrow.deposited",
+    "escrow.confirmed",
+    "escrow.released",
+    "escrow.disputed",
+    "review.created",
+    "complaint.filed",
+    "complaint.resolved",
+    "user.auto_blocked",
+    "search.query",
 ]
 
 # ─── In-Memory Event Store (would be ClickHouse in production) ────────────────
@@ -57,6 +72,10 @@ TOPICS = [
 event_store: list[dict[str, Any]] = []
 purchase_stats: dict[str, dict] = {}   # purchaseId -> stats
 payment_stats: dict[str, dict] = {}    # walletId -> stats
+commission_stats: dict[str, dict] = {} # purchaseId -> commission stats
+escrow_stats: dict[str, dict] = {}     # purchaseId -> escrow stats
+reputation_stats: dict[str, dict] = {} # userId -> reputation stats
+search_stats: dict[str, Any] = {"total_queries": 0, "avg_latency_ms": 0, "queries": []}
 
 
 # ─── S3 Client ────────────────────────────────────────────────────────────────
@@ -243,6 +262,55 @@ async def process_event(topic: str, payload: dict) -> None:
         elif topic == "payment.released":
             payment_stats[uid]["total_released"] += amount
 
+    # Update commission stats
+    if topic.startswith("commission."):
+        pid = payload.get("purchaseId", "unknown")
+        if pid not in commission_stats:
+            commission_stats[pid] = {"held": 0, "committed": 0, "released": 0, "percent": 0}
+        amount = payload.get("amount", 0)
+        if topic == "commission.held":
+            commission_stats[pid]["held"] += amount
+            commission_stats[pid]["percent"] = payload.get("percent", 0)
+        elif topic == "commission.committed":
+            commission_stats[pid]["committed"] += amount
+        elif topic == "commission.released":
+            commission_stats[pid]["released"] += amount
+
+    # Update escrow stats
+    if topic.startswith("escrow."):
+        pid = payload.get("purchaseId", "unknown")
+        if pid not in escrow_stats:
+            escrow_stats[pid] = {"total_deposited": 0, "confirmations": 0, "required": 0, "status": "active"}
+        if topic == "escrow.deposited":
+            escrow_stats[pid]["total_deposited"] += payload.get("amount", 0)
+        elif topic == "escrow.confirmed":
+            escrow_stats[pid]["confirmations"] = payload.get("confirmationsReceived", 0)
+            escrow_stats[pid]["required"] = payload.get("confirmationsRequired", 0)
+        elif topic == "escrow.released":
+            escrow_stats[pid]["status"] = "released"
+        elif topic == "escrow.disputed":
+            escrow_stats[pid]["status"] = "disputed"
+
+    # Update reputation stats
+    if topic in ("review.created", "complaint.filed", "complaint.resolved", "user.auto_blocked"):
+        target_id = payload.get("targetId") or payload.get("userId", "unknown")
+        if target_id not in reputation_stats:
+            reputation_stats[target_id] = {"reviews": 0, "avg_rating": 0, "complaints": 0, "blocked": False}
+        if topic == "review.created":
+            stats = reputation_stats[target_id]
+            stats["reviews"] += 1
+            rating = payload.get("rating", 0)
+            # Running average
+            stats["avg_rating"] = ((stats["avg_rating"] * (stats["reviews"] - 1)) + rating) / stats["reviews"]
+        elif topic == "complaint.filed":
+            reputation_stats[target_id]["complaints"] += 1
+        elif topic == "user.auto_blocked":
+            reputation_stats[target_id]["blocked"] = True
+
+    # Update search stats
+    if topic == "search.query":
+        search_stats["total_queries"] += 1
+
     # Periodically generate and upload reports (every 100 events)
     if len(event_store) % 100 == 0:
         await generate_and_upload_reports()
@@ -347,6 +415,26 @@ async def get_payment_stats():
     return {"success": True, "data": payment_stats}
 
 
+@app.get("/stats/commissions")
+async def get_commission_stats():
+    return {"success": True, "data": commission_stats}
+
+
+@app.get("/stats/escrow")
+async def get_escrow_stats():
+    return {"success": True, "data": escrow_stats}
+
+
+@app.get("/stats/reputation")
+async def get_reputation_stats():
+    return {"success": True, "data": reputation_stats}
+
+
+@app.get("/stats/search")
+async def get_search_stats():
+    return {"success": True, "data": search_stats}
+
+
 @app.get("/stats/summary")
 async def get_summary():
     return {
@@ -355,6 +443,10 @@ async def get_summary():
             "total_events": len(event_store),
             "purchases_tracked": len(purchase_stats),
             "users_tracked": len(payment_stats),
+            "commissions_tracked": len(commission_stats),
+            "escrow_accounts_tracked": len(escrow_stats),
+            "reputation_profiles_tracked": len(reputation_stats),
+            "search_queries": search_stats["total_queries"],
             "topics_consumed": TOPICS,
         },
     }

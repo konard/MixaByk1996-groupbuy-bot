@@ -28,6 +28,10 @@ export default function AdminLayout({ children }) {
     { path: '/admin-panel/categories', label: 'Категории', icon: '📁' },
     { path: '/admin-panel/messages', label: 'Сообщения', icon: '💬' },
     { path: '/admin-panel/reports', label: 'Отчёты', icon: '📈' },
+    { path: '/admin-panel/reputation', label: 'Репутация', icon: '⭐' },
+    { path: '/admin-panel/complaints', label: 'Жалобы', icon: '❗' },
+    { path: '/admin-panel/escrow', label: 'Эскроу', icon: '🔒' },
+    { path: '/admin-panel/search-analytics', label: 'Поиск', icon: '🔍' },
     { path: '/admin-panel/chat', label: 'Чат с юзерами', icon: '🗨️' },
     { path: '/admin-panel/activity', label: 'Журнал', icon: '📋' },
   ];

@@ -41,6 +41,16 @@ class CreateSessionDto {
   @IsNumber()
   @Min(1)
   minVotesToClose?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  votingDuration?: number;
+}
+
+class ResolveTieDto {
+  @IsUUID()
+  candidateId: string;
 }
 
 class AddCandidateDto {
@@ -95,6 +105,7 @@ export class VotingController {
       allowAddCandidates: dto.allowAddCandidates,
       allowChangeVote: dto.allowChangeVote,
       minVotesToClose: dto.minVotesToClose,
+      votingDuration: dto.votingDuration,
     });
     return { success: true, data: session };
   }
@@ -142,6 +153,18 @@ export class VotingController {
   ) {
     const userId = getUserId(headers);
     const session = await this.votingService.closeSession(sessionId, userId);
+    return { success: true, data: session };
+  }
+
+  @Post('sessions/:sessionId/resolve-tie')
+  @HttpCode(HttpStatus.OK)
+  async resolveTie(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() dto: ResolveTieDto,
+    @Headers() headers: Record<string, string>,
+  ) {
+    const userId = getUserId(headers);
+    const session = await this.votingService.resolveTie(sessionId, dto.candidateId, userId);
     return { success: true, data: session };
   }
 }

@@ -42,6 +42,29 @@ class RefreshDto {
   refreshToken: string;
 }
 
+class TwoFactorVerifyDto {
+  @IsString()
+  code: string;
+}
+
+class TwoFactorLoginDto {
+  @IsString()
+  tempToken: string;
+
+  @IsString()
+  code: string;
+}
+
+class TwoFactorDisableDto {
+  @IsString()
+  code: string;
+}
+
+class TwoFactorBackupCodesDto {
+  @IsString()
+  code: string;
+}
+
 @Controller()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -61,8 +84,8 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
-    const tokens = await this.authService.login(dto.email, dto.password);
-    return { success: true, data: tokens };
+    const result = await this.authService.login(dto.email, dto.password);
+    return { success: true, data: result };
   }
 
   @Post('refresh')
@@ -99,5 +122,65 @@ export class AuthController {
   @Get('health')
   health() {
     return { status: 'ok', service: 'auth-service' };
+  }
+
+  // --- Two-Factor Authentication Endpoints ---
+
+  @Post('2fa/enable')
+  @HttpCode(HttpStatus.OK)
+  async enable2FA(@Headers('authorization') authHeader: string) {
+    const payload = await this.extractAndValidateToken(authHeader);
+    const result = await this.authService.enable2FA(payload.sub);
+    return { success: true, data: result };
+  }
+
+  @Post('2fa/verify')
+  @HttpCode(HttpStatus.OK)
+  async verify2FA(
+    @Headers('authorization') authHeader: string,
+    @Body() dto: TwoFactorVerifyDto,
+  ) {
+    const payload = await this.extractAndValidateToken(authHeader);
+    await this.authService.verify2FA(payload.sub, dto.code);
+    return { success: true, message: 'Two-factor authentication enabled successfully' };
+  }
+
+  @Post('2fa/login')
+  @HttpCode(HttpStatus.OK)
+  async login2FA(@Body() dto: TwoFactorLoginDto) {
+    const tokens = await this.authService.loginWith2FA(dto.tempToken, dto.code);
+    return { success: true, data: tokens };
+  }
+
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.OK)
+  async disable2FA(
+    @Headers('authorization') authHeader: string,
+    @Body() dto: TwoFactorDisableDto,
+  ) {
+    const payload = await this.extractAndValidateToken(authHeader);
+    await this.authService.disable2FA(payload.sub, dto.code);
+    return { success: true, message: 'Two-factor authentication disabled successfully' };
+  }
+
+  @Post('2fa/backup-codes')
+  @HttpCode(HttpStatus.OK)
+  async regenerateBackupCodes(
+    @Headers('authorization') authHeader: string,
+    @Body() dto: TwoFactorBackupCodesDto,
+  ) {
+    const payload = await this.extractAndValidateToken(authHeader);
+    const backupCodes = await this.authService.regenerateBackupCodes(payload.sub, dto.code);
+    return { success: true, data: { backupCodes } };
+  }
+
+  // --- Private helpers ---
+
+  private async extractAndValidateToken(authHeader: string) {
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new UnauthorizedException('No token provided');
+    }
+    const token = authHeader.slice(7);
+    return this.authService.validateToken(token);
   }
 }

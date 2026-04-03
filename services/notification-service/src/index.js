@@ -30,6 +30,15 @@ const config = {
     vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
     subject: process.env.VAPID_SUBJECT || 'mailto:admin@example.com',
   },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    apiUrl: process.env.TELEGRAM_API_URL || 'https://api.telegram.org',
+  },
+  whatsapp: {
+    apiUrl: process.env.WHATSAPP_API_URL || '',
+    accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+  },
   port: parseInt(process.env.PORT || '4005', 10),
 };
 
@@ -107,6 +116,102 @@ async function sendPushNotification(subscription, title, body, data = {}) {
     console.log(`[PUSH] Sent push notification: ${title}`);
   } catch (err) {
     console.error(`[PUSH] Failed: ${err.message}`);
+  }
+}
+
+// ─── Telegram Bot ────────────────────────────────────────────────────────────
+
+async function sendTelegramMessage(chatId, text, inlineKeyboard = null) {
+  if (!config.telegram.botToken) {
+    console.log(`[TELEGRAM] Bot token not configured, skipping`);
+    return;
+  }
+  try {
+    const body = {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+    };
+    if (inlineKeyboard) {
+      body.reply_markup = { inline_keyboard: inlineKeyboard };
+    }
+    await axios.post(
+      `${config.telegram.apiUrl}/bot${config.telegram.botToken}/sendMessage`,
+      body,
+      { timeout: 10000 }
+    );
+    console.log(`[TELEGRAM] Sent to ${chatId}: ${text.substring(0, 50)}...`);
+  } catch (err) {
+    console.error(`[TELEGRAM] Failed to send to ${chatId}: ${err.message}`);
+  }
+}
+
+// ─── WhatsApp Bot ────────────────────────────────────────────────────────────
+
+async function sendWhatsAppMessage(phoneNumber, text, buttons = null) {
+  if (!config.whatsapp.accessToken || !config.whatsapp.phoneNumberId) {
+    console.log(`[WHATSAPP] API not configured, skipping`);
+    return;
+  }
+  try {
+    const body = {
+      messaging_product: 'whatsapp',
+      to: phoneNumber,
+      type: buttons ? 'interactive' : 'text',
+    };
+    if (buttons) {
+      body.interactive = {
+        type: 'button',
+        body: { text },
+        action: {
+          buttons: buttons.map((b, i) => ({
+            type: 'reply',
+            reply: { id: b.id || `btn_${i}`, title: b.title },
+          })),
+        },
+      };
+    } else {
+      body.text = { body: text };
+    }
+    await axios.post(
+      `${config.whatsapp.apiUrl}/${config.whatsapp.phoneNumberId}/messages`,
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${config.whatsapp.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      }
+    );
+    console.log(`[WHATSAPP] Sent to ${phoneNumber}: ${text.substring(0, 50)}...`);
+  } catch (err) {
+    console.error(`[WHATSAPP] Failed to send to ${phoneNumber}: ${err.message}`);
+  }
+}
+
+// ─── Multi-channel notification helper ───────────────────────────────────────
+
+async function notifyUser(userId, { channel, title, body, buttons, telegramChatId, whatsappPhone }) {
+  // Always send WebSocket notification
+  await publishCentrifugo(`notifications:${userId}`, {
+    type: 'notification',
+    title,
+    body,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Telegram if chat ID available
+  if (telegramChatId) {
+    const keyboard = buttons
+      ? buttons.map(b => [{ text: b.title, callback_data: b.action }])
+      : null;
+    await sendTelegramMessage(telegramChatId, `<b>${title}</b>\n${body}`, keyboard);
+  }
+
+  // WhatsApp if phone available
+  if (whatsappPhone) {
+    await sendWhatsAppMessage(whatsappPhone, `${title}\n${body}`, buttons);
   }
 }
 
@@ -226,6 +331,143 @@ const eventHandlers = {
       message: `Held funds released: ${payload.amount / 100}`,
     });
   },
+
+  // Voting tie event
+  'purchase.voting.tie': async (payload) => {
+    await publishCentrifugo(`purchase:${payload.purchaseId}`, {
+      type: 'voting_tie',
+      sessionId: payload.sessionId,
+      candidates: payload.tiedCandidates,
+      message: 'Voting ended in a tie! Organizer must select the winner.',
+    });
+    if (payload.organizerId) {
+      await notifyUser(payload.organizerId, {
+        title: 'Voting Tie - Action Required',
+        body: `Voting for purchase "${payload.purchaseTitle}" ended in a tie. Please select the winner manually.`,
+        buttons: [{ title: 'Select Winner', action: `resolve_tie:${payload.sessionId}` }],
+        telegramChatId: payload.organizerTelegramId,
+        whatsappPhone: payload.organizerWhatsappPhone,
+      });
+    }
+  },
+
+  // Commission events
+  'commission.held': async (payload) => {
+    await publishCentrifugo(`notifications:${payload.organizerId}`, {
+      type: 'commission_held',
+      purchaseId: payload.purchaseId,
+      amount: payload.amount,
+      percent: payload.percent,
+      message: `Commission ${payload.percent}% held for purchase: ${payload.amount / 100}`,
+    });
+  },
+
+  'commission.committed': async (payload) => {
+    await publishCentrifugo(`notifications:${payload.organizerId}`, {
+      type: 'commission_committed',
+      purchaseId: payload.purchaseId,
+      amount: payload.amount,
+      message: `Commission earned: ${payload.amount / 100}`,
+    });
+  },
+
+  'commission.released': async (payload) => {
+    await publishCentrifugo(`notifications:${payload.organizerId}`, {
+      type: 'commission_released',
+      purchaseId: payload.purchaseId,
+      message: 'Commission hold released (purchase cancelled)',
+    });
+  },
+
+  // Escrow events
+  'escrow.created': async (payload) => {
+    await publishCentrifugo(`purchase:${payload.purchaseId}`, {
+      type: 'escrow_created',
+      threshold: payload.threshold,
+      message: 'Escrow account created for this purchase (large amount protection)',
+    });
+  },
+
+  'escrow.deposited': async (payload) => {
+    await publishCentrifugo(`purchase:${payload.purchaseId}`, {
+      type: 'escrow_deposited',
+      userId: payload.userId,
+      amount: payload.amount,
+      message: `Payment deposited to escrow: ${payload.amount / 100}`,
+    });
+  },
+
+  'escrow.confirmed': async (payload) => {
+    await publishCentrifugo(`purchase:${payload.purchaseId}`, {
+      type: 'escrow_confirmed',
+      confirmations: payload.confirmationsReceived,
+      required: payload.confirmationsRequired,
+      message: `Delivery confirmed (${payload.confirmationsReceived}/${payload.confirmationsRequired})`,
+    });
+  },
+
+  'escrow.released': async (payload) => {
+    await publishCentrifugo(`purchase:${payload.purchaseId}`, {
+      type: 'escrow_released',
+      amount: payload.totalAmount,
+      message: 'Escrow released - funds transferred to supplier',
+    });
+  },
+
+  'escrow.disputed': async (payload) => {
+    await publishCentrifugo(`purchase:${payload.purchaseId}`, {
+      type: 'escrow_disputed',
+      message: 'Escrow disputed - arbitration in progress',
+    });
+  },
+
+  // Reputation events
+  'review.created': async (payload) => {
+    await notifyUser(payload.targetId, {
+      title: 'New Review',
+      body: `You received a ${payload.rating}-star review from a ${payload.reviewerRole}`,
+      telegramChatId: payload.targetTelegramId,
+      whatsappPhone: payload.targetWhatsappPhone,
+    });
+  },
+
+  'complaint.filed': async (payload) => {
+    await notifyUser(payload.targetId, {
+      title: 'Complaint Filed',
+      body: `A complaint has been filed against you. Type: ${payload.type}. Please respond within 72 hours.`,
+      telegramChatId: payload.targetTelegramId,
+      whatsappPhone: payload.targetWhatsappPhone,
+    });
+  },
+
+  'complaint.resolved': async (payload) => {
+    await notifyUser(payload.reporterId, {
+      title: 'Complaint Resolved',
+      body: `Your complaint has been resolved. Resolution: ${payload.resolution}`,
+      telegramChatId: payload.reporterTelegramId,
+      whatsappPhone: payload.reporterWhatsappPhone,
+    });
+  },
+
+  'user.auto_blocked': async (payload) => {
+    await notifyUser(payload.userId, {
+      title: 'Account Temporarily Blocked',
+      body: 'Your account has been temporarily blocked due to multiple unresolved complaints. Please contact support.',
+      telegramChatId: payload.telegramChatId,
+      whatsappPhone: payload.whatsappPhone,
+    });
+  },
+
+  // Search notification for saved filters
+  'search.new_match': async (payload) => {
+    await notifyUser(payload.userId, {
+      title: 'New Purchase Matches Your Filter',
+      body: `"${payload.purchaseTitle}" matches your saved filter "${payload.filterName}"`,
+      buttons: [{ title: 'View Purchase', action: `view_purchase:${payload.purchaseId}` }],
+      telegramChatId: payload.telegramChatId,
+      whatsappPhone: payload.whatsappPhone,
+    });
+  },
 };
 
 // ─── Kafka Consumer ───────────────────────────────────────────────────────────
@@ -288,6 +530,58 @@ const server = http.createServer((req, res) => {
   if (req.url === '/health' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', service: 'notification-service' }));
+  } else if (req.url === '/webhooks/telegram' && req.method === 'POST') {
+    // Handle Telegram bot callbacks (interactive buttons)
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const update = JSON.parse(body);
+        if (update.callback_query) {
+          const callbackData = update.callback_query.data;
+          const chatId = update.callback_query.message?.chat?.id;
+          console.log(`[TELEGRAM] Callback: ${callbackData} from chat ${chatId}`);
+          // Acknowledge the callback
+          if (config.telegram.botToken) {
+            axios.post(
+              `${config.telegram.apiUrl}/bot${config.telegram.botToken}/answerCallbackQuery`,
+              { callback_query_id: update.callback_query.id }
+            ).catch(err => console.error(`[TELEGRAM] Callback answer error: ${err.message}`));
+          }
+        }
+      } catch (err) {
+        console.error(`[TELEGRAM] Webhook parse error: ${err.message}`);
+      }
+      res.writeHead(200);
+      res.end('ok');
+    });
+  } else if (req.url === '/webhooks/whatsapp' && req.method === 'POST') {
+    // Handle WhatsApp webhook callbacks
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        console.log(`[WHATSAPP] Webhook received: ${JSON.stringify(data).substring(0, 200)}`);
+      } catch (err) {
+        console.error(`[WHATSAPP] Webhook parse error: ${err.message}`);
+      }
+      res.writeHead(200);
+      res.end('ok');
+    });
+  } else if (req.url === '/webhooks/whatsapp' && req.method === 'GET') {
+    // WhatsApp webhook verification
+    const urlObj = new URL(req.url, `http://localhost:${config.port}`);
+    const mode = urlObj.searchParams.get('hub.mode');
+    const token = urlObj.searchParams.get('hub.verify_token');
+    const challenge = urlObj.searchParams.get('hub.challenge');
+    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(challenge);
+    } else {
+      res.writeHead(403);
+      res.end();
+    }
   } else {
     res.writeHead(404);
     res.end();

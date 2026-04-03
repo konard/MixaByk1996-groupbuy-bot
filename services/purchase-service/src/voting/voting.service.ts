@@ -18,6 +18,7 @@ export interface CreateVotingSessionDto {
   allowAddCandidates?: boolean;
   allowChangeVote?: boolean;
   minVotesToClose?: number;
+  votingDuration?: number;
 }
 
 export interface AddCandidateDto {
@@ -66,6 +67,15 @@ export class VotingService {
       throw new BadRequestException('closesAt must be in the future');
     }
 
+    const votingDuration = dto.votingDuration ?? 24;
+    if (votingDuration < 1 || votingDuration > 168) {
+      throw new BadRequestException('votingDuration must be between 1 and 168 hours');
+    }
+
+    const now = new Date();
+    const votingEndsAt = new Date(now.getTime() + votingDuration * 60 * 60 * 1000);
+    const candidateDeadline = new Date(votingEndsAt.getTime() - 1 * 60 * 60 * 1000);
+
     return this.dataSource.transaction(async (manager) => {
       const session = manager.create(VotingSession, {
         purchaseId: dto.purchaseId,
@@ -73,6 +83,10 @@ export class VotingService {
         allowAddCandidates: dto.allowAddCandidates ?? true,
         allowChangeVote: dto.allowChangeVote ?? true,
         minVotesToClose: dto.minVotesToClose ?? 1,
+        votingDuration,
+        votingEndsAt,
+        candidateDeadline,
+        tieBreaker: null,
         status: VotingStatus.OPEN,
       });
       const saved = await manager.save(VotingSession, session);
@@ -85,6 +99,8 @@ export class VotingService {
         purchaseId: dto.purchaseId,
         sessionId: saved.id,
         closesAt: dto.closesAt,
+        votingEndsAt: votingEndsAt.toISOString(),
+        candidateDeadline: candidateDeadline.toISOString(),
       });
 
       return saved;
@@ -102,6 +118,26 @@ export class VotingService {
 
     if (!session.allowAddCandidates) {
       throw new ForbiddenException('Adding candidates is not allowed in this session');
+    }
+
+    // Block new candidates after candidateDeadline (1 hour before votingEndsAt)
+    if (session.candidateDeadline && new Date() >= session.candidateDeadline) {
+      throw new BadRequestException(
+        'Candidate submission deadline has passed (1 hour before voting ends)',
+      );
+    }
+
+    // Enforce rate limit: max 1 candidate per hour per user
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCandidate = await this.candidateRepo
+      .createQueryBuilder('c')
+      .where('c.voting_session_id = :sessionId', { sessionId })
+      .andWhere('c.proposed_by = :userId', { userId })
+      .andWhere('c.created_at > :oneHourAgo', { oneHourAgo })
+      .getCount();
+
+    if (recentCandidate > 0) {
+      throw new BadRequestException('You can only add one candidate per hour');
     }
 
     const candidate = this.candidateRepo.create({
@@ -150,9 +186,19 @@ export class VotingService {
         if (!session.allowChangeVote) {
           throw new ForbiddenException('Changing vote is not allowed in this session');
         }
+        // Idempotent: if already voting for this candidate, return existing vote
         if (existing.candidateId === dto.candidateId) {
-          throw new BadRequestException('Already voted for this candidate');
+          return existing;
         }
+
+        // Rate limit: max 10 changes per minute (check updatedAt)
+        if (existing.changedCount > 0) {
+          const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+          if (existing.updatedAt > oneMinuteAgo && existing.changedCount >= 10) {
+            throw new BadRequestException('Vote change rate limit exceeded (max 10 changes/min)');
+          }
+        }
+
         // Change vote
         const oldCandidateId = existing.candidateId;
         existing.candidateId = dto.candidateId;
@@ -247,7 +293,10 @@ export class VotingService {
 
     const now = new Date();
     for (const session of expired) {
-      if (session.closesAt <= now) {
+      const isExpiredByClosesAt = session.closesAt <= now;
+      const isExpiredByVotingEndsAt = session.votingEndsAt && session.votingEndsAt <= now;
+
+      if (isExpiredByClosesAt || isExpiredByVotingEndsAt) {
         try {
           await this.doCloseSession(session);
           this.logger.log(`Auto-closed voting session ${session.id}`);
@@ -262,7 +311,7 @@ export class VotingService {
 
   private async doCloseSession(session: VotingSession): Promise<VotingSession> {
     return this.dataSource.transaction(async (manager) => {
-      // Find winner by vote count
+      // Find winner by simple majority
       const votes = await manager.find(Vote, { where: { votingSessionId: session.id } });
       const countMap = new Map<string, number>();
       for (const v of votes) {
@@ -271,11 +320,41 @@ export class VotingService {
 
       let winnerId: string | null = null;
       let maxVotes = 0;
+      let isTie = false;
+      const tiedCandidateIds: string[] = [];
+
       for (const [candidateId, count] of countMap.entries()) {
         if (count > maxVotes) {
           maxVotes = count;
           winnerId = candidateId;
+          isTie = false;
+          tiedCandidateIds.length = 0;
+          tiedCandidateIds.push(candidateId);
+        } else if (count === maxVotes && maxVotes > 0) {
+          isTie = true;
+          tiedCandidateIds.push(candidateId);
         }
+      }
+
+      if (isTie) {
+        // Tie detected: do not set a winner, emit tie event
+        session.status = VotingStatus.CLOSED;
+        session.winnerCandidateId = null;
+        const saved = await manager.save(VotingSession, session);
+
+        await this.kafkaProducer.send('voting.tie', {
+          sessionId: session.id,
+          purchaseId: session.purchaseId,
+          tiedCandidateIds,
+          voteCount: maxVotes,
+          totalVotes: votes.length,
+        });
+
+        this.logger.warn(
+          `Tie detected in session ${session.id} between candidates: ${tiedCandidateIds.join(', ')}`,
+        );
+
+        return saved;
       }
 
       session.status = VotingStatus.CLOSED;
@@ -293,6 +372,54 @@ export class VotingService {
         purchaseId: session.purchaseId,
         winnerId,
         totalVotes: votes.length,
+      });
+
+      return saved;
+    });
+  }
+
+  // ─── Resolve Tie ──────────────────────────────────────────────────────────
+
+  async resolveTie(sessionId: string, candidateId: string, requesterId: string): Promise<VotingSession> {
+    const session = await this.sessionRepo.findOne({
+      where: { id: sessionId },
+      relations: ['candidates'],
+    });
+    if (!session) throw new NotFoundException('Voting session not found');
+    if (session.status !== VotingStatus.CLOSED) {
+      throw new BadRequestException('Session must be closed to resolve a tie');
+    }
+    if (session.winnerCandidateId) {
+      throw new BadRequestException('Session already has a winner');
+    }
+
+    const purchase = await this.purchaseRepo.findOne({ where: { id: session.purchaseId } });
+    if (!purchase) throw new NotFoundException('Purchase not found');
+    if (purchase.organizerId !== requesterId) {
+      throw new ForbiddenException('Only the organizer can resolve a tie');
+    }
+
+    // Verify candidate belongs to this session
+    const candidate = session.candidates?.find((c) => c.id === candidateId);
+    if (!candidate) {
+      throw new NotFoundException('Candidate not found in this session');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      session.tieBreaker = candidateId;
+      session.winnerCandidateId = candidateId;
+      const saved = await manager.save(VotingSession, session);
+
+      await manager.update(Purchase, session.purchaseId, {
+        status: PurchaseStatus.APPROVED,
+        closedAt: new Date(),
+      });
+
+      await this.kafkaProducer.send('voting.tie.resolved', {
+        sessionId: session.id,
+        purchaseId: session.purchaseId,
+        winnerId: candidateId,
+        resolvedBy: requesterId,
       });
 
       return saved;

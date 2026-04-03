@@ -11,6 +11,9 @@ export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
   MODERATOR = 'moderator',
+  ORGANIZER = 'organizer',
+  SUPPLIER = 'supplier',
+  BUYER = 'buyer',
 }
 
 @Entity('users')
@@ -46,6 +49,18 @@ export class User {
 
   @Column({ name: 'refresh_token_hash', nullable: true })
   refreshTokenHash: string | null;
+
+  @Column({ name: 'two_factor_secret', length: 255, nullable: true })
+  twoFactorSecret: string | null;
+
+  @Column({ name: 'two_factor_enabled', default: false })
+  twoFactorEnabled: boolean;
+
+  @Column({ name: 'backup_codes', type: 'simple-array', nullable: true })
+  backupCodes: string[] | null;
+
+  @Column({ name: 'two_factor_required', default: false })
+  twoFactorRequired: boolean;
 
   @Column({ name: 'last_login_at', type: 'timestamp with time zone', nullable: true })
   lastLoginAt: Date | null;

@@ -54,6 +54,15 @@ export class Purchase {
   @Column({ name: 'category', length: 100, nullable: true })
   category: string | null;
 
+  @Column({ name: 'commission_percent', type: 'numeric', precision: 4, scale: 1, default: 0 })
+  commissionPercent: number;
+
+  @Column({ name: 'escrow_required', default: false })
+  escrowRequired: boolean;
+
+  @Column({ name: 'escrow_threshold', type: 'bigint', default: 1000000 })
+  escrowThreshold: number;
+
   @Column({ name: 'deadline_at', type: 'timestamptz', nullable: true })
   deadlineAt: Date | null;
 

@@ -57,4 +57,28 @@ export class UsersService {
   async updateLastLogin(userId: string): Promise<void> {
     await this.usersRepo.update(userId, { lastLoginAt: new Date() });
   }
+
+  async setTwoFactorSecret(userId: string, secret: string): Promise<void> {
+    await this.usersRepo.update(userId, { twoFactorSecret: secret });
+  }
+
+  async enableTwoFactor(userId: string): Promise<void> {
+    await this.usersRepo.update(userId, { twoFactorEnabled: true });
+  }
+
+  async disableTwoFactor(userId: string): Promise<void> {
+    await this.usersRepo.update(userId, {
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+      backupCodes: null,
+    });
+  }
+
+  async setBackupCodes(userId: string, hashedCodes: string[]): Promise<void> {
+    await this.usersRepo.update(userId, { backupCodes: hashedCodes });
+  }
+
+  async setTwoFactorRequired(userId: string, required: boolean): Promise<void> {
+    await this.usersRepo.update(userId, { twoFactorRequired: required });
+  }
 }

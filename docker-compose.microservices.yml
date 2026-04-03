@@ -10,12 +10,14 @@ volumes:
   postgres_purchase_data:
   postgres_payment_data:
   postgres_chat_data:
+  postgres_reputation_data:
   redis_data:
   kafka_data:
   zookeeper_data:
   clickhouse_data:
   centrifugo_data:
   minio_data:
+  elasticsearch_data:
 
 services:
   # ─────────────────────────────────────────────
@@ -189,6 +191,44 @@ services:
       - microservices
     restart: unless-stopped
 
+  postgres-reputation:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reputation_db
+      POSTGRES_USER: reputation_user
+      POSTGRES_PASSWORD: reputation_password
+    volumes:
+      - postgres_reputation_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reputation_user -d reputation_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   centrifugo:
     image: centrifugo/centrifugo:v5
     volumes:
@@ -220,9 +260,14 @@ services:
       PURCHASE_SERVICE_URL: http://purchase-service:4002
       PAYMENT_SERVICE_URL: http://payment-service:4003
       CHAT_SERVICE_URL: http://chat-service:4004
+      SEARCH_SERVICE_URL: http://search-service:4007
+      REPUTATION_SERVICE_URL: http://reputation-service:4008
+      ANALYTICS_SERVICE_URL: http://analytics-service:4006
+      NOTIFICATION_SERVICE_URL: http://notification-service:4005
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD: redis_password
       RATE_LIMIT_RPM: 60
+      VOTING_RATE_LIMIT_RPM: 120
       CORS_ORIGINS: "http://localhost:3001,http://localhost:3002"
     depends_on:
       - redis
@@ -230,6 +275,8 @@ services:
       - purchase-service
       - payment-service
       - chat-service
+      - search-service
+      - reputation-service
     networks:
       - microservices
     restart: unless-stopped
@@ -339,6 +386,10 @@ services:
       SMTP_USER: notifications@example.com
       SMTP_PASS: smtp_password
       FCM_SERVER_KEY: fcm_server_key_placeholder
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      WHATSAPP_API_URL: "${WHATSAPP_API_URL:-}"
+      WHATSAPP_ACCESS_TOKEN: "${WHATSAPP_ACCESS_TOKEN:-}"
+      WHATSAPP_PHONE_NUMBER_ID: "${WHATSAPP_PHONE_NUMBER_ID:-}"
     depends_on:
       - kafka
       - centrifugo
@@ -364,6 +415,47 @@ services:
     depends_on:
       - kafka
       - minio
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    ports:
+      - "4007:4007"
+    environment:
+      PORT: 4007
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      REDIS_URL: redis://:redis_password@redis:6379
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  reputation-service:
+    build:
+      context: ./services/reputation-service
+      dockerfile: Dockerfile
+    ports:
+      - "4008:4008"
+    environment:
+      PORT: 4008
+      DATABASE_URL: postgresql://reputation_user:reputation_password@postgres-reputation:5432/reputation_db
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      postgres-reputation:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - microservices
     restart: unless-stopped

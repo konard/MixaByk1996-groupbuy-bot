@@ -49,6 +49,18 @@ export class VotingSession {
   @Column({ name: 'min_votes_to_close', type: 'int', default: 1 })
   minVotesToClose: number;
 
+  @Column({ name: 'voting_duration', type: 'int', default: 24 })
+  votingDuration: number;
+
+  @Column({ name: 'voting_ends_at', type: 'timestamptz', nullable: true })
+  votingEndsAt: Date | null;
+
+  @Column({ name: 'tie_breaker', type: 'uuid', nullable: true })
+  tieBreaker: string | null;
+
+  @Column({ name: 'candidate_deadline', type: 'timestamptz', nullable: true })
+  candidateDeadline: Date | null;
+
   @Column({ name: 'winner_candidate_id', type: 'uuid', nullable: true })
   winnerCandidateId: string | null;
 
