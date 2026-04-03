@@ -10,8 +10,11 @@ const (
 	TxTypeHold     TransactionType = "hold"
 	TxTypeCommit   TransactionType = "commit"
 	TxTypeRelease  TransactionType = "release"
-	TxTypeWithdraw TransactionType = "withdraw"
-	TxTypeRefund   TransactionType = "refund"
+	TxTypeWithdraw  TransactionType = "withdraw"
+	TxTypeRefund    TransactionType = "refund"
+	TxTypeEscrowIn  TransactionType = "escrow_in"
+	TxTypeEscrowOut TransactionType = "escrow_out"
+	TxTypeCommission TransactionType = "commission"
 
 	TxStatusPending   TransactionStatus = "pending"
 	TxStatusCompleted TransactionStatus = "completed"

@@ -63,6 +63,24 @@ scrape_configs:
       - targets: ["analytics-service:4006"]
     metrics_path: /metrics
 
+  # Search Service (Go)
+  - job_name: search-service
+    static_configs:
+      - targets: ["search-service:4007"]
+    metrics_path: /metrics
+
+  # Reputation Service (NestJS)
+  - job_name: reputation-service
+    static_configs:
+      - targets: ["reputation-service:4008"]
+    metrics_path: /metrics
+
+  # Elasticsearch
+  - job_name: elasticsearch
+    static_configs:
+      - targets: ["elasticsearch:9200"]
+    metrics_path: /_prometheus/metrics
+
   # Centrifugo
   - job_name: centrifugo
     static_configs:

@@ -22,16 +22,21 @@ import (
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 type Config struct {
-	Port               string
-	JWTSecret          string
-	AuthServiceURL     string
-	PurchaseServiceURL string
-	PaymentServiceURL  string
-	ChatServiceURL     string
-	RedisAddr          string
-	RedisPassword      string
-	RateLimitRPM       int
-	CORSOrigins        []string
+	Port                string
+	JWTSecret           string
+	AuthServiceURL      string
+	PurchaseServiceURL  string
+	PaymentServiceURL   string
+	ChatServiceURL      string
+	SearchServiceURL    string
+	ReputationServiceURL string
+	AnalyticsServiceURL string
+	NotificationServiceURL string
+	RedisAddr           string
+	RedisPassword       string
+	RateLimitRPM        int
+	VotingRateLimitRPM  int // Higher limit for voting during hot hour
+	CORSOrigins         []string
 }
 
 func loadConfig() *Config {
@@ -39,18 +44,27 @@ func loadConfig() *Config {
 	if v := os.Getenv("RATE_LIMIT_RPM"); v != "" {
 		fmt.Sscanf(v, "%d", &rpm)
 	}
+	votingRPM := 120
+	if v := os.Getenv("VOTING_RATE_LIMIT_RPM"); v != "" {
+		fmt.Sscanf(v, "%d", &votingRPM)
+	}
 	origins := strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3001"), ",")
 	return &Config{
-		Port:               getEnv("PORT", "3000"),
-		JWTSecret:          getEnv("JWT_SECRET", "change_me"),
-		AuthServiceURL:     getEnv("AUTH_SERVICE_URL", "http://localhost:4001"),
-		PurchaseServiceURL: getEnv("PURCHASE_SERVICE_URL", "http://localhost:4002"),
-		PaymentServiceURL:  getEnv("PAYMENT_SERVICE_URL", "http://localhost:4003"),
-		ChatServiceURL:     getEnv("CHAT_SERVICE_URL", "http://localhost:4004"),
-		RedisAddr:          getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisPassword:      getEnv("REDIS_PASSWORD", ""),
-		RateLimitRPM:       rpm,
-		CORSOrigins:        origins,
+		Port:                   getEnv("PORT", "3000"),
+		JWTSecret:              getEnv("JWT_SECRET", "change_me"),
+		AuthServiceURL:         getEnv("AUTH_SERVICE_URL", "http://localhost:4001"),
+		PurchaseServiceURL:     getEnv("PURCHASE_SERVICE_URL", "http://localhost:4002"),
+		PaymentServiceURL:      getEnv("PAYMENT_SERVICE_URL", "http://localhost:4003"),
+		ChatServiceURL:         getEnv("CHAT_SERVICE_URL", "http://localhost:4004"),
+		SearchServiceURL:       getEnv("SEARCH_SERVICE_URL", "http://localhost:4007"),
+		ReputationServiceURL:   getEnv("REPUTATION_SERVICE_URL", "http://localhost:4008"),
+		AnalyticsServiceURL:    getEnv("ANALYTICS_SERVICE_URL", "http://localhost:4006"),
+		NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:4005"),
+		RedisAddr:              getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:          getEnv("REDIS_PASSWORD", ""),
+		RateLimitRPM:           rpm,
+		VotingRateLimitRPM:     votingRPM,
+		CORSOrigins:            origins,
 	}
 }
 
@@ -120,10 +134,14 @@ func newGateway(cfg *Config) *Gateway {
 
 	proxies := map[string]*httputil.ReverseProxy{}
 	for name, rawURL := range map[string]string{
-		"auth":     cfg.AuthServiceURL,
-		"purchase": cfg.PurchaseServiceURL,
-		"payment":  cfg.PaymentServiceURL,
-		"chat":     cfg.ChatServiceURL,
+		"auth":         cfg.AuthServiceURL,
+		"purchase":     cfg.PurchaseServiceURL,
+		"payment":      cfg.PaymentServiceURL,
+		"chat":         cfg.ChatServiceURL,
+		"search":       cfg.SearchServiceURL,
+		"reputation":   cfg.ReputationServiceURL,
+		"analytics":    cfg.AnalyticsServiceURL,
+		"notification": cfg.NotificationServiceURL,
 	} {
 		u, err := url.Parse(rawURL)
 		if err != nil {
@@ -276,11 +294,35 @@ func (g *Gateway) buildRouter() http.Handler {
 	protected.PathPrefix("/purchases").Handler(
 		http.StripPrefix("/api/v1/purchases", g.proxyTo("purchase")),
 	)
+	protected.PathPrefix("/voting").Handler(
+		http.StripPrefix("/api/v1/voting", g.proxyTo("purchase")),
+	)
 	protected.PathPrefix("/payments").Handler(
 		http.StripPrefix("/api/v1/payments", g.proxyTo("payment")),
 	)
+	protected.PathPrefix("/escrow").Handler(
+		http.StripPrefix("/api/v1/escrow", g.proxyTo("payment")),
+	)
+	protected.PathPrefix("/commission").Handler(
+		http.StripPrefix("/api/v1/commission", g.proxyTo("payment")),
+	)
 	protected.PathPrefix("/chat").Handler(
 		http.StripPrefix("/api/v1/chat", g.proxyTo("chat")),
+	)
+	protected.PathPrefix("/search").Handler(
+		http.StripPrefix("/api/v1/search", g.proxyTo("search")),
+	)
+	protected.PathPrefix("/reputation").Handler(
+		http.StripPrefix("/api/v1/reputation", g.proxyTo("reputation")),
+	)
+	protected.PathPrefix("/reviews").Handler(
+		http.StripPrefix("/api/v1/reviews", g.proxyTo("reputation")),
+	)
+	protected.PathPrefix("/complaints").Handler(
+		http.StripPrefix("/api/v1/complaints", g.proxyTo("reputation")),
+	)
+	protected.PathPrefix("/analytics").Handler(
+		http.StripPrefix("/api/v1/analytics", g.proxyTo("analytics")),
 	)
 
 	// WebSocket endpoint (centrifugo is proxied via chat-service for auth)

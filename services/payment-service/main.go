@@ -49,7 +49,9 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TYPE IF NOT EXISTS wallet_status AS ENUM ('active', 'frozen', 'closed');
-CREATE TYPE IF NOT EXISTS tx_type AS ENUM ('top_up', 'hold', 'commit', 'release', 'withdraw', 'refund');
+CREATE TYPE IF NOT EXISTS tx_type AS ENUM ('top_up', 'hold', 'commit', 'release', 'withdraw', 'refund', 'escrow_in', 'escrow_out', 'commission');
+CREATE TYPE IF NOT EXISTS escrow_status AS ENUM ('active', 'released', 'disputed', 'refunded');
+CREATE TYPE IF NOT EXISTS commission_status AS ENUM ('held', 'committed', 'released');
 CREATE TYPE IF NOT EXISTS tx_status AS ENUM ('pending', 'completed', 'failed', 'rolled_back');
 
 CREATE TABLE IF NOT EXISTS wallets (
@@ -86,10 +88,43 @@ CREATE TABLE IF NOT EXISTS transactions (
     CONSTRAINT transactions_amount_positive CHECK (amount > 0)
 );
 
+CREATE TABLE IF NOT EXISTS escrow_accounts (
+    id                     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    purchase_id            UUID NOT NULL,
+    total_amount           BIGINT NOT NULL DEFAULT 0,
+    released_amount        BIGINT NOT NULL DEFAULT 0,
+    status                 escrow_status NOT NULL DEFAULT 'active',
+    threshold              BIGINT NOT NULL DEFAULT 0,
+    confirmations_required INT NOT NULL DEFAULT 1,
+    confirmations_received INT NOT NULL DEFAULT 0,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT escrow_purchase_unique UNIQUE (purchase_id),
+    CONSTRAINT escrow_amount_non_negative CHECK (total_amount >= 0),
+    CONSTRAINT escrow_released_non_negative CHECK (released_amount >= 0),
+    CONSTRAINT escrow_confirmations_non_negative CHECK (confirmations_received >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS commission_holds (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    purchase_id         UUID NOT NULL,
+    organizer_wallet_id UUID NOT NULL,
+    amount              BIGINT NOT NULL,
+    percent             DECIMAL(4,2) NOT NULL,
+    status              commission_status NOT NULL DEFAULT 'held',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT commission_amount_positive CHECK (amount > 0),
+    CONSTRAINT commission_percent_range CHECK (percent > 0 AND percent <= 100)
+);
+
 CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets (user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_wallet ON transactions (wallet_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_idempotency ON transactions (idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_transactions_purchase ON transactions (purchase_id) WHERE purchase_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_escrow_purchase ON escrow_accounts (purchase_id);
+CREATE INDEX IF NOT EXISTS idx_commission_purchase ON commission_holds (purchase_id);
+CREATE INDEX IF NOT EXISTS idx_commission_wallet ON commission_holds (organizer_wallet_id);
 `
 	_, err := pool.Exec(ctx, migration)
 	return err
@@ -112,6 +147,8 @@ func main() {
 	defer kp.Close()
 
 	h := handlers.NewPaymentHandler(pool, kp)
+	eh := handlers.NewEscrowHandler(pool, kp)
+	ch := handlers.NewCommissionHandler(pool, kp)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/health", h.Health).Methods(http.MethodGet)
@@ -120,6 +157,20 @@ func main() {
 	r.HandleFunc("/wallet/hold", h.Hold).Methods(http.MethodPost)
 	r.HandleFunc("/wallet/commit", h.Commit).Methods(http.MethodPost)
 	r.HandleFunc("/wallet/release", h.Release).Methods(http.MethodPost)
+
+	// Escrow endpoints
+	r.HandleFunc("/escrow", eh.CreateEscrow).Methods(http.MethodPost)
+	r.HandleFunc("/escrow/{purchaseId}", eh.GetEscrow).Methods(http.MethodGet)
+	r.HandleFunc("/escrow/{purchaseId}/deposit", eh.DepositToEscrow).Methods(http.MethodPost)
+	r.HandleFunc("/escrow/{purchaseId}/confirm", eh.ConfirmDelivery).Methods(http.MethodPost)
+	r.HandleFunc("/escrow/{purchaseId}/release", eh.ReleaseEscrow).Methods(http.MethodPost)
+	r.HandleFunc("/escrow/{purchaseId}/dispute", eh.DisputeEscrow).Methods(http.MethodPost)
+
+	// Commission endpoints
+	r.HandleFunc("/commission/hold", ch.HoldCommission).Methods(http.MethodPost)
+	r.HandleFunc("/commission/commit", ch.CommitCommission).Methods(http.MethodPost)
+	r.HandleFunc("/commission/release", ch.ReleaseCommission).Methods(http.MethodPost)
+	r.HandleFunc("/commission/{purchaseId}", ch.GetCommission).Methods(http.MethodGet)
 
 	// Webhook endpoints (no auth)
 	r.HandleFunc("/webhooks/stripe", h.StripeWebhook).Methods(http.MethodPost)
