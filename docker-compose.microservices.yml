@@ -5,7 +5,6 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_gateway_data:
   postgres_auth_data:
   postgres_purchase_data:
   postgres_payment_data:
@@ -15,7 +14,6 @@ volumes:
   kafka_data:
   zookeeper_data:
   clickhouse_data:
-  centrifugo_data:
   minio_data:
   elasticsearch_data:
 
@@ -186,7 +184,7 @@ services:
       - minio_data:/data
     ports:
       - "9002:9000"
-      - "9001:9001"
+      - "9003:9001"
     networks:
       - microservices
     restart: unless-stopped
@@ -390,6 +388,7 @@ services:
       WHATSAPP_API_URL: "${WHATSAPP_API_URL:-}"
       WHATSAPP_ACCESS_TOKEN: "${WHATSAPP_ACCESS_TOKEN:-}"
       WHATSAPP_PHONE_NUMBER_ID: "${WHATSAPP_PHONE_NUMBER_ID:-}"
+      WHATSAPP_VERIFY_TOKEN: "${WHATSAPP_VERIFY_TOKEN:-}"
     depends_on:
       - kafka
       - centrifugo

@@ -569,7 +569,7 @@ const server = http.createServer((req, res) => {
       res.writeHead(200);
       res.end('ok');
     });
-  } else if (req.url === '/webhooks/whatsapp' && req.method === 'GET') {
+  } else if (req.method === 'GET' && req.url.startsWith('/webhooks/whatsapp')) {
     // WhatsApp webhook verification
     const urlObj = new URL(req.url, `http://localhost:${config.port}`);
     const mode = urlObj.searchParams.get('hub.mode');

@@ -149,10 +149,14 @@ func (s *Server) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add creator as member
-	s.db.Exec(r.Context(),
+	if _, err := s.db.Exec(r.Context(),
 		`INSERT INTO room_members (room_id, user_id, joined_at) VALUES ($1, $2, NOW())`,
 		room.ID, userID,
-	)
+	); err != nil {
+		log.Printf("AddRoomMember DB error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to add creator as member")
+		return
+	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{"success": true, "data": room})
 }
@@ -237,7 +241,11 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	var count int
 	row := s.db.QueryRow(r.Context(),
 		`SELECT COUNT(*) FROM room_members WHERE room_id = $1 AND user_id = $2`, roomID, userID)
-	row.Scan(&count)
+	if err := row.Scan(&count); err != nil {
+		log.Printf("SendMessage membership check error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to verify membership")
+		return
+	}
 	if count == 0 {
 		writeError(w, http.StatusForbidden, "not a room member")
 		return
