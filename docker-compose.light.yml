@@ -1,0 +1,364 @@
+##############################################################################
+# docker-compose.light.yml — lightweight deployment for servers with 1 GB RAM
+#
+# This configuration consolidates PostgreSQL into a single instance with
+# multiple databases, removes heavy optional services (Elasticsearch,
+# ClickHouse, MinIO, Kafka-UI, monitoring), and applies strict memory limits
+# to every container so the whole stack fits in ~900 MB.
+#
+# Usage:
+#   cp .env.example .env   # edit secrets
+#   docker compose -f docker-compose.light.yml up -d
+##############################################################################
+
+version: "3.9"
+
+networks:
+  groupbuy:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+
+services:
+  # ─── Infrastructure ────────────────────────────────────────────────────────
+
+  # Single PostgreSQL instance with all databases
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: groupbuy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-groupbuy_secret}
+      POSTGRES_DB: auth_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U groupbuy -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  redis:
+    image: redis:7-alpine
+    command: >
+      redis-server
+        --appendonly yes
+        --requirepass ${REDIS_PASSWORD:-redis_secret}
+        --maxmemory 48mb
+        --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_HEAP_OPTS: "-Xmx64m -Xms64m"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 48
+      KAFKA_HEAP_OPTS: "-Xmx128m -Xms128m"
+      KAFKA_LOG_SEGMENT_BYTES: 16777216
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 60000
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    command: centrifugo -c /centrifugo/config.json
+    volumes:
+      - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
+    ports:
+      - "8000:8000"
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  # ─── Application Services ──────────────────────────────────────────────────
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PURCHASE_SERVICE_URL: http://purchase-service:4002
+      PAYMENT_SERVICE_URL: http://payment-service:4003
+      CHAT_SERVICE_URL: http://chat-service:4004
+      NOTIFICATION_SERVICE_URL: http://notification-service:4005
+      ANALYTICS_SERVICE_URL: http://analytics-service:4006
+      SEARCH_SERVICE_URL: http://search-service:4007
+      REPUTATION_SERVICE_URL: http://reputation-service:4008
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RATE_LIMIT_RPM: "60"
+      VOTING_RATE_LIMIT_RPM: "120"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4001
+      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/auth_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_ROUNDS: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  purchase-service:
+    build:
+      context: ./services/purchase-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4002
+      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/purchase_db
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: purchase-service
+      KAFKA_GROUP_ID: purchase-group
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4003
+      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/payment_db
+      KAFKA_BROKERS: kafka:9092
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-placeholder}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-placeholder}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  chat-service:
+    build:
+      context: ./services/chat-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4004
+      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/chat_db
+      CENTRIFUGO_URL: http://centrifugo:8000
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-centrifugo_api_key}
+      # ClickHouse disabled in light mode — chat history stored in PostgreSQL only
+      CLICKHOUSE_DSN: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4005
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: notification-group
+      CENTRIFUGO_URL: http://centrifugo:8000
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-centrifugo_api_key}
+      SMTP_HOST: ${SMTP_HOST:-smtp.example.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+    depends_on:
+      - kafka
+      - centrifugo
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4006
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: analytics-group
+      # S3/MinIO disabled — reports saved to local volume
+      S3_ENDPOINT: ""
+      S3_ACCESS_KEY: ""
+      S3_SECRET_KEY: ""
+      S3_BUCKET: ""
+    depends_on:
+      - kafka
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4007
+      # Elasticsearch disabled in light mode — search uses in-memory fallback
+      ELASTICSEARCH_URL: ""
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  reputation-service:
+    build:
+      context: ./services/reputation-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 4008
+      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/reputation_db
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 48M

@@ -159,6 +159,9 @@ jobs:
       - name: Validate docker-compose.microservices.yml
         run: docker compose -f docker-compose.microservices.yml config --quiet
 
+      - name: Validate docker-compose.light.yml
+        run: docker compose -f docker-compose.light.yml config --quiet
+
   # Build microservices Docker images
   microservices-build:
     runs-on: ubuntu-latest
