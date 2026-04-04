@@ -49,9 +49,13 @@ class TestCentrifugoRedisPassword:
         Centrifugo config must use 'redis_secret' (the default REDIS_PASSWORD
         in docker-compose.unified.yml) so it can authenticate to Redis out
         of the box without a custom .env file.
+
+        centrifugo.json uses the flat Centrifugo v5 key 'redis_password'
+        (not nested redis.password), so we check both locations.
         """
         config = load_centrifugo_config()
-        redis_password = config.get("redis", {}).get("password", "")
+        # Centrifugo v5 uses flat 'redis_password' key; fall back to nested for safety
+        redis_password = config.get("redis_password") or config.get("redis", {}).get("password", "")
         assert redis_password == "redis_secret", (
             f"centrifugo.json has redis password '{redis_password}' but "
             f"docker-compose.unified.yml defaults REDIS_PASSWORD to 'redis_secret'. "
@@ -60,13 +64,14 @@ class TestCentrifugoRedisPassword:
 
     def test_centrifugo_redis_password_not_placeholder(self):
         """
-        Regression: the old placeholder value 'redis_password' should not be
-        present — it never matched any Docker Compose default.
+        Regression: the old placeholder value 'redis_password' (as a string value,
+        not a key) should not be present — it never matched any Docker Compose default.
         """
         config = load_centrifugo_config()
-        redis_password = config.get("redis", {}).get("password", "")
+        # Centrifugo v5 uses flat 'redis_password' key; fall back to nested for safety
+        redis_password = config.get("redis_password") or config.get("redis", {}).get("password", "")
         assert redis_password != "redis_password", (
-            "centrifugo.json still contains the placeholder 'redis_password' "
+            "centrifugo.json still contains the placeholder value 'redis_password' "
             "which does not match any Docker Compose default."
         )
 
