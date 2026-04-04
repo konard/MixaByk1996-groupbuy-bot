@@ -203,9 +203,7 @@ services:
       -c wal_buffers=16MB
       -c random_page_cost=1.1
     healthcheck:
-      # Use pg_isready with explicit -U flag populated from the env var at container level.
-      # The variable is available inside the container because POSTGRES_USER is set above.
-      test: ["CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5

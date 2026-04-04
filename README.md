@@ -474,6 +474,28 @@ Use the production Docker Compose file:
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
+### Lightweight Deployment (1 GB RAM)
+
+For servers with limited memory (e.g. 1 GB RAM), use the two-step deployment: first start the microservice infrastructure with `docker-compose.light.yml`, then bring up the application stack with `docker-compose.prod.yml`.
+
+**Why two steps?**  
+`docker-compose.light.yml` starts Kafka, Zookeeper, Centrifugo, and the microservices (gateway, auth, purchase, etc.) with strict memory limits. `docker-compose.prod.yml` starts the main application (core Rust API, Django admin, bot, frontend, nginx). Both files share the same `groupbuy-network` Docker network so all containers can communicate.
+
+**Step 1 — Start infrastructure and microservices:**
+```bash
+cp .env.example .env   # fill in secrets
+docker compose -f docker-compose.light.yml up -d --build
+```
+
+**Step 2 — Start the application layer:**
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+> **Note:** Run Step 1 before Step 2 so that postgres and redis are healthy before the `core` container starts. The volumes (`postgres_data`, `redis_data`) are shared between both files.
+
+> **Important:** The two compose files use the same `groupbuy-network` Docker network. Do **not** run them simultaneously on separate Docker networks or containers will not be able to reach each other.
+
 ### Two-Server Deployment
 
 For high-load scenarios, the application supports a two-server architecture:
