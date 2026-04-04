@@ -10,29 +10,47 @@
 # Причина: порты 80 или 443 уже заняты другим процессом (nginx, Apache и т.д.).
 # Скрипт определяет занятый процесс и предлагает его остановить.
 #
+# Решает проблему: "container groupbuy-core is unhealthy"
+# Причина: Rust-сервис должен установить соединение с PostgreSQL (до 10 попыток ×
+# 3 с = 30 с) и выполнить миграции до того, как HTTP-сервер ответит на
+# health-check. Это учтено в start_period healthcheck'а сервиса core.
+#
 # Использование:
-#   bash scripts/setup-prod.sh            # интерактивный режим
-#   bash scripts/setup-prod.sh --reset-db # сбросить том postgres и запустить заново
+#   bash scripts/setup-prod.sh               # интерактивный режим
+#   bash scripts/setup-prod.sh --reset-db    # сбросить том postgres и запустить заново
+#   bash scripts/setup-prod.sh --unified     # запустить объединённый стек (prod + микросервисы)
+#
+# Альтернативный вариант установки через snap (Ubuntu/Debian):
+#   sudo snap install groupbuy-bot
+#   sudo groupbuy-bot.setup
 
 set -e
 
 COMPOSE_FILE="docker-compose.prod.yml"
 VOLUME_NAME="groupbuy_postgres_data"
 RESET_DB=false
+UNIFIED=false
 
 # --- Разбор аргументов ---
 for arg in "$@"; do
   case "$arg" in
     --reset-db) RESET_DB=true ;;
+    --unified)  UNIFIED=true  ;;
     --help|-h)
-      echo "Использование: bash scripts/setup-prod.sh [--reset-db]"
+      echo "Использование: bash scripts/setup-prod.sh [--reset-db] [--unified]"
       echo ""
       echo "  --reset-db  Удалить существующий том PostgreSQL и начать с чистого листа."
       echo "              ВНИМАНИЕ: все данные БД будут потеряны!"
+      echo "  --unified   Запустить объединённый стек: основное приложение + микросервисы"
+      echo "              (docker-compose.unified.yml)."
       exit 0
       ;;
   esac
 done
+
+if [ "$UNIFIED" = true ]; then
+  COMPOSE_FILE="docker-compose.unified.yml"
+fi
 
 echo "==> GroupBuy Bot — подготовка продакшен-окружения"
 echo ""

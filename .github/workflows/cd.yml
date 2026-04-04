@@ -20,6 +20,7 @@ jobs:
     strategy:
       matrix:
         include:
+          # Main application images
           - context: ./core-rust
             image: core
           - context: ./core
@@ -36,6 +37,25 @@ jobs:
             image: vk-adapter
           - context: ./adapters/mattermost
             image: mattermost-adapter
+          # Microservice images (used by docker-compose.light.yml and docker-compose.unified.yml)
+          - context: ./services/gateway
+            image: gateway
+          - context: ./services/auth-service
+            image: auth-service
+          - context: ./services/purchase-service
+            image: purchase-service
+          - context: ./services/payment-service
+            image: payment-service
+          - context: ./services/chat-service
+            image: chat-service
+          - context: ./services/notification-service
+            image: notification-service
+          - context: ./services/analytics-service
+            image: analytics-service
+          - context: ./services/search-service
+            image: search-service
+          - context: ./services/reputation-service
+            image: reputation-service
 
     steps:
       - uses: actions/checkout@v4

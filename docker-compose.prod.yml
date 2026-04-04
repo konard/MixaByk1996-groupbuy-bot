@@ -8,6 +8,11 @@ version: '3.8'
 #   4. Run: bash scripts/init-letsencrypt.sh   (first-time SSL setup)
 #   5. Run: docker compose -f docker-compose.prod.yml up -d
 #
+# Lightweight + full deployment (1 GB RAM):
+#   docker compose -f docker-compose.light.yml up -d --build
+#   docker compose -f docker-compose.prod.yml up -d
+# Both files share the same groupbuy-network; run light first so the network exists.
+#
 # Two-server deployment: see docker-compose.two-server.yml
 #
 # Images are built by CI and pushed to GitHub Container Registry (ghcr.io).
@@ -73,11 +78,13 @@ services:
     networks:
       - groupbuy-network
     healthcheck:
+      # The Rust binary retries DB connection up to 10 times × 3s = 30s, then runs
+      # migrations before the HTTP server starts.  Give it 90s before failures count.
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 15s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 40s
+      start_period: 90s
 
   # Bot service (Telegram / VK message handler)
   bot:

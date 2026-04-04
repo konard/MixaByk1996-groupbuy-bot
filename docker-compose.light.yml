@@ -6,14 +6,24 @@
 # ClickHouse, MinIO, Kafka-UI, monitoring), and applies strict memory limits
 # to every container so the whole stack fits in ~900 MB.
 #
-# Usage:
-#   cp .env.example .env   # edit secrets
+# Microservice images are pulled from GitHub Container Registry (ghcr.io)
+# matching the same IMAGE_TAG used by docker-compose.prod.yml — no local
+# builds required. Set IMAGE_TAG in .env to pin a version (default: main).
+#
+# Two-step deployment (light microservices + main prod stack):
+#   Step 1: docker compose -f docker-compose.light.yml up -d
+#   Step 2: docker compose -f docker-compose.prod.yml up -d
+# Both files share the same groupbuy-network; always start light first.
+#
+# Single-file lightweight deployment (microservices only, no main stack):
 #   docker compose -f docker-compose.light.yml up -d
 ##############################################################################
 
 version: "3.9"
 
 networks:
+  # Shared network — created here on first run; docker-compose.prod.yml
+  # attaches to this existing network automatically (same project name).
   groupbuy-network:
     driver: bridge
 
@@ -135,11 +145,11 @@ services:
           memory: 32M
 
   # ─── Application Services ──────────────────────────────────────────────────
+  # Images are pulled from GitHub Container Registry — same tag as prod stack.
+  # Set REGISTRY / IMAGE_PREFIX / IMAGE_TAG in .env to override.
 
   gateway:
-    build:
-      context: ./services/gateway
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/gateway:${IMAGE_TAG:-main}
     ports:
       - "3000:3000"
     environment:
@@ -170,9 +180,7 @@ services:
           memory: 32M
 
   auth-service:
-    build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/auth-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4001
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/auth_db
@@ -196,9 +204,7 @@ services:
           memory: 64M
 
   purchase-service:
-    build:
-      context: ./services/purchase-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/purchase-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4002
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/purchase_db
@@ -219,9 +225,7 @@ services:
           memory: 64M
 
   payment-service:
-    build:
-      context: ./services/payment-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/payment-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4003
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/payment_db
@@ -243,9 +247,7 @@ services:
           memory: 32M
 
   chat-service:
-    build:
-      context: ./services/chat-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/chat-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4004
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/chat_db
@@ -267,9 +269,7 @@ services:
           memory: 32M
 
   notification-service:
-    build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/notification-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4005
       KAFKA_BROKERS: kafka:9092
@@ -297,9 +297,7 @@ services:
           memory: 48M
 
   analytics-service:
-    build:
-      context: ./services/analytics-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/analytics-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4006
       KAFKA_BROKERS: kafka:9092
@@ -320,9 +318,7 @@ services:
           memory: 48M
 
   search-service:
-    build:
-      context: ./services/search-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/search-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4007
       # Elasticsearch disabled in light mode — search uses in-memory fallback
@@ -343,9 +339,7 @@ services:
           memory: 32M
 
   reputation-service:
-    build:
-      context: ./services/reputation-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/reputation-service:${IMAGE_TAG:-main}
     environment:
       PORT: 4008
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/reputation_db
