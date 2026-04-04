@@ -7,8 +7,10 @@
 # to every container so the whole stack fits in ~900 MB.
 #
 # Microservice images are pulled from GitHub Container Registry (ghcr.io)
-# matching the same IMAGE_TAG used by docker-compose.prod.yml — no local
-# builds required. Set IMAGE_TAG in .env to pin a version (default: main).
+# matching the same IMAGE_TAG used by docker-compose.prod.yml.
+# Set IMAGE_TAG in .env to pin a version (default: main).
+# If the registry image is unavailable (e.g. first deploy or private fork),
+# run with --build to build images locally from the ./services/* Dockerfiles.
 #
 # Two-step deployment (light microservices + main prod stack):
 #   Step 1: docker compose -f docker-compose.light.yml up -d
@@ -150,6 +152,8 @@ services:
 
   gateway:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/gateway:${IMAGE_TAG:-main}
+    build:
+      context: ./services/gateway
     ports:
       - "3000:3000"
     environment:
@@ -181,6 +185,8 @@ services:
 
   auth-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/auth-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/auth-service
     environment:
       PORT: 4001
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/auth_db
@@ -205,6 +211,8 @@ services:
 
   purchase-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/purchase-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/purchase-service
     environment:
       PORT: 4002
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/purchase_db
@@ -226,6 +234,8 @@ services:
 
   payment-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/payment-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/payment-service
     environment:
       PORT: 4003
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/payment_db
@@ -248,6 +258,8 @@ services:
 
   chat-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/chat-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/chat-service
     environment:
       PORT: 4004
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/chat_db
@@ -270,6 +282,8 @@ services:
 
   notification-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/notification-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/notification-service
     environment:
       PORT: 4005
       KAFKA_BROKERS: kafka:9092
@@ -298,6 +312,8 @@ services:
 
   analytics-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/analytics-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/analytics-service
     environment:
       PORT: 4006
       KAFKA_BROKERS: kafka:9092
@@ -319,6 +335,8 @@ services:
 
   search-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/search-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/search-service
     environment:
       PORT: 4007
       # Elasticsearch disabled in light mode — search uses in-memory fallback
@@ -340,6 +358,8 @@ services:
 
   reputation-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/reputation-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/reputation-service
     environment:
       PORT: 4008
       DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/reputation_db
