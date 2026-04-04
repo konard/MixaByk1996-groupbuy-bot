@@ -232,6 +232,71 @@ pub async fn get_user_by_platform(
     }
 }
 
+/// GET /api/users/by_email/?email=...
+pub async fn get_user_by_email(
+    pool: web::Data<PgPool>,
+    query: web::Query<EmailQuery>,
+) -> HttpResponse {
+    let email = match &query.email {
+        Some(e) if !e.is_empty() => e.clone(),
+        _ => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "email is required"}))
+        }
+    };
+
+    match sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE LOWER(email) = LOWER($1)",
+    )
+    .bind(&email)
+    .fetch_optional(pool.get_ref())
+    .await
+    {
+        Ok(Some(user)) => HttpResponse::Ok().json(UserResponse::from(user)),
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({"detail": "Not found."})),
+        Err(e) => {
+            tracing::error!("Failed to fetch user by email: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": "Database error"}))
+        }
+    }
+}
+
+/// GET /api/users/by_phone/?phone=...
+pub async fn get_user_by_phone(
+    pool: web::Data<PgPool>,
+    query: web::Query<PhoneQuery>,
+) -> HttpResponse {
+    let phone = match &query.phone {
+        Some(p) if !p.is_empty() => {
+            let p = p.clone();
+            if !p.starts_with('+') {
+                format!("+{}", p)
+            } else {
+                p
+            }
+        }
+        _ => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "phone is required"}))
+        }
+    };
+
+    match sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE phone = $1",
+    )
+    .bind(&phone)
+    .fetch_optional(pool.get_ref())
+    .await
+    {
+        Ok(Some(user)) => HttpResponse::Ok().json(UserResponse::from(user)),
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({"detail": "Not found."})),
+        Err(e) => {
+            tracing::error!("Failed to fetch user by phone: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": "Database error"}))
+        }
+    }
+}
+
 /// GET /api/users/check_exists/?platform=...&platform_user_id=...
 pub async fn check_user_exists(
     pool: web::Data<PgPool>,
