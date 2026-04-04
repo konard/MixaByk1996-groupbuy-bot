@@ -10,7 +10,7 @@
 
   "redis": {
     "address": "redis:6379",
-    "password": "redis_password",
+    "password": "redis_secret",
     "db": 1
   },
 

@@ -143,6 +143,12 @@ services:
       - kafka_data:/var/lib/kafka/data
     networks:
       - groupbuy-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -438,7 +444,7 @@ services:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     networks:
       - groupbuy-network
     deploy:
@@ -463,7 +469,7 @@ services:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     networks:
       - groupbuy-network
     deploy:
@@ -517,8 +523,10 @@ services:
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
     depends_on:
-      - kafka
-      - centrifugo
+      kafka:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
     networks:
       - groupbuy-network
     deploy:
@@ -541,7 +549,8 @@ services:
       S3_SECRET_KEY: ""
       S3_BUCKET: ""
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     networks:
       - groupbuy-network
     deploy:
@@ -564,7 +573,7 @@ services:
       redis:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     networks:
       - groupbuy-network
     deploy:
@@ -586,7 +595,7 @@ services:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
     networks:
       - groupbuy-network
     deploy:

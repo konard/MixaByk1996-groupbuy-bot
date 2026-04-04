@@ -63,8 +63,12 @@ func (h *SearchHandler) Health(w http.ResponseWriter, r *http.Request) {
 	esHealthy := true
 	redisHealthy := true
 
-	_, err := h.es.ClusterHealth().Do(ctx)
-	if err != nil {
+	if h.es != nil {
+		_, err := h.es.ClusterHealth().Do(ctx)
+		if err != nil {
+			esHealthy = false
+		}
+	} else {
 		esHealthy = false
 	}
 
@@ -102,6 +106,11 @@ func (h *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.PerPage > maxPerPage {
 		req.PerPage = maxPerPage
+	}
+
+	if h.es == nil {
+		writeError(w, http.StatusServiceUnavailable, "search is temporarily unavailable — Elasticsearch not configured")
+		return
 	}
 
 	query := h.buildSearchQuery(req)
