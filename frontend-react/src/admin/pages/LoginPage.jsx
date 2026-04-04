@@ -1,7 +1,8 @@
 /**
  * Admin Login Page
+ * Uses browser prompt dialogs for credential input
  */
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../store/adminStore';
 import '../styles/admin.css';
@@ -9,24 +10,38 @@ import '../styles/admin.css';
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, checkAuth, isLoading, error, clearError } = useAdminStore();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [prompted, setPrompted] = useState(false);
 
   useEffect(() => {
     // Check if already authenticated
     checkAuth().then((isAuth) => {
       if (isAuth) {
         navigate('/admin-panel');
+      } else if (!prompted) {
+        setPrompted(true);
+        handlePromptLogin();
       }
     });
-  }, [checkAuth, navigate]);
+  }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handlePromptLogin = async () => {
+    const username = window.prompt('GroupBuy Admin\n\nВведите имя пользователя:');
+    if (username === null) return; // user cancelled
+
+    const password = window.prompt('GroupBuy Admin\n\nВведите пароль:');
+    if (password === null) return; // user cancelled
+
     clearError();
     const success = await login(username, password);
     if (success) {
       navigate('/admin-panel');
+    } else {
+      const retry = window.confirm(
+        'Ошибка входа. Неверные учётные данные или недостаточно прав.\n\nПопробовать снова?'
+      );
+      if (retry) {
+        handlePromptLogin();
+      }
     }
   };
 
@@ -36,45 +51,27 @@ export default function LoginPage() {
         <h1>GroupBuy Admin</h1>
         <p className="admin-login-subtitle">Вход в панель администратора</p>
 
-        <form onSubmit={handleSubmit} className="admin-login-form">
-          {error && <div className="admin-login-error">{error}</div>}
+        {error && <div className="admin-login-error">{error}</div>}
 
-          <div className="admin-form-group">
-            <label htmlFor="username">Имя пользователя</label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              autoFocus
-              disabled={isLoading}
-            />
+        {isLoading ? (
+          <div className="admin-login-loading">
+            <div className="admin-login-spinner" />
+            <p>Выполняется вход...</p>
           </div>
-
-          <div className="admin-form-group">
-            <label htmlFor="password">Пароль</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
+        ) : (
+          <div className="admin-login-prompt-info">
+            <p>Для входа используйте всплывающие окна браузера.</p>
+            <button
+              className="admin-login-btn"
+              onClick={handlePromptLogin}
               disabled={isLoading}
-            />
+            >
+              Войти
+            </button>
           </div>
-
-          <button
-            type="submit"
-            className="admin-login-btn"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Вход...' : 'Войти'}
-          </button>
-        </form>
+        )}
 
         <div className="admin-login-footer">
-          <p>Используйте учётные данные суперпользователя.</p>
           <details className="admin-login-help">
             <summary>Как создать администратора?</summary>
             <ol>

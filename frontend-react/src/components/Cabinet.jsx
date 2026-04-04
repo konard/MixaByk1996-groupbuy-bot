@@ -811,49 +811,28 @@ function Cabinet() {
 
       {/* User Analytics */}
       {userStats && (
-        <div className="cabinet-stats" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '0.75rem',
-          margin: '0 1rem 1rem',
-        }}>
-          <div style={{
-            background: 'var(--bg-secondary, #f0f2f5)',
-            borderRadius: '0.75rem',
-            padding: '0.75rem',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{userStats.procurementsCount}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Закупок</div>
+        <div className="cabinet-stats">
+          <div className="cabinet-stat-card">
+            <div className="cabinet-stat-icon">🛒</div>
+            <div className="cabinet-stat-value">{userStats.procurementsCount}</div>
+            <div className="cabinet-stat-label">Закупок</div>
           </div>
-          <div style={{
-            background: 'var(--bg-secondary, #f0f2f5)',
-            borderRadius: '0.75rem',
-            padding: '0.75rem',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{userStats.activeProcurements}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Активных</div>
+          <div className="cabinet-stat-card cabinet-stat-card--active">
+            <div className="cabinet-stat-icon">✅</div>
+            <div className="cabinet-stat-value">{userStats.activeProcurements}</div>
+            <div className="cabinet-stat-label">Активных</div>
           </div>
-          <div style={{
-            background: 'var(--bg-secondary, #f0f2f5)',
-            borderRadius: '0.75rem',
-            padding: '0.75rem',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{userStats.completedProcurements}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Завершённых</div>
+          <div className="cabinet-stat-card cabinet-stat-card--done">
+            <div className="cabinet-stat-icon">🏁</div>
+            <div className="cabinet-stat-value">{userStats.completedProcurements}</div>
+            <div className="cabinet-stat-label">Завершённых</div>
           </div>
-          <div style={{
-            background: 'var(--bg-secondary, #f0f2f5)',
-            borderRadius: '0.75rem',
-            padding: '0.75rem',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+          <div className="cabinet-stat-card cabinet-stat-card--money">
+            <div className="cabinet-stat-icon">💰</div>
+            <div className="cabinet-stat-value cabinet-stat-value--sm">
               {formatCurrency(userStats.balance.total_deposited || 0)}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #8e99a4)' }}>Пополнено</div>
+            <div className="cabinet-stat-label">Пополнено</div>
           </div>
         </div>
       )}

@@ -89,6 +89,17 @@
 
 .admin-user-name {
   font-weight: 500;
+  display: block;
+}
+
+.admin-user-email {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 0.125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-badge {
@@ -176,10 +187,12 @@
 }
 
 /* Stats */
-.admin-stat-grid {
+.admin-stat-grid,
+.admin-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .admin-stat-card {
@@ -363,6 +376,9 @@
 .admin-badge-featured { background: #fbbf24; margin-left: 0.5rem; }
 .admin-badge-success { background: var(--admin-success); color: white; }
 .admin-badge-danger { background: var(--admin-danger); color: white; }
+.admin-badge-warning { background: var(--admin-warning); color: white; }
+.admin-badge-info { background: var(--admin-info); color: white; }
+.admin-badge-default { background: #94a3b8; color: white; }
 
 /* Status badges */
 .admin-status-badge { padding: 0.25rem 0.5rem; }
@@ -557,6 +573,16 @@
 
 .admin-btn-danger:hover {
   background: #b91c1c;
+}
+
+.admin-btn-success {
+  background: var(--admin-success);
+  border-color: var(--admin-success);
+  color: white;
+}
+
+.admin-btn-success:hover {
+  background: #15803d;
 }
 
 .admin-actions {
@@ -908,6 +934,44 @@
 .admin-login-help p {
   margin-top: 0.5rem;
   font-size: 0.8125rem;
+}
+
+.admin-login-prompt-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.admin-login-prompt-info p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+
+.admin-login-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  color: var(--admin-text-muted);
+  font-size: 0.875rem;
+}
+
+.admin-login-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--admin-border);
+  border-top-color: var(--admin-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ============================================
