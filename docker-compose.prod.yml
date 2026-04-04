@@ -17,6 +17,8 @@ version: '3.8'
 #
 # Images are built by CI and pushed to GitHub Container Registry (ghcr.io).
 # Set IMAGE_TAG in .env to pin a specific version (default: main).
+# If registry images are unavailable, run with --build to build locally
+# from the source Dockerfiles in each service directory.
 # Example .env entries:
 #   REGISTRY=ghcr.io
 #   IMAGE_PREFIX=mixabyk1996/groupbuy-bot
@@ -30,6 +32,8 @@ services:
   #   bash scripts/create-superuser.sh
   django-admin:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/django-admin:${IMAGE_TAG:-main}
+    build:
+      context: ./core
     container_name: groupbuy-django-admin
     restart: unless-stopped
     environment:
@@ -63,6 +67,8 @@ services:
   # Or use: bash scripts/setup-prod.sh --reset-db
   core:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/core:${IMAGE_TAG:-main}
+    build:
+      context: ./core-rust
     container_name: groupbuy-core
     restart: unless-stopped
     environment:
@@ -89,6 +95,8 @@ services:
   # Bot service (Telegram / VK message handler)
   bot:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/bot:${IMAGE_TAG:-main}
+    build:
+      context: ./bot
     container_name: groupbuy-bot
     restart: unless-stopped
     environment:
@@ -118,6 +126,8 @@ services:
   # Telegram adapter
   telegram-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/telegram-adapter:${IMAGE_TAG:-main}
+    build:
+      context: ./adapters/telegram
     container_name: groupbuy-telegram-adapter
     restart: unless-stopped
     environment:
@@ -133,6 +143,8 @@ services:
   # Mattermost adapter
   mattermost-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/mattermost-adapter:${IMAGE_TAG:-main}
+    build:
+      context: ./adapters/mattermost
     container_name: groupbuy-mattermost-adapter
     restart: unless-stopped
     environment:
@@ -152,6 +164,8 @@ services:
   # WebSocket server for real-time chat
   websocket-server:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/websocket:${IMAGE_TAG:-main}
+    build:
+      context: ./infrastructure/websocket
     container_name: groupbuy-websocket
     restart: unless-stopped
     environment:
@@ -176,6 +190,8 @@ services:
   # React frontend (production build)
   frontend-react:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/frontend:${IMAGE_TAG:-main}
+    build:
+      context: ./frontend-react
     container_name: groupbuy-frontend
     restart: unless-stopped
     depends_on:

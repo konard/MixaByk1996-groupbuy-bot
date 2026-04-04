@@ -18,6 +18,8 @@ version: "3.9"
 #
 # Images are pulled from GitHub Container Registry (ghcr.io).
 # Set IMAGE_TAG in .env to pin a specific version (default: main).
+# If registry images are unavailable, run with --build to build locally
+# from the source Dockerfiles in each service directory.
 ##############################################################################
 
 networks:
@@ -152,6 +154,8 @@ services:
 
   django-admin:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/django-admin:${IMAGE_TAG:-main}
+    build:
+      context: ./core
     container_name: groupbuy-django-admin
     restart: unless-stopped
     environment:
@@ -179,6 +183,8 @@ services:
 
   core:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/core:${IMAGE_TAG:-main}
+    build:
+      context: ./core-rust
     container_name: groupbuy-core
     restart: unless-stopped
     environment:
@@ -204,6 +210,8 @@ services:
 
   bot:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/bot:${IMAGE_TAG:-main}
+    build:
+      context: ./bot
     container_name: groupbuy-bot
     restart: unless-stopped
     environment:
@@ -230,6 +238,8 @@ services:
 
   telegram-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/telegram-adapter:${IMAGE_TAG:-main}
+    build:
+      context: ./adapters/telegram
     container_name: groupbuy-telegram-adapter
     restart: unless-stopped
     environment:
@@ -244,6 +254,8 @@ services:
 
   mattermost-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/mattermost-adapter:${IMAGE_TAG:-main}
+    build:
+      context: ./adapters/mattermost
     container_name: groupbuy-mattermost-adapter
     restart: unless-stopped
     environment:
@@ -262,6 +274,8 @@ services:
 
   websocket-server:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/websocket:${IMAGE_TAG:-main}
+    build:
+      context: ./infrastructure/websocket
     container_name: groupbuy-websocket
     restart: unless-stopped
     environment:
@@ -285,6 +299,8 @@ services:
 
   frontend-react:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/frontend:${IMAGE_TAG:-main}
+    build:
+      context: ./frontend-react
     container_name: groupbuy-frontend
     restart: unless-stopped
     depends_on:
@@ -333,6 +349,8 @@ services:
 
   gateway:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/gateway:${IMAGE_TAG:-main}
+    build:
+      context: ./services/gateway
     container_name: groupbuy-gateway
     restart: unless-stopped
     ports:
@@ -365,6 +383,8 @@ services:
 
   auth-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/auth-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/auth-service
     container_name: groupbuy-auth-service
     restart: unless-stopped
     environment:
@@ -390,6 +410,8 @@ services:
 
   purchase-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/purchase-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/purchase-service
     container_name: groupbuy-purchase-service
     restart: unless-stopped
     environment:
@@ -412,6 +434,8 @@ services:
 
   payment-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/payment-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/payment-service
     container_name: groupbuy-payment-service
     restart: unless-stopped
     environment:
@@ -435,6 +459,8 @@ services:
 
   chat-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/chat-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/chat-service
     container_name: groupbuy-chat-service
     restart: unless-stopped
     environment:
@@ -457,6 +483,8 @@ services:
 
   notification-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/notification-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/notification-service
     container_name: groupbuy-notification-service
     restart: unless-stopped
     environment:
@@ -486,6 +514,8 @@ services:
 
   analytics-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/analytics-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/analytics-service
     container_name: groupbuy-analytics-service
     restart: unless-stopped
     environment:
@@ -507,6 +537,8 @@ services:
 
   search-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/search-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/search-service
     container_name: groupbuy-search-service
     restart: unless-stopped
     environment:
@@ -528,6 +560,8 @@ services:
 
   reputation-service:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/reputation-service:${IMAGE_TAG:-main}
+    build:
+      context: ./services/reputation-service
     container_name: groupbuy-reputation-service
     restart: unless-stopped
     environment:
