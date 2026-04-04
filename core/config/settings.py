@@ -115,9 +115,10 @@ USE_TZ = True
 # Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [
-    BASE_DIR.parent / 'frontend' / 'static',
-]
+# Only include the legacy frontend/static dir when it actually exists on disk
+# (it is absent inside the Django Docker container, which only copies ./core/).
+_legacy_static = BASE_DIR.parent / 'frontend' / 'static'
+STATICFILES_DIRS = [_legacy_static] if _legacy_static.is_dir() else []
 
 # Media files
 MEDIA_URL = '/media/'
@@ -139,9 +140,16 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# CORS
-CORS_ALLOW_ALL_ORIGINS = DEBUG
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if not DEBUG else []
+# CORS — allow all origins so the admin panel can be reached regardless of DEBUG
+# mode.  When CORS_ALLOWED_ORIGINS is explicitly set in the environment it takes
+# precedence; otherwise all origins are permitted.
+_cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if _cors_origins_env:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_env.split(',') if o.strip()]
+else:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = []
 CORS_ALLOW_CREDENTIALS = True
 
 # Session / CSRF cookie settings for cross-origin admin panel

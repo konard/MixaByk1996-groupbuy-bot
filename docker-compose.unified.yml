@@ -136,9 +136,9 @@ services:
     networks:
       - groupbuy-network
     healthcheck:
-      # Use zookeeper-shell.sh (always present in cp-zookeeper) instead of nc,
-      # which is not installed in confluentinc/cp-zookeeper:7.5.0.
-      test: ["CMD-SHELL", "zookeeper-shell.sh localhost:2181 ls / > /dev/null 2>&1"]
+      # Use bash /dev/tcp to send the ZooKeeper 'ruok' 4-letter word — lightweight
+      # and always available in confluentinc/cp-zookeeper without requiring nc.
+      test: ["CMD-SHELL", "echo ruok | timeout 5 bash -c 'cat > /dev/tcp/localhost/2181' && echo OK"]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -186,13 +186,11 @@ services:
     container_name: groupbuy-centrifugo
     command: centrifugo -c /centrifugo/config.json
     restart: on-failure:3
-    # Pass Redis password via env vars so centrifugo v5 overrides the JSON config values.
-    # CENTRIFUGO_BROKER_REDIS_PASSWORD, CENTRIFUGO_PRESENCE_MANAGER_REDIS_PASSWORD, and
-    # CENTRIFUGO_HISTORY_MANAGER_REDIS_PASSWORD all map to the corresponding JSON fields.
+    # Pass Redis password via env var — centrifugo v5 uses CENTRIFUGO_REDIS_PASSWORD
+    # which maps to the "redis_password" key in centrifugo.json and overrides it.
+    # (v6 renamed this to broker_redis_password; v5 uses the plain redis_* keys.)
     environment:
-      CENTRIFUGO_BROKER_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
-      CENTRIFUGO_PRESENCE_MANAGER_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
-      CENTRIFUGO_HISTORY_MANAGER_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      CENTRIFUGO_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
     volumes:
       - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
     ports:
