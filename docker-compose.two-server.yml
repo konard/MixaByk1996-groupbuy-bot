@@ -15,7 +15,7 @@
 #   4. Set MATTERMOST_TOKEN and MATTERMOST_WEBHOOK_URL from your Mattermost admin panel
 #   5. Optionally set MATTERMOST_BOT_TOKEN for direct-message support
 
-version: '3.8'
+version: '3.9'
 
 services:
   # ============================================
@@ -27,9 +27,9 @@ services:
     build: ./infrastructure/websocket
     container_name: groupbuy-chat-server
     command: python chat_server.py
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
-      - REDIS_URL=redis://redis-chat:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis-chat:6379/0
       - CORE_API_URL=${CORE_API_URL:-http://core:8000/api}
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -41,17 +41,27 @@ services:
     networks:
       - chat-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 96M
 
   # Redis for chat message caching and pub/sub
   redis-chat:
     image: redis:7-alpine
     container_name: groupbuy-redis-chat
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    restart: unless-stopped
+    restart: on-failure:3
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_chat_data:/data
     ports:
@@ -59,16 +69,20 @@ services:
     networks:
       - chat-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # Nginx for chat server (SSL termination, load balancing)
   nginx-chat:
     image: nginx:alpine
     container_name: groupbuy-nginx-chat
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - ./infrastructure/nginx/nginx-chat.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
@@ -76,9 +90,14 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
-      - websocket-server
+      websocket-server:
+        condition: service_started
     networks:
       - chat-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
 
   # ============================================
   # SERVER 2: API and Bot Services (Rust Backend)
@@ -88,9 +107,10 @@ services:
   core:
     build: ./core-rust
     container_name: groupbuy-core-api
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis-api:6379/0
       - PORT=8000
       - RUST_LOG=${RUST_LOG:-info,groupbuy_api=debug}
     depends_on:
@@ -103,31 +123,42 @@ services:
     networks:
       - api-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/users/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # Telegram Bot service
   bot:
     build: ./bot
     container_name: groupbuy-bot
     command: python main.py
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - ./bot:/app
     environment:
       - CORE_API_URL=http://core:8000/api
-      - REDIS_URL=redis://redis-api:6379/1
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis-api:6379/1
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID}
       - YOOKASSA_SECRET_KEY=${YOOKASSA_SECRET_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
-      - core
-      - redis-api
+      core:
+        condition: service_healthy
+      redis-api:
+        condition: service_healthy
     networks:
       - api-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # SOCKS5 proxy for Telegram API (useful when api.telegram.org is blocked)
   # Enable by setting TELEGRAM_USE_PROXY=true in .env
@@ -145,23 +176,28 @@ services:
     build: ./adapters/telegram
     container_name: groupbuy-telegram-adapter
     command: python adapter.py
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_PROXY_URL=${TELEGRAM_PROXY_URL:-}
       - TELEGRAM_USE_PROXY=${TELEGRAM_USE_PROXY:-false}
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - api-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # Mattermost adapter
   mattermost-adapter:
     build: ./adapters/mattermost
     container_name: groupbuy-mattermost-adapter
     command: python adapter.py
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - MATTERMOST_URL=${MATTERMOST_URL}
@@ -172,27 +208,37 @@ services:
     ports:
       - "8002:8002"
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - api-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # React frontend
   frontend-react:
     build: ./frontend-react
     container_name: groupbuy-frontend
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "3000:80"
     depends_on:
-      - core
+      core:
+        condition: service_healthy
     networks:
       - api-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # PostgreSQL database
   postgres:
     image: postgres:16-alpine
     container_name: groupbuy-postgres
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - POSTGRES_DB=${DB_NAME:-groupbuy}
       - POSTGRES_USER=${DB_USER:-postgres}
@@ -208,13 +254,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # Redis for API caching and session storage
   redis-api:
     image: redis:7-alpine
     container_name: groupbuy-redis-api
-    command: redis-server --appendonly yes
-    restart: unless-stopped
+    restart: on-failure:3
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_api_data:/data
     ports:
@@ -222,16 +277,20 @@ services:
     networks:
       - api-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # Nginx for API server (reverse proxy)
   nginx-api:
     image: nginx:alpine
     container_name: groupbuy-nginx-api
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - ./infrastructure/nginx/nginx-api.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
@@ -239,9 +298,14 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
-      - core
+      core:
+        condition: service_healthy
     networks:
       - api-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
 
 volumes:
   postgres_data:

@@ -1,12 +1,13 @@
-version: '3.8'
+version: '3.9'
 
 services:
   # Core API (Rust backend)
   core:
     build: ./core-rust
+    restart: on-failure:3
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
       - PORT=8000
       - RUST_LOG=info,groupbuy_api=debug
     depends_on:
@@ -18,25 +19,42 @@ services:
       - "8000:8000"
     networks:
       - groupbuy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   # Bot service (command handlers)
   bot:
     build: ./bot
     command: python main.py
+    restart: on-failure:3
     volumes:
       - ./bot:/app
     environment:
       - CORE_API_URL=http://core:8000/api
-      - REDIS_URL=redis://redis:6379/1
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/1
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID}
       - YOOKASSA_SECRET_KEY=${YOOKASSA_SECRET_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
-      - core
-      - redis
+      core:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # SOCKS5 proxy for Telegram API (useful when api.telegram.org is blocked)
   # Enable by setting TELEGRAM_USE_PROXY=true in .env
@@ -53,32 +71,45 @@ services:
   telegram-adapter:
     build: ./adapters/telegram
     command: python adapter.py
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_PROXY_URL=${TELEGRAM_PROXY_URL:-}
       - TELEGRAM_USE_PROXY=${TELEGRAM_USE_PROXY:-false}
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # VK adapter
   vk-adapter:
     build: ./adapters/vk
     command: python adapter.py
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - VK_TOKEN=${VK_TOKEN}
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # Mattermost adapter
   mattermost-adapter:
     build: ./adapters/mattermost
     command: python adapter.py
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - MATTERMOST_URL=${MATTERMOST_URL}
@@ -89,9 +120,14 @@ services:
     ports:
       - "8002:8002"
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # WASM build (produces WebAssembly package from Rust)
   wasm-builder:
@@ -105,35 +141,54 @@ services:
   websocket-server:
     build: ./infrastructure/websocket
     command: python chat_server.py
+    restart: on-failure:3
     environment:
-      - REDIS_URL=redis://redis:6379/2
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/2
       - CORE_API_URL=http://core:8000/api
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
-      - redis
-      - core
+      redis:
+        condition: service_healthy
+      core:
+        condition: service_healthy
     ports:
       - "8765:8765"
     networks:
       - groupbuy-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 96M
 
   # React frontend (with WASM integration)
   frontend-react:
     build: ./frontend-react
+    restart: on-failure:3
     ports:
       - "3000:80"
     depends_on:
-      - core
-      - websocket-server
+      core:
+        condition: service_healthy
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # PostgreSQL database
   # NOTE: POSTGRES_PASSWORD is only used on first volume creation.
   # To reset: docker compose down -v && docker compose up -d
   postgres:
     image: postgres:16-alpine
+    restart: on-failure:3
     environment:
       - POSTGRES_DB=${DB_NAME:-groupbuy}
       - POSTGRES_USER=${DB_USER:-postgres}
@@ -149,11 +204,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # Redis for cache and queues
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    restart: on-failure:3
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     ports:
@@ -161,10 +226,14 @@ services:
     networks:
       - groupbuy-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 160M
 
 volumes:
   postgres_data:
