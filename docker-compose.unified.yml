@@ -1,0 +1,547 @@
+version: "3.9"
+
+##############################################################################
+# docker-compose.unified.yml — all-in-one production + microservices stack
+#
+# Combines docker-compose.prod.yml (main app: Rust core, Django admin, bot,
+# frontend, nginx, certbot) with docker-compose.light.yml (microservices:
+# gateway, auth, purchase, payment, chat, notification, analytics, search,
+# reputation) into a single file.
+#
+# Infrastructure (postgres, redis, kafka, zookeeper, centrifugo) is shared
+# by all services in this file.
+#
+# Usage:
+#   cp .env.example .env   # fill in all secrets including DOMAIN / CERTBOT_EMAIL
+#   bash scripts/init-letsencrypt.sh
+#   docker compose -f docker-compose.unified.yml up -d
+#
+# Images are pulled from GitHub Container Registry (ghcr.io).
+# Set IMAGE_TAG in .env to pin a specific version (default: main).
+##############################################################################
+
+networks:
+  groupbuy-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+  letsencrypt_data:
+  certbot_webroot:
+
+services:
+  # ── Infrastructure ─────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: groupbuy-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME:-groupbuy}
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    networks:
+      - groupbuy-network
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c random_page_cost=1.1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: groupbuy-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_data:/data
+    networks:
+      - groupbuy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: groupbuy-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_HEAP_OPTS: "-Xmx64m -Xms64m"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: groupbuy-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 48
+      KAFKA_HEAP_OPTS: "-Xmx128m -Xms128m"
+      KAFKA_LOG_SEGMENT_BYTES: 16777216
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 60000
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    container_name: groupbuy-centrifugo
+    command: centrifugo -c /centrifugo/config.json
+    restart: unless-stopped
+    volumes:
+      - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
+    networks:
+      - groupbuy-network
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  # ── Main Application (from docker-compose.prod.yml) ────────────────────────
+
+  django-admin:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/django-admin:${IMAGE_TAG:-main}
+    container_name: groupbuy-django-admin
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
+      - SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-change-this-in-production}
+      - DEBUG=False
+      - ALLOWED_HOSTS=${DOMAIN:-localhost},127.0.0.1
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@localhost}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/admin/auth/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  core:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/core:${IMAGE_TAG:-main}
+    container_name: groupbuy-core
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
+      - PORT=8000
+      - RUST_LOG=${RUST_LOG:-info,groupbuy_api=info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+    healthcheck:
+      # The Rust binary retries DB connection up to 10 times × 3s = 30s, then runs
+      # migrations before the HTTP server starts.  Give it 90s before failures count.
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  bot:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/bot:${IMAGE_TAG:-main}
+    container_name: groupbuy-bot
+    restart: unless-stopped
+    environment:
+      - CORE_API_URL=http://core:8000/api
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/1
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      core:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+
+  telegram-proxy:
+    image: serjs/go-socks5-proxy:latest
+    container_name: groupbuy-telegram-proxy
+    restart: unless-stopped
+    networks:
+      - groupbuy-network
+    profiles:
+      - proxy
+
+  telegram-adapter:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/telegram-adapter:${IMAGE_TAG:-main}
+    container_name: groupbuy-telegram-adapter
+    restart: unless-stopped
+    environment:
+      - BOT_SERVICE_URL=http://bot:8001
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_PROXY_URL=${TELEGRAM_PROXY_URL:-}
+      - TELEGRAM_USE_PROXY=${TELEGRAM_USE_PROXY:-false}
+    depends_on:
+      - bot
+    networks:
+      - groupbuy-network
+
+  mattermost-adapter:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/mattermost-adapter:${IMAGE_TAG:-main}
+    container_name: groupbuy-mattermost-adapter
+    restart: unless-stopped
+    environment:
+      - BOT_SERVICE_URL=http://bot:8001
+      - MATTERMOST_URL=${MATTERMOST_URL}
+      - MATTERMOST_TOKEN=${MATTERMOST_TOKEN}
+      - MATTERMOST_WEBHOOK_URL=${MATTERMOST_WEBHOOK_URL}
+      - MATTERMOST_ADAPTER_URL=${MATTERMOST_ADAPTER_URL:-http://mattermost-adapter:8002}
+      - MATTERMOST_BOT_TOKEN=${MATTERMOST_BOT_TOKEN:-}
+    ports:
+      - "8002:8002"
+    depends_on:
+      - bot
+    networks:
+      - groupbuy-network
+
+  websocket-server:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/websocket:${IMAGE_TAG:-main}
+    container_name: groupbuy-websocket
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/2
+      - CORE_API_URL=http://core:8000/api
+      - JWT_SECRET=${JWT_SECRET}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      core:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend-react:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/frontend:${IMAGE_TAG:-main}
+    container_name: groupbuy-frontend
+    restart: unless-stopped
+    depends_on:
+      - core
+    networks:
+      - groupbuy-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: groupbuy-nginx
+    restart: unless-stopped
+    entrypoint: ["/docker-entrypoint-custom.sh"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx-api.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/docker-entrypoint.sh:/docker-entrypoint-custom.sh:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+      - certbot_webroot:/var/www/certbot:ro
+      - letsencrypt_data:/etc/letsencrypt:ro
+    depends_on:
+      core:
+        condition: service_healthy
+      django-admin:
+        condition: service_started
+      websocket-server:
+        condition: service_started
+      frontend-react:
+        condition: service_started
+    networks:
+      - groupbuy-network
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: groupbuy-certbot
+    restart: unless-stopped
+    volumes:
+      - letsencrypt_data:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    networks:
+      - groupbuy-network
+
+  # ── Microservices (from docker-compose.light.yml) ─────────────────────────
+
+  gateway:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/gateway:${IMAGE_TAG:-main}
+    container_name: groupbuy-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PURCHASE_SERVICE_URL: http://purchase-service:4002
+      PAYMENT_SERVICE_URL: http://payment-service:4003
+      CHAT_SERVICE_URL: http://chat-service:4004
+      NOTIFICATION_SERVICE_URL: http://notification-service:4005
+      ANALYTICS_SERVICE_URL: http://analytics-service:4006
+      SEARCH_SERVICE_URL: http://search-service:4007
+      REPUTATION_SERVICE_URL: http://reputation-service:4008
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RATE_LIMIT_RPM: "60"
+      VOTING_RATE_LIMIT_RPM: "120"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  auth-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/auth-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-auth-service
+    restart: unless-stopped
+    environment:
+      PORT: 4001
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/auth_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      BCRYPT_ROUNDS: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  purchase-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/purchase-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-purchase-service
+    restart: unless-stopped
+    environment:
+      PORT: 4002
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/purchase_db
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: purchase-service
+      KAFKA_GROUP_ID: purchase-group
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  payment-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/payment-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-payment-service
+    restart: unless-stopped
+    environment:
+      PORT: 4003
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/payment_db
+      KAFKA_BROKERS: kafka:9092
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-placeholder}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-placeholder}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  chat-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/chat-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-chat-service
+    restart: unless-stopped
+    environment:
+      PORT: 4004
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/chat_db
+      CENTRIFUGO_URL: http://centrifugo:8000
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-centrifugo_api_key}
+      CLICKHOUSE_DSN: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  notification-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/notification-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-notification-service
+    restart: unless-stopped
+    environment:
+      PORT: 4005
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: notification-group
+      CENTRIFUGO_URL: http://centrifugo:8000
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-centrifugo_api_key}
+      SMTP_HOST: ${SMTP_HOST:-smtp.example.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+    depends_on:
+      - kafka
+      - centrifugo
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+
+  analytics-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/analytics-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-analytics-service
+    restart: unless-stopped
+    environment:
+      PORT: 4006
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_GROUP_ID: analytics-group
+      S3_ENDPOINT: ""
+      S3_ACCESS_KEY: ""
+      S3_SECRET_KEY: ""
+      S3_BUCKET: ""
+    depends_on:
+      - kafka
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+
+  search-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/search-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-search-service
+    restart: unless-stopped
+    environment:
+      PORT: 4007
+      ELASTICSEARCH_URL: ""
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  reputation-service:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/reputation-service:${IMAGE_TAG:-main}
+    container_name: groupbuy-reputation-service
+    restart: unless-stopped
+    environment:
+      PORT: 4008
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/reputation_db
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 48M
