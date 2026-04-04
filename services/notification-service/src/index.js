@@ -590,15 +590,31 @@ const server = http.createServer((req, res) => {
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
+async function startConsumerWithRetry(maxRetries = 10, baseDelay = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await startConsumer();
+      return;
+    } catch (err) {
+      const delay = Math.min(baseDelay * attempt, 30000);
+      console.error(`[KAFKA] Connection attempt ${attempt}/${maxRetries} failed: ${err.message}. Retrying in ${delay}ms...`);
+      if (attempt === maxRetries) {
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 async function main() {
   server.listen(config.port, () => {
     console.log(`[HTTP] Health server running on :${config.port}`);
   });
 
   try {
-    await startConsumer();
+    await startConsumerWithRetry();
   } catch (err) {
-    console.error(`[KAFKA] Fatal error: ${err.message}`);
+    console.error(`[KAFKA] Fatal error after all retries: ${err.message}`);
     process.exit(1);
   }
 }

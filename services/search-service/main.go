@@ -25,7 +25,11 @@ func getEnv(key, fallback string) string {
 }
 
 func initElasticsearch() (*elastic.Client, error) {
-	url := getEnv("ELASTICSEARCH_URL", "http://localhost:9200")
+	url := getEnv("ELASTICSEARCH_URL", "")
+	if url == "" {
+		log.Printf("Warning: ELASTICSEARCH_URL not configured, search functionality will be degraded")
+		return nil, nil
+	}
 
 	client, err := elastic.NewClient(
 		elastic.SetURL(url),
@@ -63,7 +67,7 @@ func main() {
 
 	esClient, err := initElasticsearch()
 	if err != nil {
-		log.Fatalf("Elasticsearch init failed: %v", err)
+		log.Printf("Warning: Elasticsearch init failed: %v — search will be degraded", err)
 	}
 
 	rdb := initRedis()
@@ -73,14 +77,18 @@ func main() {
 		log.Printf("Warning: Redis ping failed: %v", err)
 	}
 
-	idx := indexer.NewIndexer(esClient)
-	defer idx.Close()
+	if esClient != nil {
+		idx := indexer.NewIndexer(esClient)
+		defer idx.Close()
 
-	if err := idx.EnsureIndex(ctx); err != nil {
-		log.Printf("Warning: failed to ensure Elasticsearch index: %v", err)
+		if err := idx.EnsureIndex(ctx); err != nil {
+			log.Printf("Warning: failed to ensure Elasticsearch index: %v", err)
+		}
+
+		go idx.Start(ctx)
+	} else {
+		log.Printf("Elasticsearch disabled — indexer not started")
 	}
-
-	go idx.Start(ctx)
 
 	h := handlers.NewSearchHandler(esClient, rdb)
 
