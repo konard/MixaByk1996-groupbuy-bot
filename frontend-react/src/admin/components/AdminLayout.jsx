@@ -80,6 +80,9 @@ export default function AdminLayout({ children }) {
           {adminUser && (
             <div className="admin-user-info">
               <span className="admin-user-name">{adminUser.username}</span>
+              {adminUser.email && (
+                <span className="admin-user-email">{adminUser.email}</span>
+              )}
               {adminUser.is_superuser && (
                 <span className="admin-badge">Superuser</span>
               )}
