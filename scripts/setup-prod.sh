@@ -27,7 +27,6 @@
 set -e
 
 COMPOSE_FILE="docker-compose.prod.yml"
-VOLUME_NAME="groupbuy_postgres_data"
 RESET_DB=false
 UNIFIED=false
 
@@ -51,6 +50,11 @@ done
 if [ "$UNIFIED" = true ]; then
   COMPOSE_FILE="docker-compose.unified.yml"
 fi
+
+# Determine the Docker Compose project name (same logic Docker uses: basename of working dir,
+# lowercased with non-alphanumeric chars replaced by hyphens — matching Docker Compose behaviour).
+PROJECT_NAME=$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
+VOLUME_NAME="${PROJECT_NAME}_postgres_data"
 
 echo "==> GroupBuy Bot — подготовка продакшен-окружения"
 echo ""
@@ -118,6 +122,10 @@ bash scripts/free-ports.sh || true
 # --- 6. Обнаружение устаревшего тома PostgreSQL ---
 # Симптом: том существует, но пароль в .env отличается от того,
 # с которым был инициализирован том — PostgreSQL откажет в подключении.
+# ПРИЧИНА ошибки "password authentication failed for user postgres":
+#   PostgreSQL применяет POSTGRES_PASSWORD только при первой инициализации тома.
+#   Если том уже существует (например, после предыдущего запуска с другим
+#   паролем), переменная окружения ИГНОРИРУЕТСЯ и используется старый пароль.
 
 VOLUME_EXISTS=false
 if docker volume inspect "$VOLUME_NAME" &>/dev/null; then
@@ -127,12 +135,15 @@ fi
 if [ "$VOLUME_EXISTS" = true ] && [ "$RESET_DB" = false ]; then
   echo ""
   echo "  [!] Том PostgreSQL '$VOLUME_NAME' уже существует."
-  echo "      Если при предыдущем запуске использовался другой пароль,"
-  echo "      PostgreSQL вернёт ошибку 'password authentication failed'."
+  echo "      ВАЖНО: PostgreSQL устанавливает пароль ТОЛЬКО при первом запуске."
+  echo "      Если пароль DB_PASSWORD в .env был изменён с момента создания тома,"
+  echo "      контейнер core завершится с ошибкой:"
+  echo "        'password authentication failed for user \"postgres\"'"
+  echo "      Для исправления выберите вариант 2 (сброс тома)."
   echo ""
   echo "  Выберите действие:"
-  echo "    1) Продолжить (том не трогать — данные сохранятся)"
-  echo "    2) Сбросить том (УДАЛИТЬ все данные БД и начать заново)"
+  echo "    1) Продолжить (том не трогать — данные сохранятся, пароль не изменится)"
+  echo "    2) Сбросить том (УДАЛИТЬ все данные БД и начать заново с текущим паролем)"
   echo "    q) Отмена"
   echo ""
   read -r -p "  Ваш выбор [1/2/q]: " choice
