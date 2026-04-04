@@ -533,21 +533,6 @@ function Cabinet() {
             <SearchIcon className="cabinet-menu-icon" />
             <span className="cabinet-menu-text">Поиск</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => setActiveSection(activeSection === 'botAvito' ? null : 'botAvito')}>
-            <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>А</span>
-            <span className="cabinet-menu-text">Бот Авито</span>
-          </div>
-          {activeSection === 'botAvito' && renderBotSection('Бот Авито', 'А', 'Интеграция с Авито позволит публиковать закупки и принимать заявки напрямую через объявления.')}
-          <div className="cabinet-menu-item" onClick={() => setActiveSection(activeSection === 'botVK' ? null : 'botVK')}>
-            <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ВК</span>
-            <span className="cabinet-menu-text">Бот ВК</span>
-          </div>
-          {activeSection === 'botVK' && renderBotSection('Бот ВКонтакте', 'ВК', 'Бот для ВКонтакте позволит управлять закупками прямо из VK-сообщества или личных сообщений.')}
-          <div className="cabinet-menu-item" onClick={() => setActiveSection(activeSection === 'botTG' ? null : 'botTG')}>
-            <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>TG</span>
-            <span className="cabinet-menu-text">Бот телега</span>
-          </div>
-          {activeSection === 'botTG' && renderBotSection('Бот Telegram', 'TG', 'Telegram-бот для быстрого управления закупками и получения уведомлений прямо в мессенджере.')}
           <div className="cabinet-menu-item" onClick={() => {
             if (activeProcurements.length > 0) {
               navigate(`/chat/${activeProcurements[0].id}`);
