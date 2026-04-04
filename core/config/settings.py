@@ -140,11 +140,16 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-# CORS — allow all origins so the admin panel can be reached regardless of DEBUG
-# mode.  When CORS_ALLOWED_ORIGINS is explicitly set in the environment it takes
-# precedence; otherwise all origins are permitted.
+# CORS — When CORS_ALLOW_ALL_ORIGINS is explicitly set to True in the environment,
+# all origins are permitted regardless of CORS_ALLOWED_ORIGINS.  When
+# CORS_ALLOWED_ORIGINS is set (and CORS_ALLOW_ALL_ORIGINS is not True), only
+# those origins are allowed.  Otherwise all origins are permitted by default.
+_cors_allow_all_env = os.getenv('CORS_ALLOW_ALL_ORIGINS', '').lower()
 _cors_origins_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
-if _cors_origins_env:
+if _cors_allow_all_env == 'true':
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_env.split(',') if o.strip()] if _cors_origins_env else []
+elif _cors_origins_env:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins_env.split(',') if o.strip()]
 else:
