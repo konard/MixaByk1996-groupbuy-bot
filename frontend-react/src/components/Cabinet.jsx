@@ -211,11 +211,9 @@ function Cabinet() {
   };
 
   const handleCategorySelect = (category) => {
-    if (CHAT_SLIDER_ITEMS.has(category)) {
-      navigate('/');
-    } else {
-      navigate(`/in-development?section=${encodeURIComponent(category)}`);
-    }
+    // All slider categories navigate to home — chat-related ones show all procurements,
+    // others pre-fill the sidebar search with the category name.
+    navigate(CHAT_SLIDER_ITEMS.has(category) ? '/' : `/?category=${encodeURIComponent(category)}`);
   };
 
   const handleRoleSwitch = async (newRole) => {
@@ -636,7 +634,7 @@ function Cabinet() {
           <div
             key={cat}
             className="cabinet-menu-item"
-            onClick={() => navigate(`/in-development?section=${encodeURIComponent(cat)}`)}
+            onClick={() => navigate(`/?category=${encodeURIComponent(cat)}`)}
           >
             <HomeIcon />
             <span className="cabinet-menu-text">{cat}</span>

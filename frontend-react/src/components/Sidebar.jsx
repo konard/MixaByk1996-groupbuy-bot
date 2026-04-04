@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { getInitials, getAvatarColor, formatTime } from '../utils/helpers';
@@ -24,7 +24,14 @@ import {
 function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
+  const categoryParam = new URLSearchParams(location.search).get('category') || '';
+  const [searchQuery, setSearchQuery] = useState(categoryParam);
+
+  // Sync search query when URL category param changes (e.g. from cabinet category buttons)
+  useEffect(() => {
+    const category = new URLSearchParams(location.search).get('category') || '';
+    setSearchQuery(category);
+  }, [location.search]);
   const {
     user,
     procurements,
