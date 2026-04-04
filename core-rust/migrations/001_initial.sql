@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     language_code VARCHAR(10) NOT NULL DEFAULT 'ru',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    selfie_file_id VARCHAR(255) NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (platform, platform_user_id)
