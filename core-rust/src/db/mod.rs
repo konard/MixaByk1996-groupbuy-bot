@@ -37,6 +37,9 @@ pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::Error> {
     let migration_002 = include_str!("../../migrations/002_add_selfie_file_id.sql");
     sqlx::raw_sql(migration_002).execute(pool).await?;
 
+    let migration_003 = include_str!("../../migrations/003_widen_phone_and_language_code.sql");
+    sqlx::raw_sql(migration_003).execute(pool).await?;
+
     tracing::info!("Database migrations applied successfully");
     Ok(())
 }

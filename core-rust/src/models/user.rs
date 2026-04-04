@@ -28,12 +28,13 @@ pub struct CreateUser {
     pub platform: Option<String>,
     pub platform_user_id: String,
     pub username: Option<String>,
-    pub first_name: String,
+    pub first_name: Option<String>,
     pub last_name: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
     pub role: Option<String>,
     pub language_code: Option<String>,
+    pub selfie_file_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
