@@ -22,7 +22,7 @@ import {
   MinLength,
   Min,
 } from 'class-validator';
-import { PurchasesService } from './purchases.service';
+import { PurchasesService, CreatePurchaseDto as CreatePurchaseInput } from './purchases.service';
 
 class CreatePurchaseDto {
   @IsString()
@@ -90,11 +90,12 @@ export class PurchasesController {
     @Headers() headers: Record<string, string>,
   ) {
     const organizerId = getUserId(headers);
-    const purchase = await this.purchasesService.create({
+    const input: CreatePurchaseInput = {
       ...dto,
       organizerId,
       deadlineAt: dto.deadlineAt ? new Date(dto.deadlineAt) : undefined,
-    });
+    };
+    const purchase = await this.purchasesService.create(input);
     return { success: true, data: purchase };
   }
 
@@ -120,7 +121,11 @@ export class PurchasesController {
     @Headers() headers: Record<string, string>,
   ) {
     const requesterId = getUserId(headers);
-    const purchase = await this.purchasesService.update(id, requesterId, dto);
+    const updates: Partial<CreatePurchaseInput> = {
+      ...dto,
+      deadlineAt: dto.deadlineAt ? new Date(dto.deadlineAt) : undefined,
+    };
+    const purchase = await this.purchasesService.update(id, requesterId, updates);
     return { success: true, data: purchase };
   }
 
