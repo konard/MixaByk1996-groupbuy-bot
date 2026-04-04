@@ -37,13 +37,13 @@ version: "3.9"
 #
 # Memory budget (3 GB host, ~2.5 GB reserved for containers):
 #   postgres 512M | redis 256M | zookeeper 128M | kafka 256M | centrifugo 192M
-#   django-admin 512M | core 128M | bot 256M | telegram-adapter 64M
+#   django-admin 512M | core 128M | bot 256M | telegram-adapter 128M
 #   mattermost-adapter 64M | websocket-server 96M | frontend-react 64M
 #   nginx 64M | certbot 32M | gateway 32M | auth-service 64M
 #   purchase-service 64M | payment-service 32M | chat-service 32M
 #   notification-service 48M | analytics-service 256M | search-service 32M
 #   reputation-service 48M
-#   Total ≈ 2742 MB
+#   Total ≈ 2806 MB
 ##############################################################################
 
 networks:
@@ -333,7 +333,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          # Increased from 64M: Python aiohttp/aiogram process was being
+          # OOM-killed (exit 137) under the 64M limit (issue #182).
+          memory: 128M
 
   mattermost-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/mattermost-adapter:${IMAGE_TAG:-main}

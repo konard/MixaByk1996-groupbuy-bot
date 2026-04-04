@@ -17,7 +17,11 @@
 set -e
 
 echo "==> Running Django migrations..."
-python manage.py migrate --noinput
+# --fake-initial records already-applied initial migrations as done without
+# re-executing them.  This prevents "relation '...' already exists" crashes
+# when the container restarts against a database that was initialised during
+# a previous run (issue #182).
+python manage.py migrate --noinput --fake-initial
 
 echo "==> Collecting static files..."
 python manage.py collectstatic --noinput --clear
