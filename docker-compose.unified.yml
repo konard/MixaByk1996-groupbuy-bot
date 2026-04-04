@@ -20,6 +20,20 @@ version: "3.9"
 # Set IMAGE_TAG in .env to pin a specific version (default: main).
 # If registry images are unavailable, run with --build to build locally
 # from the source Dockerfiles in each service directory.
+#
+# IMPORTANT — PostgreSQL volume and credential consistency:
+#   POSTGRES_PASSWORD / DB_PASSWORD is only applied on the FIRST initialisation
+#   of the postgres_data volume.  If you previously ran any other compose file
+#   with different credentials, that volume already contains a different
+#   user/password and authentication will fail.
+#
+#   To start fresh (WARNING: destroys all data in the volume):
+#     docker compose -f docker-compose.unified.yml down
+#     docker volume rm $(docker volume ls -q | grep postgres_data)
+#     docker compose -f docker-compose.unified.yml up -d
+#
+#   Or set DB_USER / DB_PASSWORD / DB_NAME in .env to match whatever was used
+#   when the volume was first created.
 ##############################################################################
 
 networks:

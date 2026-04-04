@@ -19,6 +19,11 @@
 #
 # Single-file lightweight deployment (microservices only, no main stack):
 #   docker compose -f docker-compose.light.yml up -d
+#
+# PostgreSQL credentials: uses the same DB_USER / DB_PASSWORD / DB_NAME
+# variables as docker-compose.prod.yml and docker-compose.unified.yml so
+# all three compose files can share the same postgres_data volume without
+# credential mismatches.  Defaults: postgres / postgres / groupbuy.
 ##############################################################################
 
 version: "3.9"
@@ -39,12 +44,18 @@ services:
   # ─── Infrastructure ────────────────────────────────────────────────────────
 
   # Single PostgreSQL instance with all databases
+  # IMPORTANT: POSTGRES_PASSWORD / DB_PASSWORD is only applied on FIRST initialisation
+  # of the postgres_data volume.  If the volume was created by a previous run with
+  # different credentials, authentication will fail.  To reset:
+  #   docker compose -f docker-compose.light.yml down
+  #   docker volume rm $(docker volume ls -q | grep postgres_data)
+  #   docker compose -f docker-compose.light.yml up -d
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: groupbuy
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-groupbuy_secret}
-      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-groupbuy}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
@@ -54,7 +65,7 @@ services:
       - groupbuy-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U groupbuy -d auth_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -189,7 +200,7 @@ services:
       context: ./services/auth-service
     environment:
       PORT: 4001
-      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/auth_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/auth_db
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
@@ -215,7 +226,7 @@ services:
       context: ./services/purchase-service
     environment:
       PORT: 4002
-      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/purchase_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/purchase_db
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID: purchase-service
       KAFKA_GROUP_ID: purchase-group
@@ -238,7 +249,7 @@ services:
       context: ./services/payment-service
     environment:
       PORT: 4003
-      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/payment_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/payment_db
       KAFKA_BROKERS: kafka:9092
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
       YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-placeholder}
@@ -262,7 +273,7 @@ services:
       context: ./services/chat-service
     environment:
       PORT: 4004
-      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/chat_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/chat_db
       CENTRIFUGO_URL: http://centrifugo:8000
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-centrifugo_api_key}
       # ClickHouse disabled in light mode — chat history stored in PostgreSQL only
@@ -362,7 +373,7 @@ services:
       context: ./services/reputation-service
     environment:
       PORT: 4008
-      DATABASE_URL: postgresql://groupbuy:${POSTGRES_PASSWORD:-groupbuy_secret}@postgres:5432/reputation_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/reputation_db
       KAFKA_BROKERS: kafka:9092
     depends_on:
       postgres:
