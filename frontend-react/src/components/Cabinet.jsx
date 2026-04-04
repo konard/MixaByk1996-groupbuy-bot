@@ -102,6 +102,23 @@ function Cabinet() {
   const [orderTables, setOrderTables] = useState([]);
   const [shipmentHistory, setShipmentHistory] = useState([]);
 
+  // Subscriptions: list of category/organizer subscriptions
+  const [subscriptions, setSubscriptions] = useState([
+    { id: 1, type: 'category', name: 'Биржа', active: true },
+    { id: 2, type: 'category', name: 'Быт', active: true },
+    { id: 3, type: 'organizer', name: 'Организатор Иванов', active: false },
+  ]);
+  const [newSubscription, setNewSubscription] = useState('');
+
+  // Messages/Invitations: inbox list
+  const [messages, setMessages] = useState([
+    { id: 1, from: 'Система', text: 'Добро пожаловать на платформу!', date: new Date(Date.now() - 86400000).toISOString(), read: true },
+  ]);
+
+  // Pending procurements (supplier: awaiting shipment confirmation)
+  const [pendingItems, setPendingItems] = useState([]);
+  const [pendingLoaded, setPendingLoaded] = useState(false);
+
   // View state for sections
   const [activeSection, setActiveSection] = useState(null);
   // Slider/page swap state (for supplier top button)
@@ -189,6 +206,40 @@ function Cabinet() {
 
   const handleSendClosingDocuments = async (data) => {
     addToast('Закрывающие документы отправлены покупателям', 'success');
+  };
+
+  const handleAddSubscription = () => {
+    const name = newSubscription.trim();
+    if (!name) return;
+    setSubscriptions((prev) => [...prev, { id: Date.now(), type: 'category', name, active: true }]);
+    setNewSubscription('');
+    addToast('Подписка добавлена', 'success');
+  };
+
+  const handleToggleSubscription = (id) => {
+    setSubscriptions((prev) => prev.map((s) => s.id === id ? { ...s, active: !s.active } : s));
+  };
+
+  const handleDeleteSubscription = (id) => {
+    setSubscriptions((prev) => prev.filter((s) => s.id !== id));
+    addToast('Подписка удалена', 'info');
+  };
+
+  const handleMarkMessageRead = (id) => {
+    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, read: true } : m));
+  };
+
+  const handleOpenPending = async () => {
+    setActiveSection(activeSection === 'pending' ? null : 'pending');
+    if (activeSection !== 'pending' && !pendingLoaded) {
+      setPendingLoaded(true);
+      try {
+        const waiting = myProcurements?.organized?.filter((p) => p.status === 'stopped') || [];
+        setPendingItems(waiting);
+      } catch {
+        // ignore
+      }
+    }
   };
 
   const handleOpenOrderTables = async () => {
@@ -284,17 +335,27 @@ function Cabinet() {
           gap: '0.5rem',
           scrollbarWidth: 'none',
         }}>
-          {['Новости', 'Подписки'].map((item) => (
-            <button
-              key={item}
-              className="btn btn-outline btn-round"
-              style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-              onClick={() => navigate(`/in-development?section=${encodeURIComponent(item)}`)}
-            >
-              {item}
-            </button>
-          ))}
+          <button
+            className={`btn btn-round ${activeSection === 'supplierNews' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            onClick={() => setActiveSection(activeSection === 'supplierNews' ? null : 'supplierNews')}
+          >
+            Новости
+          </button>
+          <button
+            className={`btn btn-round ${activeSection === 'supplierSubscriptions' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ whiteSpace: 'nowrap', fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+            onClick={() => setActiveSection(activeSection === 'supplierSubscriptions' ? null : 'supplierSubscriptions')}
+          >
+            Подписки
+          </button>
         </div>
+        {activeSection === 'supplierNews' && (
+          <div style={{ marginTop: '0.5rem', background: 'var(--bg-secondary,#f0f2f5)', borderRadius: '0.5rem', padding: '0.75rem' }}>
+            <p style={{ fontSize: '0.85rem', margin: 0 }} className="text-muted">Нет новостей для отображения</p>
+          </div>
+        )}
+        {activeSection === 'supplierSubscriptions' && renderSubscriptions()}
       </div>
 
       {/* Category slider */}
@@ -361,11 +422,15 @@ function Cabinet() {
         )}
         <div
           className="cabinet-menu-item"
-          onClick={() => navigate('/in-development?section=%D0%92%20%D0%BE%D0%B6%D0%B8%D0%B4%D0%B0%D0%BD%D0%B8%D0%B8')}
+          onClick={handleOpenPending}
         >
           <HistoryIcon />
           <span className="cabinet-menu-text">В ожидании</span>
+          {pendingItems.length > 0 && (
+            <span style={{ background: 'var(--warning-color,#f57c00)', color:'#fff', borderRadius:'1rem', fontSize:'0.7rem', padding:'0 0.4rem', minWidth:'1.2rem', textAlign:'center' }}>{pendingItems.length}</span>
+          )}
         </div>
+        {activeSection === 'pending' && renderPending()}
         <div
           className="cabinet-menu-item"
           onClick={() => setActiveSection(activeSection === 'shipmentHistory' ? null : 'shipmentHistory')}
@@ -391,10 +456,17 @@ function Cabinet() {
             )}
           </div>
         )}
-        <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Приглашения и сообщения')}`)}>
+        <div
+          className="cabinet-menu-item"
+          onClick={() => setActiveSection(activeSection === 'supplierMessages' ? null : 'supplierMessages')}
+        >
           <MailIcon />
           <span className="cabinet-menu-text">Приглашения и сообщения</span>
+          {messages.filter((m) => !m.read).length > 0 && (
+            <span style={{ background: 'var(--primary-color,#3390ec)', color:'#fff', borderRadius:'1rem', fontSize:'0.7rem', padding:'0 0.4rem', minWidth:'1.2rem', textAlign:'center' }}>{messages.filter((m) => !m.read).length}</span>
+          )}
         </div>
+        {activeSection === 'supplierMessages' && renderMessages('Приглашения и сообщения')}
       </div>
     </>
   );
@@ -461,18 +533,21 @@ function Cabinet() {
             <SearchIcon className="cabinet-menu-icon" />
             <span className="cabinet-menu-text">Поиск</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Бот Авито')}`)}>
+          <div className="cabinet-menu-item" onClick={() => setActiveSection(activeSection === 'botAvito' ? null : 'botAvito')}>
             <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>А</span>
             <span className="cabinet-menu-text">Бот Авито</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Бот ВКонтакте')}`)}>
+          {activeSection === 'botAvito' && renderBotSection('Бот Авито', 'А', 'Интеграция с Авито позволит публиковать закупки и принимать заявки напрямую через объявления.')}
+          <div className="cabinet-menu-item" onClick={() => setActiveSection(activeSection === 'botVK' ? null : 'botVK')}>
             <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ВК</span>
             <span className="cabinet-menu-text">Бот ВК</span>
           </div>
-          <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Бот Telegram')}`)}>
+          {activeSection === 'botVK' && renderBotSection('Бот ВКонтакте', 'ВК', 'Бот для ВКонтакте позволит управлять закупками прямо из VK-сообщества или личных сообщений.')}
+          <div className="cabinet-menu-item" onClick={() => setActiveSection(activeSection === 'botTG' ? null : 'botTG')}>
             <span className="cabinet-menu-icon" style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>TG</span>
             <span className="cabinet-menu-text">Бот телега</span>
           </div>
+          {activeSection === 'botTG' && renderBotSection('Бот Telegram', 'TG', 'Telegram-бот для быстрого управления закупками и получения уведомлений прямо в мессенджере.')}
           <div className="cabinet-menu-item" onClick={() => {
             if (activeProcurements.length > 0) {
               navigate(`/chat/${activeProcurements[0].id}`);
@@ -602,14 +677,28 @@ function Cabinet() {
             </span>
           )}
         </div>
-        <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Подписки')}`)}>
+        <div
+          className="cabinet-menu-item"
+          onClick={() => setActiveSection(activeSection === 'buyerSubscriptions' ? null : 'buyerSubscriptions')}
+        >
           <HistoryIcon />
           <span className="cabinet-menu-text">Подписки</span>
+          {subscriptions.filter((s) => s.active).length > 0 && (
+            <span style={{ background: 'var(--primary-color,#3390ec)', color:'#fff', borderRadius:'1rem', fontSize:'0.7rem', padding:'0 0.4rem', minWidth:'1.2rem', textAlign:'center' }}>{subscriptions.filter((s) => s.active).length}</span>
+          )}
         </div>
-        <div className="cabinet-menu-item" onClick={() => navigate(`/in-development?section=${encodeURIComponent('Сообщения')}`)}>
+        {activeSection === 'buyerSubscriptions' && renderSubscriptions()}
+        <div
+          className="cabinet-menu-item"
+          onClick={() => setActiveSection(activeSection === 'buyerMessages' ? null : 'buyerMessages')}
+        >
           <MailIcon />
           <span className="cabinet-menu-text">Сообщения</span>
+          {messages.filter((m) => !m.read).length > 0 && (
+            <span style={{ background: 'var(--primary-color,#3390ec)', color:'#fff', borderRadius:'1rem', fontSize:'0.7rem', padding:'0 0.4rem', minWidth:'1.2rem', textAlign:'center' }}>{messages.filter((m) => !m.read).length}</span>
+          )}
         </div>
+        {activeSection === 'buyerMessages' && renderMessages()}
 
         {/* История закупок */}
         <div
@@ -733,6 +822,167 @@ function Cabinet() {
           </div>
         ))
       )}
+    </div>
+  );
+
+  const renderSubscriptions = () => (
+    <div style={{ padding: '0 1rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.25rem' }}>
+        <input
+          type="text"
+          className="form-input"
+          style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem', flex: 1 }}
+          placeholder="Категория или организатор..."
+          value={newSubscription}
+          onChange={(e) => setNewSubscription(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleAddSubscription()}
+        />
+        <button
+          className="btn btn-primary btn-round"
+          style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', whiteSpace: 'nowrap' }}
+          onClick={handleAddSubscription}
+        >
+          + Добавить
+        </button>
+      </div>
+      {subscriptions.length === 0 ? (
+        <p className="text-muted" style={{ fontSize: '0.85rem', padding: '0.5rem 0' }}>Нет подписок</p>
+      ) : (
+        subscriptions.map((s) => (
+          <div key={s.id} style={{
+            background: 'var(--bg-secondary, #f0f2f5)',
+            borderRadius: '0.5rem',
+            padding: '0.5rem 0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}>
+            <span style={{ fontSize: '0.75rem', flex: 1, fontWeight: 500 }}>
+              {s.type === 'organizer' ? '👤' : '🏷️'} {s.name}
+            </span>
+            <button
+              className={`btn btn-round ${s.active ? 'btn-primary' : 'btn-outline'}`}
+              style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+              onClick={() => handleToggleSubscription(s.id)}
+            >
+              {s.active ? 'Вкл' : 'Выкл'}
+            </button>
+            <button
+              onClick={() => handleDeleteSubscription(s.id)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1rem', padding: 0 }}
+              title="Удалить"
+            >
+              ×
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderMessages = (title = 'Сообщения') => (
+    <div style={{ padding: '0 1rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      {messages.length === 0 ? (
+        <p className="text-muted" style={{ fontSize: '0.85rem', padding: '0.5rem 0' }}>Нет сообщений</p>
+      ) : (
+        messages.map((m) => (
+          <div
+            key={m.id}
+            onClick={() => handleMarkMessageRead(m.id)}
+            style={{
+              background: m.read ? 'var(--bg-secondary, #f0f2f5)' : 'var(--primary-bg, #e8f4fd)',
+              borderRadius: '0.5rem',
+              padding: '0.6rem 0.75rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.15rem',
+              cursor: 'pointer',
+              borderLeft: m.read ? 'none' : '3px solid var(--primary-color, #3390ec)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.8rem' }}>{m.from}</span>
+              {!m.read && (
+                <span style={{ background: 'var(--primary-color,#3390ec)', color: '#fff', borderRadius: '1rem', fontSize: '0.65rem', padding: '0 0.4rem' }}>
+                  Новое
+                </span>
+              )}
+            </div>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{m.text}</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{formatTime(m.date)}</span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderPending = () => (
+    <div style={{ padding: '0 1rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      {pendingItems.length === 0 ? (
+        <p className="text-muted" style={{ fontSize: '0.85rem', padding: '0.5rem 0' }}>Нет закупок в ожидании</p>
+      ) : (
+        pendingItems.map((p) => (
+          <div
+            key={p.id}
+            style={{
+              background: 'var(--bg-secondary, #f0f2f5)',
+              borderRadius: '0.5rem',
+              padding: '0.6rem 0.75rem',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.15rem',
+            }}
+            onClick={() => navigate(`/chat/${p.id}`)}
+          >
+            <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{p.title}</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              {p.city} · {p.participant_count || 0} участн.
+            </span>
+            <span className={`status-badge status-${p.status}`} style={{ fontSize: '0.7rem', alignSelf: 'flex-start' }}>
+              {getStatusText(p.status)}
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderBotSection = (botName, icon, description) => (
+    <div style={{ padding: '0 1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div style={{
+        background: 'var(--bg-secondary, #f0f2f5)',
+        borderRadius: '0.75rem',
+        padding: '1rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '1.5rem' }}>{icon}</span>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{botName}</span>
+          <span style={{
+            background: 'var(--warning-color,#f57c00)',
+            color: '#fff',
+            borderRadius: '1rem',
+            fontSize: '0.65rem',
+            padding: '0.1rem 0.5rem',
+            marginLeft: 'auto',
+          }}>
+            Скоро
+          </span>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+          {description}
+        </p>
+        <button
+          className="btn btn-outline btn-round"
+          style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', alignSelf: 'flex-start' }}
+          onClick={() => addToast(`Интеграция с ${botName} появится в следующем обновлении`, 'info')}
+        >
+          Подключить
+        </button>
+      </div>
     </div>
   );
 
