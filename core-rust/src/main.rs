@@ -69,6 +69,8 @@ async fn main() -> std::io::Result<()> {
             .route("/api/users/", web::get().to(handlers::users::list_users))
             .route("/api/users/", web::post().to(handlers::users::create_user))
             .route("/api/users/by_platform/", web::get().to(handlers::users::get_user_by_platform))
+            .route("/api/users/by_email/", web::get().to(handlers::users::get_user_by_email))
+            .route("/api/users/by_phone/", web::get().to(handlers::users::get_user_by_phone))
             .route("/api/users/check_exists/", web::get().to(handlers::users::check_user_exists))
             .route("/api/users/sessions/set_state/", web::post().to(handlers::users::set_session_state))
             .route("/api/users/sessions/clear_state/", web::post().to(handlers::users::clear_session_state))

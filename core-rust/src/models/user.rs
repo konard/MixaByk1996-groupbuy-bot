@@ -18,6 +18,7 @@ pub struct User {
     pub language_code: String,
     pub is_active: bool,
     pub is_verified: bool,
+    pub selfie_file_id: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -113,6 +114,16 @@ pub struct UpdateBalanceRequest {
 pub struct PlatformQuery {
     pub platform: Option<String>,
     pub platform_user_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EmailQuery {
+    pub email: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PhoneQuery {
+    pub phone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
