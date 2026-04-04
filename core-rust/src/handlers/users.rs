@@ -32,33 +32,42 @@ pub async fn create_user(pool: web::Data<PgPool>, body: web::Json<CreateUser>) -
 
     let platform = data.platform.unwrap_or_else(|| "telegram".to_string());
     let username = data.username.unwrap_or_default();
+    let first_name = data.first_name.unwrap_or_default();
     let last_name = data.last_name.unwrap_or_default();
     let phone = data.phone.unwrap_or_default();
     let email = data.email.unwrap_or_default();
     let role = data.role.unwrap_or_else(|| "buyer".to_string());
     let language_code = data.language_code.unwrap_or_else(|| "ru".to_string());
+    let selfie_file_id = data.selfie_file_id.unwrap_or_default();
 
-    // Normalize phone
+    // Truncate fields to their column limits to avoid "value too long" errors
+    let platform = truncate_str(&platform, 20);
+    let role = truncate_str(&role, 20);
+    let language_code = truncate_str(&language_code, 20);
+    let phone = truncate_str(&phone, 30);
+
+    // Normalize phone: ensure it starts with + if non-empty
     let phone = if !phone.is_empty() && !phone.starts_with('+') {
         format!("+{}", phone)
     } else {
-        phone
+        phone.to_string()
     };
 
     match sqlx::query_as::<_, User>(
-        r#"INSERT INTO users (platform, platform_user_id, username, first_name, last_name, phone, email, role, language_code)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        r#"INSERT INTO users (platform, platform_user_id, username, first_name, last_name, phone, email, role, language_code, selfie_file_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
            RETURNING *"#,
     )
     .bind(&platform)
     .bind(&data.platform_user_id)
     .bind(&username)
-    .bind(&data.first_name)
+    .bind(&first_name)
     .bind(&last_name)
     .bind(&phone)
     .bind(&email)
     .bind(&role)
     .bind(&language_code)
+    .bind(&selfie_file_id)
     .fetch_one(pool.get_ref())
     .await
     {
@@ -73,6 +82,15 @@ pub async fn create_user(pool: web::Data<PgPool>, body: web::Json<CreateUser>) -
                     .json(serde_json::json!({"error": format!("{}", e)}))
             }
         }
+    }
+}
+
+/// Truncate a string to at most `max_chars` Unicode scalar values.
+fn truncate_str(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        s.to_string()
+    } else {
+        s.chars().take(max_chars).collect()
     }
 }
 
