@@ -81,7 +81,7 @@ export default function LoginPage() {
               <li>Подключитесь к серверу по SSH</li>
               <li>
                 Выполните команду:
-                <pre><code>docker compose exec core python manage.py createsuperuser</code></pre>
+                <pre><code>docker compose exec django-admin python manage.py createsuperuser</code></pre>
               </li>
               <li>Введите имя пользователя, email и пароль</li>
               <li>Войдите в панель с созданными данными</li>
