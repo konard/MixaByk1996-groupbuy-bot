@@ -1,5 +1,19 @@
 version: "3.9"
 
+##############################################################################
+# docker-compose.microservices.yml — standalone microservices development stack
+#
+# Uses separate PostgreSQL instances per service (postgres-auth, postgres-purchase,
+# etc.) each with its own data volume.
+#
+# PostgreSQL credentials: uses DB_USER / DB_PASSWORD from .env (default: postgres/postgres),
+# matching the convention of all other compose files in this project.
+#
+# IMPORTANT: POSTGRES_PASSWORD is only applied on FIRST initialisation of each
+# volume. If you previously ran with different credentials, delete the volumes:
+#   docker compose -f docker-compose.microservices.yml down -v
+##############################################################################
+
 networks:
   microservices:
     driver: bridge
@@ -69,9 +83,9 @@ services:
   postgres-auth:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: auth_db
-      POSTGRES_USER: auth_user
-      POSTGRES_PASSWORD: auth_password
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
     ports:
@@ -80,7 +94,7 @@ services:
       - microservices
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,9 +102,9 @@ services:
   postgres-purchase:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: purchase_db
-      POSTGRES_USER: purchase_user
-      POSTGRES_PASSWORD: purchase_password
+      POSTGRES_DB: ${PURCHASE_DB_NAME:-purchase_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_purchase_data:/var/lib/postgresql/data
     ports:
@@ -99,7 +113,7 @@ services:
       - microservices
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U purchase_user -d purchase_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -107,9 +121,9 @@ services:
   postgres-payment:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: payment_db
-      POSTGRES_USER: payment_user
-      POSTGRES_PASSWORD: payment_password
+      POSTGRES_DB: ${PAYMENT_DB_NAME:-payment_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_payment_data:/var/lib/postgresql/data
     ports:
@@ -118,7 +132,7 @@ services:
       - microservices
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -126,9 +140,9 @@ services:
   postgres-chat:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: chat_db
-      POSTGRES_USER: chat_user
-      POSTGRES_PASSWORD: chat_password
+      POSTGRES_DB: ${CHAT_DB_NAME:-chat_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_chat_data:/var/lib/postgresql/data
     ports:
@@ -137,14 +151,14 @@ services:
       - microservices
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chat_user -d chat_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes --requirepass redis_password
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
     volumes:
       - redis_data:/data
     ports:
@@ -153,7 +167,7 @@ services:
       - microservices
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -192,9 +206,9 @@ services:
   postgres-reputation:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: reputation_db
-      POSTGRES_USER: reputation_user
-      POSTGRES_PASSWORD: reputation_password
+      POSTGRES_DB: ${REPUTATION_DB_NAME:-reputation_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_reputation_data:/var/lib/postgresql/data
     ports:
@@ -203,7 +217,7 @@ services:
       - microservices
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U reputation_user -d reputation_db"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -253,7 +267,7 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      JWT_SECRET: super_secret_jwt_key_change_in_production
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
       AUTH_SERVICE_URL: http://auth-service:4001
       PURCHASE_SERVICE_URL: http://purchase-service:4002
       PAYMENT_SERVICE_URL: http://payment-service:4003
@@ -263,10 +277,10 @@ services:
       ANALYTICS_SERVICE_URL: http://analytics-service:4006
       NOTIFICATION_SERVICE_URL: http://notification-service:4005
       REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: redis_password
-      RATE_LIMIT_RPM: 60
-      VOTING_RATE_LIMIT_RPM: 120
-      CORS_ORIGINS: "http://localhost:3001,http://localhost:3002"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RATE_LIMIT_RPM: ${RATE_LIMIT_RPM:-60}
+      VOTING_RATE_LIMIT_RPM: ${VOTING_RATE_LIMIT_RPM:-120}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
     depends_on:
       - redis
       - auth-service
@@ -287,10 +301,10 @@ services:
       - "4001:4001"
     environment:
       PORT: 4001
-      DATABASE_URL: postgresql://auth_user:auth_password@postgres-auth:5432/auth_db
-      REDIS_URL: redis://:redis_password@redis:6379
-      JWT_SECRET: super_secret_jwt_key_change_in_production
-      JWT_REFRESH_SECRET: super_secret_refresh_key_change_in_production
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-auth:5432/${AUTH_DB_NAME:-auth_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       BCRYPT_ROUNDS: 10
@@ -311,7 +325,7 @@ services:
       - "4002:4002"
     environment:
       PORT: 4002
-      DATABASE_URL: postgresql://purchase_user:purchase_password@postgres-purchase:5432/purchase_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-purchase:5432/${PURCHASE_DB_NAME:-purchase_db}
       KAFKA_BROKERS: kafka:9092
       KAFKA_CLIENT_ID: purchase-service
       KAFKA_GROUP_ID: purchase-group
@@ -332,7 +346,7 @@ services:
       - "4003:4003"
     environment:
       PORT: 4003
-      DATABASE_URL: postgresql://payment_user:payment_password@postgres-payment:5432/payment_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-payment:5432/${PAYMENT_DB_NAME:-payment_db}
       KAFKA_BROKERS: kafka:9092
       STRIPE_SECRET_KEY: sk_test_placeholder
       YOOKASSA_SHOP_ID: placeholder_shop_id
@@ -354,7 +368,7 @@ services:
       - "4004:4004"
     environment:
       PORT: 4004
-      DATABASE_URL: postgresql://chat_user:chat_password@postgres-chat:5432/chat_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-chat:5432/${CHAT_DB_NAME:-chat_db}
       CENTRIFUGO_URL: http://centrifugo:8000
       CENTRIFUGO_API_KEY: centrifugo_api_key
       CLICKHOUSE_DSN: clickhouse://clickhouse_user:clickhouse_password@clickhouse:9000/chat_history
@@ -427,7 +441,7 @@ services:
     environment:
       PORT: 4007
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      REDIS_URL: redis://:redis_password@redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
       KAFKA_BROKERS: kafka:9092
     depends_on:
       elasticsearch:
@@ -448,7 +462,7 @@ services:
       - "4008:4008"
     environment:
       PORT: 4008
-      DATABASE_URL: postgresql://reputation_user:reputation_password@postgres-reputation:5432/reputation_db
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-reputation:5432/${REPUTATION_DB_NAME:-reputation_db}
       KAFKA_BROKERS: kafka:9092
     depends_on:
       postgres-reputation:
