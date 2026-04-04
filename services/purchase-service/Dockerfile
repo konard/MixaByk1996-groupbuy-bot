@@ -3,12 +3,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    --network=host \
     npm ci
 COPY . .
 RUN npm run build
 RUN --mount=type=cache,target=/root/.npm \
-    --network=host \
     npm ci --omit=dev
 
 FROM node:20-alpine AS runner
