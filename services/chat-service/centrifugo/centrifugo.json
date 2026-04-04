@@ -8,13 +8,20 @@
   "port": 8000,
   "grpc_api": false,
 
-  "redis": {
-    "address": "redis:6379",
-    "password": "redis_secret",
-    "db": 1
-  },
+  "broker": "redis",
+  "broker_redis_address": "redis:6379",
+  "broker_redis_password": "",
+  "broker_redis_db": 1,
 
-  "engine": "redis",
+  "presence_manager": "redis",
+  "presence_manager_redis_address": "redis:6379",
+  "presence_manager_redis_password": "",
+  "presence_manager_redis_db": 1,
+
+  "history_manager": "redis",
+  "history_manager_redis_address": "redis:6379",
+  "history_manager_redis_password": "",
+  "history_manager_redis_db": 1,
 
   "presence": true,
   "history_size": 100,

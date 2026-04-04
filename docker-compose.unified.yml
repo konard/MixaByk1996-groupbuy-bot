@@ -37,13 +37,13 @@ version: "3.9"
 #
 # Memory budget (3 GB host, ~2.5 GB reserved for containers):
 #   postgres 512M | redis 256M | zookeeper 128M | kafka 256M | centrifugo 192M
-#   django-admin 512M | core 128M | bot 96M | telegram-adapter 64M
+#   django-admin 512M | core 128M | bot 256M | telegram-adapter 64M
 #   mattermost-adapter 64M | websocket-server 96M | frontend-react 64M
 #   nginx 64M | certbot 32M | gateway 32M | auth-service 64M
 #   purchase-service 64M | payment-service 32M | chat-service 32M
 #   notification-service 48M | analytics-service 256M | search-service 32M
 #   reputation-service 48M
-#   Total ≈ 2582 MB
+#   Total ≈ 2742 MB
 ##############################################################################
 
 networks:
@@ -136,11 +136,13 @@ services:
     networks:
       - groupbuy-network
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      # Use zookeeper-shell.sh (always present in cp-zookeeper) instead of nc,
+      # which is not installed in confluentinc/cp-zookeeper:7.5.0.
+      test: ["CMD-SHELL", "zookeeper-shell.sh localhost:2181 ls / > /dev/null 2>&1"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 10s
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -184,8 +186,17 @@ services:
     container_name: groupbuy-centrifugo
     command: centrifugo -c /centrifugo/config.json
     restart: on-failure:3
+    # Pass Redis password via env vars so centrifugo v5 overrides the JSON config values.
+    # CENTRIFUGO_BROKER_REDIS_PASSWORD, CENTRIFUGO_PRESENCE_MANAGER_REDIS_PASSWORD, and
+    # CENTRIFUGO_HISTORY_MANAGER_REDIS_PASSWORD all map to the corresponding JSON fields.
+    environment:
+      CENTRIFUGO_BROKER_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      CENTRIFUGO_PRESENCE_MANAGER_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      CENTRIFUGO_HISTORY_MANAGER_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
     volumes:
       - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
+    ports:
+      - "8001:8000"
     networks:
       - groupbuy-network
     depends_on:
@@ -196,7 +207,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     deploy:
       resources:
         limits:
@@ -219,6 +230,9 @@ services:
       - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-admin}
       - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@localhost}
+      # Limit gunicorn to 2 workers to stay within the 512M memory budget.
+      # Without this, gunicorn defaults to 2*CPU+1 workers and can OOM.
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
     depends_on:
       postgres:
         condition: service_healthy
@@ -231,7 +245,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      # Django startup: migrations + collectstatic + superuser creation can take 90-120s
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -289,7 +304,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 96M
+          # Increased from 96M: Python bot with aiohttp/aiogram needs at least 256M on 3GB host
+          memory: 256M
 
   telegram-proxy:
     image: serjs/go-socks5-proxy:latest
@@ -312,7 +328,8 @@ services:
       - TELEGRAM_PROXY_URL=${TELEGRAM_PROXY_URL:-}
       - TELEGRAM_USE_PROXY=${TELEGRAM_USE_PROXY:-false}
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - groupbuy-network
     deploy:
@@ -336,7 +353,8 @@ services:
     ports:
       - "8002:8002"
     depends_on:
-      - bot
+      bot:
+        condition: service_started
     networks:
       - groupbuy-network
     deploy:

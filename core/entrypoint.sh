@@ -55,4 +55,6 @@ else
 fi
 
 echo "==> Starting Gunicorn..."
-exec gunicorn config.wsgi:application --bind 0.0.0.0:8000
+# GUNICORN_WORKERS defaults to 2 to stay within memory limits on 3GB hosts.
+# Set GUNICORN_WORKERS in .env to override (e.g. 4 for hosts with more RAM).
+exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers "${GUNICORN_WORKERS:-2}"
