@@ -323,6 +323,10 @@ services:
       - groupbuy-network
     profiles:
       - proxy
+    deploy:
+      resources:
+        limits:
+          memory: 32M
 
   telegram-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/telegram-adapter:${IMAGE_TAG:-main}
