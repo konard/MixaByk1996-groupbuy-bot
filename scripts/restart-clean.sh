@@ -11,27 +11,22 @@ set -euo pipefail
 ###############################################################################
 
 COMPOSE_FILE="docker-compose.unified.yml"
-PROBLEM_SERVICES="groupbuy-analytics-service groupbuy-django-admin groupbuy-centrifugo groupbuy-websocket groupbuy-kafka groupbuy-zookeeper"
+PROBLEM_SERVICES="analytics-service django-admin centrifugo websocket-server kafka zookeeper"
 
 echo "==> Stopping all services..."
-docker compose -f "$COMPOSE_FILE" down --remove-orphans
-
 if [[ "${1:-}" == "--purge" ]]; then
   echo "==> Removing named volumes (postgres_data, redis_data, kafka_data, zookeeper_data)..."
-  for vol in postgres_data redis_data kafka_data zookeeper_data; do
-    vol_name=$(docker volume ls -q | grep "$vol" || true)
-    if [[ -n "$vol_name" ]]; then
-      docker volume rm "$vol_name" && echo "    removed $vol_name"
-    fi
-  done
+  docker compose -f "$COMPOSE_FILE" down --remove-orphans -v
+else
+  docker compose -f "$COMPOSE_FILE" down --remove-orphans
 fi
 
 echo "==> Starting all services..."
 docker compose -f "$COMPOSE_FILE" up -d
 
 echo ""
-echo "==> Waiting 10 seconds for containers to initialise..."
-sleep 10
+echo "==> Waiting 15 seconds for containers to initialise..."
+sleep 15
 
 echo ""
 echo "==> Container status:"
@@ -39,4 +34,4 @@ docker compose -f "$COMPOSE_FILE" ps
 
 echo ""
 echo "==> Tailing logs for previously-problematic services (Ctrl+C to stop)..."
-docker logs --tail 50 --follow $PROBLEM_SERVICES 2>&1
+docker compose -f "$COMPOSE_FILE" logs --tail 50 --follow $PROBLEM_SERVICES

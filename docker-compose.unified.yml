@@ -34,6 +34,16 @@ version: "3.9"
 #
 #   Or set DB_USER / DB_PASSWORD / DB_NAME in .env to match whatever was used
 #   when the volume was first created.
+#
+# Memory budget (3 GB host, ~2.5 GB reserved for containers):
+#   postgres 512M | redis 256M | zookeeper 128M | kafka 256M | centrifugo 192M
+#   django-admin 512M | core 128M | bot 96M | telegram-adapter 64M
+#   mattermost-adapter 64M | websocket-server 96M | frontend-react 64M
+#   nginx 64M | certbot 32M | gateway 32M | auth-service 64M
+#   purchase-service 64M | payment-service 32M | chat-service 32M
+#   notification-service 48M | analytics-service 256M | search-service 32M
+#   reputation-service 48M
+#   Total ≈ 2582 MB
 ##############################################################################
 
 networks:
@@ -54,7 +64,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: groupbuy-postgres
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - POSTGRES_DB=${DB_NAME:-groupbuy}
       - POSTGRES_USER=${DB_USER:-postgres}
@@ -68,7 +78,7 @@ services:
       postgres
       -c max_connections=200
       -c shared_buffers=256MB
-      -c effective_cache_size=1GB
+      -c effective_cache_size=512MB
       -c work_mem=4MB
       -c maintenance_work_mem=64MB
       -c checkpoint_completion_target=0.9
@@ -80,17 +90,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   redis:
     image: redis:7-alpine
     container_name: groupbuy-redis
-    restart: unless-stopped
+    restart: on-failure:3
     command: >
       redis-server
       --appendonly yes
       --appendfsync everysec
       --requirepass ${REDIS_PASSWORD:-redis_secret}
-      --maxmemory 512mb
+      --maxmemory 200mb
       --maxmemory-policy allkeys-lru
       --save 900 1
       --save 300 10
@@ -104,11 +118,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: groupbuy-zookeeper
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -131,7 +149,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: groupbuy-kafka
-    restart: unless-stopped
+    restart: on-failure:3
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -165,7 +183,7 @@ services:
     image: centrifugo/centrifugo:v5
     container_name: groupbuy-centrifugo
     command: centrifugo -c /centrifugo/config.json
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
     networks:
@@ -182,7 +200,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 192M
 
   # ── Main Application (from docker-compose.prod.yml) ────────────────────────
 
@@ -191,7 +209,7 @@ services:
     build:
       context: ./core
     container_name: groupbuy-django-admin
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
@@ -209,7 +227,7 @@ services:
     networks:
       - groupbuy-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/admin/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -224,7 +242,7 @@ services:
     build:
       context: ./core-rust
     container_name: groupbuy-core
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-groupbuy}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/0
@@ -245,13 +263,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   bot:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/bot:${IMAGE_TAG:-main}
     build:
       context: ./bot
     container_name: groupbuy-bot
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - CORE_API_URL=http://core:8000/api
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/1
@@ -264,11 +286,15 @@ services:
         condition: service_healthy
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 96M
 
   telegram-proxy:
     image: serjs/go-socks5-proxy:latest
     container_name: groupbuy-telegram-proxy
-    restart: unless-stopped
+    restart: on-failure:3
     networks:
       - groupbuy-network
     profiles:
@@ -279,7 +305,7 @@ services:
     build:
       context: ./adapters/telegram
     container_name: groupbuy-telegram-adapter
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
@@ -289,13 +315,17 @@ services:
       - bot
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   mattermost-adapter:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/mattermost-adapter:${IMAGE_TAG:-main}
     build:
       context: ./adapters/mattermost
     container_name: groupbuy-mattermost-adapter
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - BOT_SERVICE_URL=http://bot:8001
       - MATTERMOST_URL=${MATTERMOST_URL}
@@ -309,13 +339,17 @@ services:
       - bot
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   websocket-server:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/websocket:${IMAGE_TAG:-main}
     build:
       context: ./infrastructure/websocket
     container_name: groupbuy-websocket
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379/2
       - CORE_API_URL=http://core:8000/api
@@ -334,22 +368,30 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 96M
 
   frontend-react:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_PREFIX:-mixabyk1996/groupbuy-bot}/frontend:${IMAGE_TAG:-main}
     build:
       context: ./frontend-react
     container_name: groupbuy-frontend
-    restart: unless-stopped
+    restart: on-failure:3
     depends_on:
       - core
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   nginx:
     image: nginx:alpine
     container_name: groupbuy-nginx
-    restart: unless-stopped
+    restart: on-failure:3
     entrypoint: ["/docker-entrypoint-custom.sh"]
     ports:
       - "80:80"
@@ -371,17 +413,25 @@ services:
         condition: service_started
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   certbot:
     image: certbot/certbot:latest
     container_name: groupbuy-certbot
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - letsencrypt_data:/etc/letsencrypt
       - certbot_webroot:/var/www/certbot
     entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
     networks:
       - groupbuy-network
+    deploy:
+      resources:
+        limits:
+          memory: 32M
 
   # ── Microservices (from docker-compose.light.yml) ─────────────────────────
 
@@ -390,7 +440,7 @@ services:
     build:
       context: ./services/gateway
     container_name: groupbuy-gateway
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "3000:3000"
     environment:
@@ -424,7 +474,7 @@ services:
     build:
       context: ./services/auth-service
     container_name: groupbuy-auth-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4001
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/auth_db
@@ -451,7 +501,7 @@ services:
     build:
       context: ./services/purchase-service
     container_name: groupbuy-purchase-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4002
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/purchase_db
@@ -475,7 +525,7 @@ services:
     build:
       context: ./services/payment-service
     container_name: groupbuy-payment-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4003
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/payment_db
@@ -500,7 +550,7 @@ services:
     build:
       context: ./services/chat-service
     container_name: groupbuy-chat-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4004
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/chat_db
@@ -524,7 +574,7 @@ services:
     build:
       context: ./services/notification-service
     container_name: groupbuy-notification-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4005
       KAFKA_BROKERS: kafka:9092
@@ -557,7 +607,7 @@ services:
     build:
       context: ./services/analytics-service
     container_name: groupbuy-analytics-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4006
       KAFKA_BROKERS: kafka:9092
@@ -587,7 +637,7 @@ services:
     build:
       context: ./services/search-service
     container_name: groupbuy-search-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4007
       ELASTICSEARCH_URL: ""
@@ -610,7 +660,7 @@ services:
     build:
       context: ./services/reputation-service
     container_name: groupbuy-reputation-service
-    restart: unless-stopped
+    restart: on-failure:3
     environment:
       PORT: 4008
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/reputation_db
