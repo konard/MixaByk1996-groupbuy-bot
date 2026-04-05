@@ -58,9 +58,9 @@ class User(models.Model):
         db_table = 'users'
         unique_together = ['platform', 'platform_user_id']
         indexes = [
-            models.Index(fields=['platform', 'platform_user_id']),
-            models.Index(fields=['role']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=['platform', 'platform_user_id'], name='users_platfor_c3e4f9_idx'),
+            models.Index(fields=['role'], name='users_role_7f85d1_idx'),
+            models.Index(fields=['created_at'], name='users_created_d5e9f8_idx'),
         ]
         verbose_name = 'User'
         verbose_name_plural = 'Users'
@@ -97,7 +97,7 @@ class UserSession(models.Model):
     class Meta:
         db_table = 'user_sessions'
         indexes = [
-            models.Index(fields=['user', 'dialog_type']),
+            models.Index(fields=['user', 'dialog_type'], name='user_sessio_user_id_1a2b3c_idx'),
         ]
 
     def __str__(self):
