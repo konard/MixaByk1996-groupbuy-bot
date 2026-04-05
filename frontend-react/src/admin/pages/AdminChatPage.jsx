@@ -106,12 +106,42 @@ export default function AdminChatPage() {
     if (!selectedUser) return;
     loadMessages(selectedUser.id);
 
-    // Poll for new messages every 5 seconds
-    pollRef.current = setInterval(() => {
-      loadMessages(selectedUser.id);
-    }, 5000);
+    // Poll for new messages every 30 seconds, only when the tab is visible
+    const POLL_INTERVAL = 30_000;
 
-    return () => clearInterval(pollRef.current);
+    const startPolling = () => {
+      if (!pollRef.current) {
+        pollRef.current = setInterval(() => {
+          if (!document.hidden) {
+            loadMessages(selectedUser.id);
+          }
+        }, POLL_INTERVAL);
+      }
+    };
+
+    const stopPolling = () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        loadMessages(selectedUser.id);
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [selectedUser, loadMessages]);
 
   useEffect(() => {

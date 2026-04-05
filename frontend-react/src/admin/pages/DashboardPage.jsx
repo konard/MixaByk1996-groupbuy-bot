@@ -32,6 +32,44 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardStats();
+
+    // Refresh every 30 seconds, but only when the tab is visible
+    const REFRESH_INTERVAL = 30_000;
+    let intervalId = null;
+
+    const startPolling = () => {
+      if (!intervalId) {
+        intervalId = setInterval(() => {
+          if (!document.hidden) {
+            loadDashboardStats();
+          }
+        }, REFRESH_INTERVAL);
+      }
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        loadDashboardStats();
+        startPolling();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [loadDashboardStats]);
 
   if (isLoading && !dashboardStats) {
