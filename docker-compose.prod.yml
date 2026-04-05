@@ -46,6 +46,14 @@ services:
       # Use http://<SERVER_IP> or http://localhost:PORT as appropriate.
       # Set CORS_ALLOWED_ORIGINS=* only for local development.
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
+      # CSRF trusted origins must include the scheme+host used by browsers to
+      # reach the admin panel.  Without this, Django's CSRF middleware rejects
+      # POST login requests with 403, preventing admin login even with valid
+      # credentials.  Set CSRF_TRUSTED_ORIGINS in .env to override.
+      # Examples:
+      #   With domain:   CSRF_TRUSTED_ORIGINS=https://your-domain.com
+      #   With IP only:  CSRF_TRUSTED_ORIGINS=http://95.81.123.52
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-http://localhost,http://${EXTERNAL_IP:-}}
       # Auto-superuser creation: set a password to enable, leave empty to skip.
       - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
