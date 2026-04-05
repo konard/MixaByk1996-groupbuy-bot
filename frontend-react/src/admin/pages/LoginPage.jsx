@@ -1,6 +1,6 @@
 /**
  * Admin Login Page
- * Uses browser prompt dialogs for credential input
+ * Uses a standard HTML form for credential input
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,38 +10,23 @@ import '../styles/admin.css';
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, checkAuth, isLoading, error, clearError } = useAdminStore();
-  const [prompted, setPrompted] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
-    // Check if already authenticated
     checkAuth().then((isAuth) => {
       if (isAuth) {
         navigate('/admin-panel');
-      } else if (!prompted) {
-        setPrompted(true);
-        handlePromptLogin();
       }
     });
   }, []);
 
-  const handlePromptLogin = async () => {
-    const username = window.prompt('GroupBuy Admin\n\nВведите имя пользователя:');
-    if (username === null) return; // user cancelled
-
-    const password = window.prompt('GroupBuy Admin\n\nВведите пароль:');
-    if (password === null) return; // user cancelled
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     clearError();
     const success = await login(username, password);
     if (success) {
       navigate('/admin-panel');
-    } else {
-      const retry = window.confirm(
-        'Ошибка входа. Неверные учётные данные или недостаточно прав.\n\nПопробовать снова?'
-      );
-      if (retry) {
-        handlePromptLogin();
-      }
     }
   };
 
@@ -53,23 +38,41 @@ export default function LoginPage() {
 
         {error && <div className="admin-login-error">{error}</div>}
 
-        {isLoading ? (
-          <div className="admin-login-loading">
-            <div className="admin-login-spinner" />
-            <p>Выполняется вход...</p>
-          </div>
-        ) : (
-          <div className="admin-login-prompt-info">
-            <p>Для входа используйте всплывающие окна браузера.</p>
-            <button
-              className="admin-login-btn"
-              onClick={handlePromptLogin}
+        <form className="admin-login-form" onSubmit={handleSubmit}>
+          <div className="admin-form-group">
+            <label htmlFor="admin-username">Имя пользователя</label>
+            <input
+              id="admin-username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              required
               disabled={isLoading}
-            >
-              Войти
-            </button>
+            />
           </div>
-        )}
+
+          <div className="admin-form-group">
+            <label htmlFor="admin-password">Пароль</label>
+            <input
+              id="admin-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+              disabled={isLoading}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="admin-login-btn"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Вход...' : 'Войти'}
+          </button>
+        </form>
 
         <div className="admin-login-footer">
           <details className="admin-login-help">

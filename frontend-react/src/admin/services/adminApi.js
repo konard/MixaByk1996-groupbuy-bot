@@ -37,9 +37,13 @@ async function request(endpoint, options = {}) {
   });
 
   if (response.status === 401) {
-    // Redirect to admin login if unauthorized
-    window.location.href = '/admin-panel/login';
-    throw new Error('Unauthorized');
+    const error = await response.json().catch(() => ({}));
+    // Only redirect to login when not already on the auth endpoint
+    // (avoids redirect loop when login credentials are wrong)
+    if (endpoint !== '/auth/') {
+      window.location.href = '/admin-panel/login';
+    }
+    throw new Error(error.detail || 'Unauthorized');
   }
 
   if (!response.ok) {
