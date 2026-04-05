@@ -31,6 +31,9 @@ function makePurchase(overrides: Partial<Purchase> = {}): Purchase {
     targetAmount: null,
     currency: 'RUB',
     category: null,
+    commissionPercent: 0,
+    escrowRequired: false,
+    escrowThreshold: 1000000,
     deadlineAt: null,
     closedAt: null,
     metadata: {},
@@ -52,6 +55,10 @@ function makeSession(overrides: Partial<VotingSession> = {}): VotingSession {
     allowAddCandidates: true,
     allowChangeVote: true,
     minVotesToClose: 1,
+    votingDuration: 24,
+    votingEndsAt: null,
+    tieBreaker: null,
+    candidateDeadline: null,
     winnerCandidateId: null,
     candidates: [],
     votes: [],
@@ -104,6 +111,11 @@ function mockRepo<T>() {
     create: jest.fn((dto: any) => dto),
     save: jest.fn((entity: any) => Promise.resolve({ ...entity, id: entity.id || 'new-id' })),
     update: jest.fn().mockResolvedValue(undefined),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getCount: jest.fn().mockResolvedValue(0),
+    })),
   };
 }
 
@@ -375,7 +387,7 @@ describe('VotingService', () => {
       expect(result.changedCount).toBe(3);
     });
 
-    it('throws BadRequestException when voting for same candidate twice', async () => {
+    it('returns existing vote idempotently when voting for same candidate twice', async () => {
       const session = makeSession({ allowChangeVote: true });
       const candidate = makeCandidate({ id: 'candidate-1' });
       const existingVote = makeVote({ candidateId: 'candidate-1' });
@@ -384,9 +396,12 @@ describe('VotingService', () => {
       candidateRepo.findOne.mockResolvedValue(candidate);
       dataSource._manager.findOne.mockResolvedValue(existingVote);
 
-      await expect(
-        service.castVote('session-1', 'user-1', { candidateId: 'candidate-1' })
-      ).rejects.toThrow(BadRequestException);
+      // Service returns existing vote idempotently (no error)
+      const result = await service.castVote('session-1', 'user-1', { candidateId: 'candidate-1' });
+      expect(result.candidateId).toBe('candidate-1');
+      expect(result.userId).toBe('user-1');
+      // No Kafka event should be emitted for idempotent re-vote
+      expect(kafkaProducer.send).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException when changing vote is disallowed', async () => {

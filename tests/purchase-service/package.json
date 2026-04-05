@@ -31,7 +31,18 @@
     },
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^../../services/purchase-service/src/(.*)$": "<rootDir>/../../services/purchase-service/src/$1"
+      "^../../services/purchase-service/src/(.*)$": "<rootDir>/../../services/purchase-service/src/$1",
+      "^typeorm$": "<rootDir>/node_modules/typeorm",
+      "^@nestjs/common$": "<rootDir>/node_modules/@nestjs/common",
+      "^@nestjs/common/(.*)$": "<rootDir>/node_modules/@nestjs/common/$1",
+      "^@nestjs/core$": "<rootDir>/node_modules/@nestjs/core",
+      "^@nestjs/core/(.*)$": "<rootDir>/node_modules/@nestjs/core/$1",
+      "^@nestjs/typeorm$": "<rootDir>/node_modules/@nestjs/typeorm",
+      "^@nestjs/typeorm/(.*)$": "<rootDir>/node_modules/@nestjs/typeorm/$1",
+      "^@nestjs/schedule$": "<rootDir>/node_modules/@nestjs/schedule",
+      "^@nestjs/schedule/(.*)$": "<rootDir>/node_modules/@nestjs/schedule/$1",
+      "^@nestjs/testing$": "<rootDir>/node_modules/@nestjs/testing",
+      "^@nestjs/testing/(.*)$": "<rootDir>/node_modules/@nestjs/testing/$1"
     }
   }
 }
