@@ -72,6 +72,12 @@ class TelegramAdapter:
 
         use_builtin = os.getenv("TELEGRAM_USE_PROXY", "").strip().lower()
         if use_builtin in ("true", "1", "yes"):
+            logger.warning(
+                "TELEGRAM_USE_PROXY=true: using built-in SOCKS5 proxy at "
+                "socks5://telegram-proxy:1080.  Make sure the 'proxy' Docker "
+                "Compose profile is active (--profile proxy), otherwise the "
+                "telegram-adapter will fail to connect."
+            )
             return "socks5://telegram-proxy:1080"
 
         return ""

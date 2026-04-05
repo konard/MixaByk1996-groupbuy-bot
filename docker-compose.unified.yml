@@ -316,6 +316,12 @@ services:
           memory: 256M
 
   telegram-proxy:
+    # IMPORTANT: This service only starts when the "proxy" profile is active.
+    # To use the built-in SOCKS5 proxy for Telegram, start with:
+    #   docker compose -f docker-compose.unified.yml --profile proxy up -d
+    # AND set TELEGRAM_USE_PROXY=true in your .env file.
+    # Do NOT set TELEGRAM_USE_PROXY=true without enabling this profile —
+    # the telegram-adapter will fail to connect to telegram-proxy:1080.
     image: serjs/go-socks5-proxy:latest
     container_name: groupbuy-telegram-proxy
     restart: on-failure:3
@@ -415,6 +421,12 @@ services:
       - core
     networks:
       - groupbuy-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -440,9 +452,9 @@ services:
       django-admin:
         condition: service_started
       websocket-server:
-        condition: service_started
+        condition: service_healthy
       frontend-react:
-        condition: service_started
+        condition: service_healthy
     networks:
       - groupbuy-network
     deploy:
