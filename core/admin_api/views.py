@@ -171,7 +171,11 @@ class DashboardView(APIView):
         }
 
         serializer = DashboardStatsSerializer(stats)
-        return Response(serializer.data)
+        response = Response(serializer.data)
+        # Allow private caching for 30 seconds to reduce DB load when the
+        # frontend polls; cache is private so only the user's browser caches it.
+        response['Cache-Control'] = 'private, max-age=30'
+        return response
 
 
 class AnalyticsView(APIView):
