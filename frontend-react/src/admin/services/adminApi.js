@@ -148,6 +148,7 @@ export const adminApi = {
     const query = buildQuery(params);
     return request(`/transactions/?${query}`);
   },
+  getTransaction: (id) => request(`/transactions/${id}/`),
 
   // Categories
   getCategories: () => request('/categories/'),

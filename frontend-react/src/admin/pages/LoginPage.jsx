@@ -19,7 +19,7 @@ export default function LoginPage() {
         navigate('/admin-panel');
       }
     });
-  }, []);
+  }, [checkAuth, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

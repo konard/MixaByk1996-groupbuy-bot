@@ -40,39 +40,17 @@ export default function ComplaintsPage() {
   const getCsrfToken = () =>
     document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/)?.[1] || '';
 
-  const loadComplaints = useCallback(async (params = {}) => {
+  const loadComplaints = useCallback(async (/* params = {} */) => {
     setLoading(true);
-    try {
-      const query = new URLSearchParams(
-        Object.fromEntries(
-          Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
-        )
-      ).toString();
-      const response = await fetch(`/api/admin/complaints/?${query}`, {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setComplaints(response.results || response);
-      setPagination({
-        count: response.count || 0,
-        next: response.next,
-        previous: response.previous,
-      });
-    } catch {
-      addToast('Ошибка загрузки жалоб', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
+    // Complaints/arbitration backend is not yet implemented.
+    // The /api/admin/complaints/ endpoint does not exist.
+    setComplaints([]);
+    setPagination({ count: 0, next: null, previous: null });
+    setLoading(false);
+  }, []);
 
   const loadStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/complaints/stats/', {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setStats(response);
-    } catch {
-      // Stats loading is non-critical
-    }
+    // Complaints stats endpoint is not yet implemented.
   }, []);
 
   useEffect(() => {
@@ -99,42 +77,17 @@ export default function ComplaintsPage() {
   };
 
   const handleViewDetail = async (complaint) => {
-    try {
-      const response = await fetch(`/api/admin/complaints/${complaint.id}/`, {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setDetailModal(response);
-    } catch {
-      addToast('Ошибка загрузки деталей жалобы', 'error');
-    }
+    // Complaints detail endpoint is not yet implemented.
+    setDetailModal(complaint);
   };
 
   const handleResolveSubmit = async (e) => {
     e.preventDefault();
-    if (!resolveModal || !resolveAction) return;
-    try {
-      await fetch(`/api/admin/complaints/${resolveModal.id}/resolve/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCsrfToken(),
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          action: resolveAction,
-          comment: resolveComment,
-        }),
-      });
-      addToast('Жалоба обработана', 'success');
-      setResolveModal(null);
-      setResolveAction('');
-      setResolveComment('');
-      setDetailModal(null);
-      loadComplaints({ ...filters, page });
-      loadStats();
-    } catch {
-      addToast('Ошибка обработки жалобы', 'error');
-    }
+    // Complaints resolve endpoint is not yet implemented.
+    addToast('Функция в разработке', 'info');
+    setResolveModal(null);
+    setResolveAction('');
+    setResolveComment('');
   };
 
   const columns = [
@@ -265,6 +218,10 @@ export default function ComplaintsPage() {
       <div className="admin-page">
         <div className="admin-page-header">
           <h1 className="admin-page-title">Жалобы и арбитраж</h1>
+        </div>
+
+        <div className="admin-notice" style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#713f12' }}>
+          Раздел в разработке. Функциональность жалоб и арбитража будет доступна в следующей версии.
         </div>
 
         <div className="admin-stats-grid">

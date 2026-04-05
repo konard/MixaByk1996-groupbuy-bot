@@ -307,6 +307,69 @@ class AdminProcurementManagementTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['is_featured'])
 
+    def test_procurement_serializer_includes_participant_count_and_progress(self):
+        """Regression test: participant_count and progress must be serialized from model properties."""
+        self.client.login(username='admin', password='adminpass123')
+
+        url = f'/api/admin/procurements/{self.procurement.id}/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # participant_count and progress come from @property on Procurement model
+        self.assertIn('participant_count', response.data)
+        self.assertIn('progress', response.data)
+        self.assertIsInstance(response.data['participant_count'], int)
+        self.assertIsInstance(response.data['progress'], int)
+        self.assertEqual(response.data['participant_count'], 0)
+        self.assertEqual(response.data['progress'], 0)
+
+
+class AdminTransactionViewTests(APITestCase):
+    """Tests for Admin transaction viewing endpoints"""
+
+    def setUp(self):
+        """Set up test data"""
+        self.admin_user = DjangoUser.objects.create_user(
+            username='admin',
+            password='adminpass123',
+            is_staff=True
+        )
+        from users.models import User
+        from payments.models import Transaction
+
+        self.user = User.objects.create(
+            platform='telegram',
+            platform_user_id='123',
+            first_name='Test',
+            role='buyer'
+        )
+        self.transaction = Transaction.objects.create(
+            user=self.user,
+            transaction_type='bonus',
+            amount=500,
+            balance_after=500,
+            description='Test transaction'
+        )
+
+    def test_list_transactions(self):
+        """Test listing transactions"""
+        self.client.login(username='admin', password='adminpass123')
+
+        url = '/api/admin/transactions/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_transaction_by_id(self):
+        """Test getting a single transaction by ID."""
+        self.client.login(username='admin', password='adminpass123')
+
+        url = f'/api/admin/transactions/{self.transaction.id}/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.transaction.id)
+        self.assertEqual(response.data['transaction_type'], 'bonus')
+        self.assertIn('user_name', response.data)
+
 
 class AdminPaymentViewTests(APITestCase):
     """Tests for Admin payment viewing endpoints"""

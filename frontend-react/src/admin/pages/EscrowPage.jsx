@@ -36,39 +36,17 @@ export default function EscrowPage() {
   const getCsrfToken = () =>
     document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/)?.[1] || '';
 
-  const loadEscrows = useCallback(async (params = {}) => {
+  const loadEscrows = useCallback(async (/* params = {} */) => {
     setLoading(true);
-    try {
-      const query = new URLSearchParams(
-        Object.fromEntries(
-          Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
-        )
-      ).toString();
-      const response = await fetch(`/api/admin/escrow/?${query}`, {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setEscrows(response.results || response);
-      setPagination({
-        count: response.count || 0,
-        next: response.next,
-        previous: response.previous,
-      });
-    } catch {
-      addToast('Ошибка загрузки эскроу-счетов', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
+    // Escrow backend is not yet implemented.
+    // The /api/admin/escrow/ endpoint does not exist.
+    setEscrows([]);
+    setPagination({ count: 0, next: null, previous: null });
+    setLoading(false);
+  }, []);
 
   const loadStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/escrow/stats/', {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setStats(response);
-    } catch {
-      // Stats loading is non-critical
-    }
+    // Escrow stats endpoint is not yet implemented.
   }, []);
 
   useEffect(() => {
@@ -95,37 +73,14 @@ export default function EscrowPage() {
   };
 
   const handleViewDetail = async (escrow) => {
-    try {
-      const response = await fetch(`/api/admin/escrow/${escrow.id}/`, {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setDetailModal(response);
-    } catch {
-      addToast('Ошибка загрузки деталей эскроу', 'error');
-    }
+    // Escrow detail endpoint is not yet implemented.
+    setDetailModal(escrow);
   };
 
-  const handleForceAction = async (escrowId, action) => {
-    try {
-      await fetch(`/api/admin/escrow/${escrowId}/${action}/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCsrfToken(),
-        },
-        credentials: 'include',
-      });
-      addToast(
-        action === 'force_release' ? 'Средства выпущены' : 'Средства возвращены',
-        'success'
-      );
-      setConfirmAction(null);
-      setDetailModal(null);
-      loadEscrows({ ...filters, page });
-      loadStats();
-    } catch {
-      addToast('Ошибка выполнения действия', 'error');
-    }
+  const handleForceAction = async (/* escrowId, action */) => {
+    // Escrow force action endpoints are not yet implemented.
+    addToast('Функция в разработке', 'info');
+    setConfirmAction(null);
   };
 
   const columns = [
@@ -275,6 +230,10 @@ export default function EscrowPage() {
       <div className="admin-page">
         <div className="admin-page-header">
           <h1 className="admin-page-title">Эскроу-счета</h1>
+        </div>
+
+        <div className="admin-notice" style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#713f12' }}>
+          Раздел в разработке. Функциональность эскроу-счетов будет доступна в следующей версии.
         </div>
 
         <div className="admin-stats-grid">

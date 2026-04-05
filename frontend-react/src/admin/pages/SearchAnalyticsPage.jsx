@@ -26,39 +26,21 @@ export default function SearchAnalyticsPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [period, setPeriod] = useState('7d');
 
-  const getCsrfToken = () =>
-    document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/)?.[1] || '';
-
   const loadAnalytics = useCallback(async () => {
     setLoading(true);
-    try {
-      const [statsRes, termsRes, volumeRes, healthRes] = await Promise.all([
-        fetch(`/api/admin/search-analytics/stats/?period=${period}`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`/api/admin/search-analytics/popular/?period=${period}`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`/api/admin/search-analytics/volume/?period=${period}`, { credentials: 'include' }).then((r) => r.json()),
-        fetch('/api/admin/search-analytics/health/', { credentials: 'include' }).then((r) => r.json()),
-      ]);
-      setStats(statsRes);
-      setPopularTerms(termsRes.results || termsRes);
-      setVolumeData(volumeRes.results || volumeRes);
-      setIndexHealth(healthRes.indices || healthRes);
-    } catch {
-      addToast('Ошибка загрузки аналитики поиска', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast, period]);
+    // Search analytics backend is not yet implemented.
+    // The /api/admin/search-analytics/ endpoints do not exist.
+    setStats({ total_queries: 0, avg_latency_ms: 0, queries_today: 0, unique_users: 0 });
+    setPopularTerms([]);
+    setVolumeData([]);
+    setIndexHealth([]);
+    setLoading(false);
+  }, []);
 
   const loadSavedFilters = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/search-analytics/saved-filters/', {
-        credentials: 'include',
-      }).then((r) => r.json());
-      setSavedFilters(response.results || response);
-    } catch {
-      addToast('Ошибка загрузки сохраненных фильтров', 'error');
-    }
-  }, [addToast]);
+    // Saved filters endpoint is not yet implemented.
+    setSavedFilters([]);
+  }, []);
 
   useEffect(() => {
     loadAnalytics();
@@ -70,18 +52,9 @@ export default function SearchAnalyticsPage() {
     }
   }, [activeTab, loadSavedFilters]);
 
-  const handleDeleteFilter = async (filterId) => {
-    try {
-      await fetch(`/api/admin/search-analytics/saved-filters/${filterId}/`, {
-        method: 'DELETE',
-        headers: { 'X-CSRFToken': getCsrfToken() },
-        credentials: 'include',
-      });
-      addToast('Фильтр удален', 'success');
-      loadSavedFilters();
-    } catch {
-      addToast('Ошибка удаления фильтра', 'error');
-    }
+  const handleDeleteFilter = async (/* filterId */) => {
+    // Saved filters delete endpoint is not yet implemented.
+    addToast('Функция в разработке', 'info');
   };
 
   const popularTermColumns = [
@@ -203,6 +176,10 @@ export default function SearchAnalyticsPage() {
               <option value="90d">90 дней</option>
             </select>
           </div>
+        </div>
+
+        <div className="admin-notice" style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#713f12' }}>
+          Раздел в разработке. Аналитика поиска будет доступна в следующей версии.
         </div>
 
         <div className="admin-stats-grid">
