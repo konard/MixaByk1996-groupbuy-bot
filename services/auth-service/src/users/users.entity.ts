@@ -28,10 +28,10 @@ export class User {
   @Column({ name: 'password_hash', length: 255 })
   passwordHash: string;
 
-  @Column({ name: 'first_name', length: 100, nullable: true })
+  @Column({ name: 'first_name', type: 'varchar', length: 100, nullable: true })
   firstName: string | null;
 
-  @Column({ name: 'last_name', length: 100, nullable: true })
+  @Column({ name: 'last_name', type: 'varchar', length: 100, nullable: true })
   lastName: string | null;
 
   @Column({
@@ -47,10 +47,10 @@ export class User {
   @Column({ name: 'is_email_verified', default: false })
   isEmailVerified: boolean;
 
-  @Column({ name: 'refresh_token_hash', nullable: true })
+  @Column({ name: 'refresh_token_hash', type: 'varchar', nullable: true })
   refreshTokenHash: string | null;
 
-  @Column({ name: 'two_factor_secret', length: 255, nullable: true })
+  @Column({ name: 'two_factor_secret', type: 'varchar', length: 255, nullable: true })
   twoFactorSecret: string | null;
 
   @Column({ name: 'two_factor_enabled', default: false })
