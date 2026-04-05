@@ -92,7 +92,7 @@ export class Candidate {
   @Column({ name: 'supplier_name', length: 500 })
   supplierName: string;
 
-  @Column({ length: 1000, nullable: true })
+  @Column({ type: 'varchar', length: 1000, nullable: true })
   description: string | null;
 
   @Column({ name: 'price_per_unit', type: 'numeric', precision: 18, scale: 2, nullable: true })
