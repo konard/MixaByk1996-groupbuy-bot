@@ -55,6 +55,7 @@ export class PurchasesService {
   private async checkOrganizerQuota(organizerId: string): Promise<void> {
     const activeStatuses = [
       PurchaseStatus.DRAFT,
+      PurchaseStatus.ACTIVE,
       PurchaseStatus.VOTING,
       PurchaseStatus.APPROVED,
       PurchaseStatus.PAYMENT_PENDING,
@@ -99,7 +100,7 @@ export class PurchasesService {
       commissionPercent,
       escrowRequired,
       escrowThreshold,
-      status: PurchaseStatus.DRAFT,
+      status: PurchaseStatus.ACTIVE,
     });
     const saved = await this.purchaseRepo.save(purchase);
 
@@ -141,8 +142,8 @@ export class PurchasesService {
     if (purchase.organizerId !== requesterId) {
       throw new ForbiddenException('Only the organizer can update this purchase');
     }
-    if (purchase.status !== PurchaseStatus.DRAFT) {
-      throw new BadRequestException('Can only update draft purchases');
+    if (purchase.status !== PurchaseStatus.DRAFT && purchase.status !== PurchaseStatus.ACTIVE) {
+      throw new BadRequestException('Can only update draft or active purchases');
     }
 
     if (updates.commissionPercent != null) {

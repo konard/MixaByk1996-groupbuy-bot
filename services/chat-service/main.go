@@ -211,6 +211,61 @@ func (s *Server) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
+// InviteParticipant allows the room creator to invite another user to the room.
+func (s *Server) InviteParticipant(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	roomID := vars["roomId"]
+	requesterID := r.Header.Get("X-User-ID")
+	if requesterID == "" {
+		writeError(w, http.StatusBadRequest, "X-User-ID required")
+		return
+	}
+
+	var req struct {
+		UserID string `json:"user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if req.UserID == "" {
+		writeError(w, http.StatusBadRequest, "user_id is required")
+		return
+	}
+
+	// Only the room creator can invite participants
+	var createdBy string
+	row := s.db.QueryRow(r.Context(), `SELECT created_by FROM rooms WHERE id = $1`, roomID)
+	if err := row.Scan(&createdBy); err != nil {
+		writeError(w, http.StatusNotFound, "room not found")
+		return
+	}
+	if createdBy != requesterID {
+		writeError(w, http.StatusForbidden, "only the room creator can invite participants")
+		return
+	}
+
+	_, err := s.db.Exec(r.Context(),
+		`INSERT INTO room_members (room_id, user_id, joined_at)
+		 VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`,
+		roomID, req.UserID,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to invite participant")
+		return
+	}
+
+	channel := "chat:" + roomID
+	s.centrifugoPublish(channel, map[string]any{
+		"type":        "user_invited",
+		"userId":      req.UserID,
+		"invitedBy":   requesterID,
+		"roomId":      roomID,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
 // SendMessage saves message to ClickHouse and publishes to Centrifugo.
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -404,6 +459,7 @@ func main() {
 	r.HandleFunc("/rooms", srv.CreateRoom).Methods(http.MethodPost)
 	r.HandleFunc("/rooms/{roomId}", srv.GetRoom).Methods(http.MethodGet)
 	r.HandleFunc("/rooms/{roomId}/join", srv.JoinRoom).Methods(http.MethodPost)
+	r.HandleFunc("/rooms/{roomId}/invite", srv.InviteParticipant).Methods(http.MethodPost)
 	r.HandleFunc("/rooms/{roomId}/messages", srv.SendMessage).Methods(http.MethodPost)
 	r.HandleFunc("/rooms/{roomId}/history", srv.GetHistory).Methods(http.MethodGet)
 

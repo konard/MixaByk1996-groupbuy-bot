@@ -59,8 +59,8 @@ export class VotingService {
       where: { id: dto.purchaseId },
     });
     if (!purchase) throw new NotFoundException('Purchase not found');
-    if (purchase.status !== PurchaseStatus.DRAFT) {
-      throw new BadRequestException('Voting can only be started for draft purchases');
+    if (purchase.status !== PurchaseStatus.DRAFT && purchase.status !== PurchaseStatus.ACTIVE) {
+      throw new BadRequestException('Voting can only be started for draft or active purchases');
     }
 
     if (dto.closesAt <= new Date()) {
