@@ -38,8 +38,8 @@ class Message(models.Model):
     class Meta:
         db_table = 'chat_messages'
         indexes = [
-            models.Index(fields=['procurement', 'created_at']),
-            models.Index(fields=['user']),
+            models.Index(fields=['procurement', 'created_at'], name='chat_messa_procure_a1b2c3_idx'),
+            models.Index(fields=['user'], name='chat_messa_user_id_d4e5f6_idx'),
         ]
         ordering = ['created_at']
 
@@ -90,8 +90,8 @@ class Notification(models.Model):
     class Meta:
         db_table = 'notifications'
         indexes = [
-            models.Index(fields=['user', 'is_read']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=['user', 'is_read'], name='notificati_user_id_g7h8i9_idx'),
+            models.Index(fields=['created_at'], name='notificati_created_j0k1l2_idx'),
         ]
         ordering = ['-created_at']
 
