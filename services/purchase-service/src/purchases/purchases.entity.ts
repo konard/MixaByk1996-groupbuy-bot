@@ -10,6 +10,7 @@ import { VotingSession } from '../voting/voting.entity';
 
 export enum PurchaseStatus {
   DRAFT = 'draft',
+  ACTIVE = 'active',
   VOTING = 'voting',
   APPROVED = 'approved',
   PAYMENT_PENDING = 'payment_pending',
@@ -35,7 +36,7 @@ export class Purchase {
   @Column({
     type: 'enum',
     enum: PurchaseStatus,
-    default: PurchaseStatus.DRAFT,
+    default: PurchaseStatus.ACTIVE,
   })
   status: PurchaseStatus;
 
