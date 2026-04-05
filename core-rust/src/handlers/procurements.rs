@@ -90,11 +90,15 @@ pub async fn create_procurement(
     let unit = data.unit.unwrap_or_else(|| "units".to_string());
     let status = data.status.unwrap_or_else(|| "draft".to_string());
     let image_url = data.image_url.unwrap_or_default();
+    let commission_percent = data
+        .commission_percent
+        .unwrap_or_else(|| rust_decimal::Decimal::ZERO);
 
     match sqlx::query_as::<_, Procurement>(
         r#"INSERT INTO procurements (title, description, category_id, organizer_id, city, delivery_address,
-            target_amount, stop_at_amount, unit, price_per_unit, status, deadline, payment_deadline, image_url)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            target_amount, stop_at_amount, unit, price_per_unit, status, commission_percent, min_quantity,
+            deadline, payment_deadline, image_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
            RETURNING *"#,
     )
     .bind(&data.title)
@@ -108,6 +112,8 @@ pub async fn create_procurement(
     .bind(&unit)
     .bind(data.price_per_unit)
     .bind(&status)
+    .bind(commission_percent)
+    .bind(data.min_quantity)
     .bind(data.deadline)
     .bind(data.payment_deadline)
     .bind(&image_url)
