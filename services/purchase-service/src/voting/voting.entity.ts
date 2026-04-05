@@ -98,10 +98,10 @@ export class Candidate {
   @Column({ name: 'price_per_unit', type: 'numeric', precision: 18, scale: 2, nullable: true })
   pricePerUnit: number | null;
 
-  @Column({ name: 'unit', length: 50, nullable: true })
+  @Column({ name: 'unit', type: 'varchar', length: 50, nullable: true })
   unit: string | null;
 
-  @Column({ name: 'supplier_url', length: 2048, nullable: true })
+  @Column({ name: 'supplier_url', type: 'varchar', length: 2048, nullable: true })
   supplierUrl: string | null;
 
   @Column({ name: 'proposed_by', type: 'uuid' })
