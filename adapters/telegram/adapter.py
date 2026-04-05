@@ -6,8 +6,10 @@ Handles Telegram-specific message routing and formatting
 import asyncio
 import logging
 import os
+import socket
 from datetime import datetime
 from typing import Dict, Any, Optional
+from urllib.parse import urlparse
 
 import aiohttp
 from aiogram import Bot, Dispatcher, types
@@ -57,6 +59,19 @@ class TelegramAdapter:
         self._register_handlers()
 
     @staticmethod
+    def _check_proxy_reachable(proxy_url: str) -> bool:
+        """Check if the proxy host is reachable via DNS lookup."""
+        try:
+            parsed = urlparse(proxy_url)
+            host = parsed.hostname or ""
+            port = parsed.port or 1080
+            socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+            return True
+        except (socket.gaierror, OSError) as exc:
+            logger.warning("Proxy %s is not reachable: %s", proxy_url, exc)
+            return False
+
+    @staticmethod
     def _resolve_proxy_url() -> str:
         """Determine proxy URL from environment variables.
 
@@ -65,6 +80,9 @@ class TelegramAdapter:
         2. TELEGRAM_USE_PROXY=true — use the built-in Docker SOCKS5 proxy
            at socks5://telegram-proxy:1080
         3. Empty string — direct connection
+
+        If the resolved proxy is not reachable (DNS lookup fails), falls back
+        to a direct connection so the adapter can still start.
         """
         explicit = os.getenv("TELEGRAM_PROXY_URL", "").strip()
         if explicit:
@@ -72,13 +90,20 @@ class TelegramAdapter:
 
         use_builtin = os.getenv("TELEGRAM_USE_PROXY", "").strip().lower()
         if use_builtin in ("true", "1", "yes"):
+            proxy = "socks5://telegram-proxy:1080"
+            if TelegramAdapter._check_proxy_reachable(proxy):
+                logger.info(
+                    "TELEGRAM_USE_PROXY=true: using built-in SOCKS5 proxy at %s",
+                    proxy,
+                )
+                return proxy
             logger.warning(
-                "TELEGRAM_USE_PROXY=true: using built-in SOCKS5 proxy at "
-                "socks5://telegram-proxy:1080.  Make sure the 'proxy' Docker "
-                "Compose profile is active (--profile proxy), otherwise the "
-                "telegram-adapter will fail to connect."
+                "TELEGRAM_USE_PROXY=true but the proxy at %s is not reachable. "
+                "Make sure the 'proxy' Docker Compose profile is active "
+                "(--profile proxy). Falling back to direct connection.",
+                proxy,
             )
-            return "socks5://telegram-proxy:1080"
+            return ""
 
         return ""
 

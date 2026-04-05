@@ -16,6 +16,9 @@
 
 set -e
 
+echo "==> Generating any pending model migrations..."
+python manage.py makemigrations --noinput
+
 echo "==> Running Django migrations..."
 # --fake-initial records already-applied initial migrations as done without
 # re-executing them.  This prevents "relation '...' already exists" crashes

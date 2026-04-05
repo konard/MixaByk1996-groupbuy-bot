@@ -51,7 +51,7 @@ export class Purchase {
   @Column({ name: 'currency', length: 3, default: 'RUB' })
   currency: string;
 
-  @Column({ name: 'category', length: 100, nullable: true })
+  @Column({ name: 'category', type: 'varchar', length: 100, nullable: true })
   category: string | null;
 
   @Column({ name: 'commission_percent', type: 'numeric', precision: 4, scale: 1, default: 0 })
