@@ -88,12 +88,12 @@ class Procurement(models.Model):
     class Meta:
         db_table = 'procurements'
         indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['organizer']),
-            models.Index(fields=['category']),
-            models.Index(fields=['city']),
-            models.Index(fields=['deadline']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=['status'], name='procurement_status_a1b2c3_idx'),
+            models.Index(fields=['organizer'], name='procurement_organiz_d4e5f6_idx'),
+            models.Index(fields=['category'], name='procurement_categor_g7h8i9_idx'),
+            models.Index(fields=['city'], name='procurement_city_j0k1l2_idx'),
+            models.Index(fields=['deadline'], name='procurement_deadlin_m3n4o5_idx'),
+            models.Index(fields=['created_at'], name='procurement_created_p6q7r8_idx'),
         ]
         ordering = ['-created_at']
 
@@ -173,8 +173,8 @@ class Participant(models.Model):
         db_table = 'participants'
         unique_together = ['procurement', 'user']
         indexes = [
-            models.Index(fields=['procurement', 'status']),
-            models.Index(fields=['user']),
+            models.Index(fields=['procurement', 'status'], name='participant_procure_s9t0u1_idx'),
+            models.Index(fields=['user'], name='participant_user_id_v2w3x4_idx'),
         ]
 
     def __str__(self):
@@ -212,7 +212,7 @@ class SupplierVote(models.Model):
         # One vote per participant per procurement
         unique_together = ['procurement', 'voter']
         indexes = [
-            models.Index(fields=['procurement', 'supplier']),
+            models.Index(fields=['procurement', 'supplier'], name='supplier_vo_procure_idx'),
         ]
 
     def __str__(self):
@@ -238,7 +238,7 @@ class VoteCloseRequest(models.Model):
         db_table = 'vote_close_requests'
         unique_together = ['procurement', 'user']
         indexes = [
-            models.Index(fields=['procurement']),
+            models.Index(fields=['procurement'], name='vote_close_procure_idx'),
         ]
 
     def __str__(self):
