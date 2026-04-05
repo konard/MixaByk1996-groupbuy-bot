@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { User } from './users/users.entity';
+import { CreateUsers1000000000001 } from './migrations/001_create_users';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { User } from './users/users.entity';
         entities: [User],
         synchronize: false,
         migrationsRun: true,
-        migrations: [__dirname + '/migrations/*.sql'],
+        migrations: [CreateUsers1000000000001],
         ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
       }),
     }),
