@@ -3,7 +3,7 @@ mod handlers;
 mod models;
 
 use actix_cors::Cors;
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use std::sync::Arc;
 use tracing_actix_web::TracingLogger;
 
@@ -60,9 +60,21 @@ async fn main() -> std::io::Result<()> {
             .allow_any_header()
             .max_age(3600);
 
+        // Return a structured JSON error when JSON deserialization fails (e.g. truncated
+        // or malformed request body) instead of the default plain-text 400 response.
+        let json_cfg = web::JsonConfig::default()
+            .error_handler(|err, _req| {
+                let message = err.to_string();
+                tracing::warn!("JSON deserialization error: {}", message);
+                let response = HttpResponse::BadRequest()
+                    .json(serde_json::json!({"error": message}));
+                actix_web::error::InternalError::from_response(err, response).into()
+            });
+
         App::new()
             .wrap(TracingLogger::default())
             .wrap(cors)
+            .app_data(json_cfg)
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(ws_state.clone()))
             // User endpoints
