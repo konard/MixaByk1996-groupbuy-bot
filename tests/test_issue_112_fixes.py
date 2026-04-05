@@ -133,7 +133,8 @@ class CategoryDataTests(APITestCase):
 
         response = self.client.get('/api/procurements/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data.get('results', response.data)
+        # CategoryViewSet has pagination_class = None — response is a plain list
+        results = response.data if isinstance(response.data, list) else response.data.get('results', response.data)
         self.assertGreaterEqual(len(results), 1)
 
     def test_inactive_categories_not_returned(self):
@@ -144,7 +145,8 @@ class CategoryDataTests(APITestCase):
 
         response = self.client.get('/api/procurements/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data.get('results', response.data)
+        # CategoryViewSet has pagination_class = None — response is a plain list
+        results = response.data if isinstance(response.data, list) else response.data.get('results', response.data)
         names = [c['name'] for c in results]
         self.assertIn('Active', names)
         self.assertNotIn('Inactive', names)
