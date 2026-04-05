@@ -53,9 +53,9 @@ class Payment(models.Model):
     class Meta:
         db_table = 'payments'
         indexes = [
-            models.Index(fields=['user', 'status']),
-            models.Index(fields=['external_id']),
-            models.Index(fields=['created_at']),
+            models.Index(fields=['user', 'status'], name='payments_user_id_a1b2c3_idx'),
+            models.Index(fields=['external_id'], name='payments_externa_d4e5f6_idx'),
+            models.Index(fields=['created_at'], name='payments_created_g7h8i9_idx'),
         ]
         ordering = ['-created_at']
 
@@ -98,8 +98,8 @@ class Transaction(models.Model):
     class Meta:
         db_table = 'transactions'
         indexes = [
-            models.Index(fields=['user', 'created_at']),
-            models.Index(fields=['transaction_type']),
+            models.Index(fields=['user', 'created_at'], name='transactio_user_id_j0k1l2_idx'),
+            models.Index(fields=['transaction_type'], name='transactio_transac_m3n4o5_idx'),
         ]
         ordering = ['-created_at']
 
