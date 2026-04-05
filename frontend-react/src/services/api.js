@@ -117,7 +117,7 @@ export const api = {
   // Chat endpoints
   getMessages: (procurementId, params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return request(`/chat/messages/?procurement_id=${procurementId}&${query}`);
+    return request(`/chat/messages/?procurement=${procurementId}&${query}`);
   },
 
   sendMessage: (data) =>
@@ -126,7 +126,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  getNotifications: (userId) => request(`/chat/notifications/?user_id=${userId}`),
+  getNotifications: (userId) => request(`/chat/notifications/?user=${userId}`),
 
   // Payment endpoints
   createPayment: (data) =>

@@ -16,5 +16,9 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
+COPY src/migrations ./migrations
+RUN apk add --no-cache postgresql-client
 EXPOSE 4002
-CMD ["node", "dist/main"]
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
+CMD ["./entrypoint.sh"]

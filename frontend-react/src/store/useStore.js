@@ -263,8 +263,8 @@ export const useStore = create((set, get) => ({
 
     try {
       const message = await api.sendMessage({
-        procurement_id: currentChat,
-        user_id: user.id,
+        procurement: currentChat,
+        user: user.id,
         text,
         message_type: 'text',
       });
