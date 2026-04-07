@@ -903,6 +903,9 @@ const App = {
     },
 
     async loadMainContent() {
+        // Show main page
+        this.showMain();
+
         // Load procurements
         try {
             const response = await API.getProcurements({ status: 'active' });
@@ -920,11 +923,25 @@ const App = {
     },
 
     showLogin() {
-        // Show login/registration modal or page
+        // Show the redesigned auth page, hide main app page
+        const authPage = document.getElementById('auth-page');
+        const mainPage = document.getElementById('main-page');
+        if (authPage) authPage.classList.remove('hidden');
+        if (mainPage) mainPage.classList.add('hidden');
+
+        // Legacy modal fallback (kept for backward compatibility)
         const modal = document.querySelector('#login-modal');
-        if (modal) {
+        if (modal && !authPage) {
             UI.openModal('login-modal');
         }
+    },
+
+    showMain() {
+        // Show main app page, hide auth page
+        const authPage = document.getElementById('auth-page');
+        const mainPage = document.getElementById('main-page');
+        if (authPage) authPage.classList.add('hidden');
+        if (mainPage) mainPage.classList.remove('hidden');
     },
 
     async register(data) {
@@ -937,6 +954,7 @@ const App = {
             AppState.user = user;
             localStorage.setItem('userId', user.id);
             UI.closeModal();
+            this.showMain();
             this.loadMainContent();
         } catch (error) {
             Utils.showToast('Ошибка регистрации', 'error');
