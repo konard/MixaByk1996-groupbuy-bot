@@ -1,11 +1,13 @@
-/* GroupBuy Bot - Telegram Dark Design System */
+/* GroupBuy Bot - Telegram Dark Design System
+   Official Telegram colors & spacing rhythm (8/12/16/24px)
+   ============================================================ */
 
 /* CSS Variables - Telegram Dark Color Palette */
 :root {
-    /* Primary accent */
-    --tg-primary: #2b5278;
-    --tg-primary-dark: #1e3d5c;
-    --tg-primary-light: #3a6a9a;
+    /* Primary accent — official Telegram blue */
+    --tg-primary: #3390ec;
+    --tg-primary-dark: #2b7ed8;
+    --tg-primary-light: #4ea4f6;
 
     /* Background colors - dark theme by default */
     --tg-bg-primary: #17212b;
@@ -17,9 +19,9 @@
 
     /* Text colors */
     --tg-text-primary: #ffffff;
-    --tg-text-secondary: #8e9aaf;
+    --tg-text-secondary: #a9a9a9;
     --tg-text-muted: #6d7f8f;
-    --tg-text-link: #5b9bd5;
+    --tg-text-link: #6ab2f2;
 
     /* Message colors */
     --tg-msg-outgoing: #2b5278;
@@ -32,21 +34,21 @@
     --tg-warning: #f5a623;
     --tg-success: #4fae4e;
 
-    /* Border colors */
-    --tg-border: #2f3b47;
+    /* Border / delimiter colors */
+    --tg-border: #2b2f36;
     --tg-border-light: #3a4654;
 
-    /* Shadows */
-    --tg-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-    --tg-shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.5);
-    --tg-shadow-large: 0 8px 32px rgba(0, 0, 0, 0.6);
+    /* Shadows — soft Telegram style */
+    --tg-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    --tg-shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --tg-shadow-large: 0 4px 16px rgba(0, 0, 0, 0.5);
 
     /* Transitions */
     --tg-transition: 0.2s ease;
     --tg-transition-slow: 0.4s ease;
 
     /* Typography */
-    --tg-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    --tg-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Roboto', 'Segoe UI', Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
     --tg-font-size-xs: 11px;
     --tg-font-size-sm: 12px;
     --tg-font-size-base: 14px;
@@ -55,14 +57,14 @@
     --tg-font-size-xl: 18px;
     --tg-font-size-xxl: 20px;
 
-    /* Spacing */
+    /* Spacing — Telegram rhythm 8/12/16/24 */
     --tg-spacing-xs: 4px;
     --tg-spacing-sm: 8px;
     --tg-spacing-md: 12px;
     --tg-spacing-lg: 16px;
     --tg-spacing-xl: 24px;
 
-    /* Border radius */
+    /* Border radius — cards 16px, buttons/inputs 8px, avatars 50% */
     --tg-radius-sm: 4px;
     --tg-radius-md: 8px;
     --tg-radius-lg: 12px;
@@ -74,6 +76,7 @@
     --tg-sidebar-width: 300px;
     --tg-header-height: 56px;
     --tg-input-height: 48px;
+    --tg-btn-min-height: 44px;
     --tg-avatar-sm: 32px;
     --tg-avatar-md: 42px;
     --tg-avatar-lg: 54px;
@@ -82,9 +85,9 @@
 
 /* Light theme override */
 [data-theme="light"] {
-    --tg-primary: #2481cc;
-    --tg-primary-dark: #1b6aaa;
-    --tg-primary-light: #4aa3df;
+    --tg-primary: #3390ec;
+    --tg-primary-dark: #2b7ed8;
+    --tg-primary-light: #4ea4f6;
 
     --tg-bg-primary: #ffffff;
     --tg-bg-secondary: #f0f2f5;
@@ -102,6 +105,10 @@
 
     --tg-border: #dadce0;
     --tg-border-light: #e8e8e8;
+
+    --tg-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --tg-shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --tg-shadow-large: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 /* Reset and base styles */
@@ -173,13 +180,14 @@ input, textarea, select {
 .auth-logo-icon {
     width: 80px;
     height: 80px;
-    background: linear-gradient(135deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     border-radius: var(--tg-radius-xxl);
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto var(--tg-spacing-md);
-    box-shadow: 0 8px 24px rgba(43, 82, 120, 0.4);
+    box-shadow: 0 8px 24px rgba(51, 144, 236, 0.3);
+    color: #ffffff;
 }
 
 .auth-logo-title {
@@ -249,16 +257,16 @@ input, textarea, select {
     padding: 0 var(--tg-spacing-lg);
     background-color: var(--tg-bg-input);
     border: 1.5px solid var(--tg-border);
-    border-radius: var(--tg-radius-lg);
+    border-radius: var(--tg-radius-md);
     font-size: var(--tg-font-size-md);
     color: var(--tg-text-primary);
     transition: border-color var(--tg-transition), background-color var(--tg-transition), box-shadow var(--tg-transition);
 }
 
 .auth-input:focus {
-    border-color: var(--tg-primary-light);
+    border-color: var(--tg-primary);
     background-color: var(--tg-bg-tertiary);
-    box-shadow: 0 0 0 3px rgba(43, 82, 120, 0.2);
+    box-shadow: 0 0 0 3px rgba(51, 144, 236, 0.15);
 }
 
 .auth-input::placeholder {
@@ -295,56 +303,41 @@ input, textarea, select {
     font-weight: 600;
     background-color: var(--tg-bg-input);
     border: 1.5px solid var(--tg-border);
-    border-radius: var(--tg-radius-lg);
+    border-radius: var(--tg-radius-md);
     color: var(--tg-text-primary);
     transition: border-color var(--tg-transition), box-shadow var(--tg-transition);
-    caret-color: var(--tg-primary-light);
+    caret-color: var(--tg-primary);
 }
 
 .auth-code-digit:focus {
-    border-color: var(--tg-primary-light);
-    box-shadow: 0 0 0 3px rgba(43, 82, 120, 0.2);
+    border-color: var(--tg-primary);
+    box-shadow: 0 0 0 3px rgba(51, 144, 236, 0.15);
     outline: none;
 }
 
 .auth-btn {
     width: 100%;
     height: var(--tg-input-height);
-    background: linear-gradient(135deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     color: #ffffff;
-    border-radius: var(--tg-radius-lg);
+    border-radius: var(--tg-radius-md);
     font-size: var(--tg-font-size-md);
     font-weight: 600;
     letter-spacing: 0.3px;
     transition: all var(--tg-transition);
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 16px rgba(43, 82, 120, 0.35);
-}
-
-.auth-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    transition: left 0.5s ease;
-}
-
-.auth-btn:hover::before {
-    left: 100%;
+    box-shadow: 0 2px 8px rgba(51, 144, 236, 0.25);
 }
 
 .auth-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(43, 82, 120, 0.45);
+    background: var(--tg-primary-dark);
+    box-shadow: 0 4px 16px rgba(51, 144, 236, 0.35);
 }
 
 .auth-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(43, 82, 120, 0.3);
+    transform: scale(0.98);
+    box-shadow: 0 1px 4px rgba(51, 144, 236, 0.2);
 }
 
 .auth-back-link {
@@ -401,7 +394,7 @@ input, textarea, select {
     height: 100vh;
     overflow: hidden;
     background-color: var(--tg-bg-primary);
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
     flex-direction: column;
 }
 
@@ -458,17 +451,18 @@ input, textarea, select {
     width: 44px;
     height: 44px;
     border-radius: var(--tg-radius-md);
-    background: linear-gradient(135deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(43, 82, 120, 0.4);
+    box-shadow: 0 2px 8px rgba(51, 144, 236, 0.3);
 }
 
 .slider-slide-text {
     flex: 1;
+    min-width: 0;
 }
 
 .slider-slide-title {
@@ -501,10 +495,11 @@ input, textarea, select {
     padding: var(--tg-spacing-md) var(--tg-spacing-lg);
     background-color: var(--tg-bg-primary);
     border: 1px solid var(--tg-border);
-    border-radius: var(--tg-radius-lg);
+    border-radius: var(--tg-radius-md);
     cursor: pointer;
     transition: all var(--tg-transition);
     min-width: 80px;
+    min-height: var(--tg-btn-min-height);
     flex: 1;
     color: var(--tg-text-primary);
 }
@@ -512,16 +507,14 @@ input, textarea, select {
 .slider-action-btn:hover {
     background-color: var(--tg-primary);
     border-color: var(--tg-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(43, 82, 120, 0.4);
 }
 
 .slider-action-btn:active {
-    transform: translateY(0);
+    transform: scale(0.96);
 }
 
 .slider-action-icon {
-    color: var(--tg-primary-light);
+    color: var(--tg-primary);
     transition: color var(--tg-transition);
 }
 
@@ -561,7 +554,7 @@ input, textarea, select {
 }
 
 .slider-dot.active {
-    background-color: var(--tg-primary-light);
+    background-color: var(--tg-primary);
     width: 18px;
     border-radius: 3px;
 }
@@ -648,7 +641,7 @@ input, textarea, select {
 
 .search-input:focus {
     background-color: var(--tg-bg-tertiary);
-    box-shadow: 0 0 0 2px rgba(43, 82, 120, 0.3);
+    box-shadow: 0 0 0 2px rgba(51, 144, 236, 0.2);
 }
 
 .search-input::placeholder {
@@ -696,6 +689,11 @@ input, textarea, select {
     gap: var(--tg-spacing-md);
     cursor: pointer;
     transition: background-color var(--tg-transition);
+    border-bottom: 1px solid var(--tg-border);
+}
+
+.chat-item:last-child {
+    border-bottom: none;
 }
 
 .chat-item:hover {
@@ -767,7 +765,7 @@ input, textarea, select {
     min-width: 20px;
     height: 20px;
     padding: 0 6px;
-    background-color: var(--tg-primary-light);
+    background-color: var(--tg-primary);
     border-radius: 10px;
     color: #ffffff;
     font-size: var(--tg-font-size-xs);
@@ -826,7 +824,7 @@ input, textarea, select {
     min-width: 190px;
     max-width: 190px;
     background-color: var(--tg-bg-tertiary);
-    border-radius: var(--tg-radius-lg);
+    border-radius: var(--tg-radius-xl);
     padding: var(--tg-spacing-md);
     cursor: pointer;
     transition: transform var(--tg-transition), box-shadow var(--tg-transition);
@@ -865,7 +863,7 @@ input, textarea, select {
 
 .procurement-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     border-radius: 2px;
     transition: width 0.5s ease;
 }
@@ -934,7 +932,7 @@ input, textarea, select {
 .message-sender {
     font-size: var(--tg-font-size-sm);
     font-weight: 600;
-    color: var(--tg-primary-light);
+    color: var(--tg-primary);
     margin-bottom: 2px;
 }
 
@@ -1011,19 +1009,19 @@ input, textarea, select {
     width: 44px;
     height: 44px;
     border-radius: var(--tg-radius-round);
-    background: linear-gradient(135deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all var(--tg-transition);
-    box-shadow: 0 2px 8px rgba(43, 82, 120, 0.4);
+    box-shadow: 0 2px 8px rgba(51, 144, 236, 0.3);
     flex-shrink: 0;
 }
 
 .send-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 14px rgba(43, 82, 120, 0.5);
+    background: var(--tg-primary-dark);
+    box-shadow: 0 4px 14px rgba(51, 144, 236, 0.4);
 }
 
 .send-button:active {
@@ -1043,17 +1041,18 @@ input, textarea, select {
     font-weight: 500;
     border-radius: var(--tg-radius-md);
     transition: all var(--tg-transition);
+    min-height: var(--tg-btn-min-height);
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     color: #ffffff;
-    box-shadow: 0 2px 8px rgba(43, 82, 120, 0.35);
+    box-shadow: 0 2px 8px rgba(51, 144, 236, 0.25);
 }
 
 .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(43, 82, 120, 0.5);
+    background: var(--tg-primary-dark);
+    box-shadow: 0 4px 14px rgba(51, 144, 236, 0.35);
 }
 
 .btn-secondary {
@@ -1069,7 +1068,7 @@ input, textarea, select {
 .btn-outline {
     background-color: transparent;
     border: 1.5px solid var(--tg-primary);
-    color: var(--tg-primary-light);
+    color: var(--tg-primary);
 }
 
 .btn-outline:hover {
@@ -1123,7 +1122,7 @@ input, textarea, select {
     padding: 0 var(--tg-spacing-md);
     background-color: var(--tg-bg-input);
     border: 1.5px solid var(--tg-border);
-    border-radius: var(--tg-radius-lg);
+    border-radius: var(--tg-radius-md);
     font-size: var(--tg-font-size-base);
     color: var(--tg-text-primary);
     transition: border-color var(--tg-transition), background-color var(--tg-transition), box-shadow var(--tg-transition);
@@ -1131,8 +1130,8 @@ input, textarea, select {
 
 .form-input:focus {
     background-color: var(--tg-bg-tertiary);
-    border-color: var(--tg-primary-light);
-    box-shadow: 0 0 0 3px rgba(43, 82, 120, 0.15);
+    border-color: var(--tg-primary);
+    box-shadow: 0 0 0 3px rgba(51, 144, 236, 0.12);
 }
 
 .form-input::placeholder {
@@ -1147,7 +1146,7 @@ input, textarea, select {
 
 .form-select {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238e9aaf' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23a9a9a9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
     background-size: 16px;
@@ -1196,14 +1195,14 @@ input, textarea, select {
     width: 72px;
     height: 72px;
     border-radius: var(--tg-radius-round);
-    background: linear-gradient(135deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #ffffff;
     font-size: 28px;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(43, 82, 120, 0.4);
+    box-shadow: 0 4px 16px rgba(51, 144, 236, 0.3);
     flex-shrink: 0;
 }
 
@@ -1262,6 +1261,7 @@ input, textarea, select {
     cursor: pointer;
     transition: background-color var(--tg-transition);
     border-bottom: 1px solid var(--tg-border);
+    min-height: var(--tg-btn-min-height);
 }
 
 .cabinet-menu-item:last-child {
@@ -1275,7 +1275,7 @@ input, textarea, select {
 .cabinet-menu-icon {
     width: 22px;
     height: 22px;
-    color: var(--tg-primary-light);
+    color: var(--tg-primary);
     flex-shrink: 0;
 }
 
@@ -1416,6 +1416,7 @@ input, textarea, select {
     transition: color var(--tg-transition);
     background: none;
     border: none;
+    min-height: var(--tg-btn-min-height);
 }
 
 .tab:hover {
@@ -1423,7 +1424,7 @@ input, textarea, select {
 }
 
 .tab.active {
-    color: var(--tg-primary-light);
+    color: var(--tg-primary);
 }
 
 .tab.active::after {
@@ -1433,7 +1434,7 @@ input, textarea, select {
     left: 20%;
     right: 20%;
     height: 2px;
-    background: linear-gradient(90deg, var(--tg-primary), var(--tg-primary-light));
+    background: var(--tg-primary);
     border-radius: 1px 1px 0 0;
 }
 
@@ -1464,9 +1465,9 @@ input, textarea, select {
 }
 
 .status-completed {
-    background-color: rgba(43, 82, 120, 0.15);
-    color: var(--tg-primary-light);
-    border: 1px solid rgba(43, 82, 120, 0.3);
+    background-color: rgba(51, 144, 236, 0.15);
+    color: var(--tg-primary);
+    border: 1px solid rgba(51, 144, 236, 0.3);
 }
 
 .status-cancelled {
@@ -1542,7 +1543,7 @@ input, textarea, select {
 
 .toast-error { border-left: 3px solid var(--tg-error); }
 .toast-success { border-left: 3px solid var(--tg-success); }
-.toast-info { border-left: 3px solid var(--tg-primary-light); }
+.toast-info { border-left: 3px solid var(--tg-primary); }
 
 .toast.fade-out {
     animation: toastOut 0.3s ease forwards;
@@ -1609,7 +1610,8 @@ input, textarea, select {
    RESPONSIVE DESIGN
    ============================================ */
 
-@media (min-width: 601px) {
+/* Desktop: centered container with rounded corners */
+@media (min-width: 768px) {
     .app-wrapper {
         align-items: center;
     }
@@ -1617,7 +1619,12 @@ input, textarea, select {
     .app-container {
         border-radius: var(--tg-radius-xl);
         height: min(100vh, 840px);
-        box-shadow: 0 0 80px rgba(0, 0, 0, 0.9);
+        max-width: 800px;
+        box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
+    }
+
+    .auth-container {
+        max-width: 420px;
     }
 
     .modal-overlay {
@@ -1640,10 +1647,66 @@ input, textarea, select {
     }
 }
 
+/* Tablet: wider max-width */
+@media (min-width: 601px) and (max-width: 767px) {
+    .app-wrapper {
+        align-items: center;
+    }
+
+    .app-container {
+        border-radius: var(--tg-radius-xl);
+        height: min(100vh, 840px);
+        box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-overlay {
+        align-items: center;
+    }
+
+    .modal {
+        border-radius: var(--tg-radius-xl);
+        max-height: 80vh;
+        transform: scale(0.9);
+        border-bottom: 1px solid var(--tg-border);
+    }
+
+    .modal-overlay.active .modal {
+        transform: scale(1);
+    }
+
+    .modal-handle {
+        display: none;
+    }
+}
+
+/* Mobile: full-width, 12px margins, single column */
 @media (max-width: 600px) {
+    :root {
+        --tg-spacing-lg: 12px;
+    }
+
     .app-container {
         height: 100vh;
         border-radius: 0;
+        max-width: 100%;
+    }
+
+    .auth-wrapper {
+        padding: var(--tg-spacing-md);
+    }
+
+    .auth-container {
+        max-width: 100%;
+    }
+
+    .auth-card {
+        padding: var(--tg-spacing-lg);
+    }
+
+    .auth-code-digit {
+        width: 46px;
+        height: 50px;
+        font-size: var(--tg-font-size-xl);
     }
 
     .message {
@@ -1653,6 +1716,34 @@ input, textarea, select {
     .procurement-card {
         min-width: 160px;
         max-width: 160px;
+    }
+
+    .slider-action-btn {
+        padding: var(--tg-spacing-sm) var(--tg-spacing-md);
+        min-width: 70px;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 360px) {
+    .auth-code-digit {
+        width: 40px;
+        height: 46px;
+        font-size: var(--tg-font-size-lg);
+    }
+
+    .auth-code-inputs {
+        gap: 6px;
+    }
+
+    .slider-action-btn {
+        padding: var(--tg-spacing-sm);
+        min-width: 60px;
+    }
+
+    .procurement-card {
+        min-width: 140px;
+        max-width: 140px;
     }
 }
 
