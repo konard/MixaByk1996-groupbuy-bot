@@ -1411,31 +1411,25 @@ function Cabinet() {
           </div>
         </div>
 
-        {/* Role-specific rows (hidden on mobile — accessible via burger menu) */}
-        <div className="lk-mobile-hidden">
-          {renderRoleRows()}
+        {/* Role-specific rows */}
+        {renderRoleRows()}
+
+        {/* Subscriptions section (common) */}
+        <SectionHeader title="Подписки" />
+        <div className="lk-section-group">
+          <ActionRow icon={<HistoryIcon />} label="Управление подписками" badge={subscriptions.filter((s) => s.active).length} onClick={() => toggleSection('subscriptions')} />
+          {activeSection === 'subscriptions' && renderSubscriptions()}
         </div>
 
-        {/* Subscriptions section (hidden on mobile — accessible via burger menu) */}
-        <div className="lk-mobile-hidden">
-          <SectionHeader title="Подписки" />
-          <div className="lk-section-group">
-            <ActionRow icon={<HistoryIcon />} label="Управление подписками" badge={subscriptions.filter((s) => s.active).length} onClick={() => toggleSection('subscriptions')} />
-            {activeSection === 'subscriptions' && renderSubscriptions()}
-          </div>
+        {/* Settings */}
+        <SectionHeader title="Настройки" />
+        <div className="lk-section-group">
+          <ActionRow icon={<SettingsIcon />} label="Тема и шрифт" onClick={() => toggleSection('settings')} />
+          {activeSection === 'settings' && renderSettings()}
         </div>
 
-        {/* Settings (hidden on mobile — accessible via burger menu) */}
-        <div className="lk-mobile-hidden">
-          <SectionHeader title="Настройки" />
-          <div className="lk-section-group">
-            <ActionRow icon={<SettingsIcon />} label="Тема и шрифт" onClick={() => toggleSection('settings')} />
-            {activeSection === 'settings' && renderSettings()}
-          </div>
-        </div>
-
-        {/* Logout (hidden on mobile — accessible via burger menu) */}
-        <div className="lk-mobile-hidden lk-section-group" style={{ marginBottom: 24 }}>
+        {/* Logout */}
+        <div className="lk-section-group" style={{ marginBottom: 24 }}>
           <ActionRow
             danger
             icon={<LogoutSvg />}
