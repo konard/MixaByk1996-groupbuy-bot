@@ -161,21 +161,12 @@ function ProcurementModal() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color, #e0e0e0)', padding: '0 1rem' }}>
+        <div className="tabs">
           {['info', 'participants', showVoteTab && 'vote'].filter(Boolean).map((tab) => (
             <button
               key={tab}
+              className={`tab${activeTab === tab ? ' active' : ''}`}
               onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '0.5rem 1rem',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeTab === tab ? '2px solid var(--primary-color, #3390ec)' : '2px solid transparent',
-                color: activeTab === tab ? 'var(--primary-color, #3390ec)' : 'var(--text-secondary, #8e99a4)',
-                cursor: 'pointer',
-                fontWeight: activeTab === tab ? 600 : 400,
-                fontSize: '0.875rem',
-              }}
             >
               {tab === 'info' && 'Информация'}
               {tab === 'participants' && 'Участники'}
@@ -288,18 +279,18 @@ function ProcurementModal() {
             ) : participants.length === 0 ? (
               <p className="text-muted text-center">Нет участников</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {participants.map((p) => (
                   <div key={p.id} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    padding: '0.5rem',
-                    background: 'var(--bg-secondary, #f0f2f5)',
-                    borderRadius: '0.5rem',
+                    padding: '8px',
+                    background: 'var(--tg-bg-secondary)',
+                    borderRadius: '10px',
                   }}>
                     <span>{p.user_name || `Пользователь #${p.user}`}</span>
                     <span className="text-secondary">{p.quantity} × {formatCurrency(p.amount)}</span>
-                    <span className={`status-badge status-${p.status}`} style={{ fontSize: '0.75rem' }}>
+                    <span className={`status-badge status-${p.status}`} style={{ fontSize: '12px' }}>
                       {p.status}
                     </span>
                   </div>
@@ -322,7 +313,7 @@ function ProcurementModal() {
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         padding: '0.4rem 0',
-                        borderBottom: '1px solid var(--border-color, #e0e0e0)',
+                        borderBottom: '1px solid var(--tg-border)',
                       }}>
                         <span>{r.supplier_name || `Поставщик #${r.supplier_id}`}</span>
                         <span className="text-secondary">{r.vote_count} ({r.percentage}%)</span>
@@ -404,25 +395,25 @@ function ProcurementModal() {
           )}
           {user && selectedProcurement.status !== 'completed' && !isOrganizer && (
             <button className="btn btn-outline btn-round" onClick={handleLeave}
-              style={{ color: 'var(--error-color, #e53935)', borderColor: 'var(--error-color, #e53935)' }}>
+              style={{ color: 'var(--tg-error)', borderColor: 'var(--tg-error)' }}>
               Выйти
             </button>
           )}
           {canStop && (
             <button className="btn btn-outline btn-round" onClick={handleStop}
-              style={{ color: 'var(--warning-color, #f57c00)', borderColor: 'var(--warning-color, #f57c00)' }}>
+              style={{ color: 'var(--tg-warning)', borderColor: 'var(--tg-warning)' }}>
               Стоп-сумма
             </button>
           )}
           {canSendReceiptTable && (
             <button className="btn btn-outline btn-round" onClick={handleSendReceiptTable}
-              style={{ color: 'var(--primary-color, #3390ec)', borderColor: 'var(--primary-color, #3390ec)' }}>
+              style={{ color: 'var(--tg-primary)', borderColor: 'var(--tg-primary)' }}>
               Отправить таблицу чеков
             </button>
           )}
           {canClose && (
             <button className="btn btn-outline btn-round" onClick={handleClose}
-              style={{ color: 'var(--error-color, #e53935)', borderColor: 'var(--error-color, #e53935)' }}>
+              style={{ color: 'var(--tg-error)', borderColor: 'var(--tg-error)' }}>
               Закрыть закупку
             </button>
           )}

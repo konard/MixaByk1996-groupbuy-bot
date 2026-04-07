@@ -128,8 +128,8 @@ function ChatVotingPanel({ procurementId, user, participants }) {
 
   return (
     <div style={{
-      background: 'var(--bg-secondary, #f0f2f5)',
-      borderBottom: '2px solid var(--primary-color, #3390ec)',
+      background: 'var(--tg-bg-secondary)',
+      borderBottom: '2px solid var(--tg-primary)',
       padding: '0.5rem 1rem',
     }}>
       {/* Pinned header */}
@@ -137,7 +137,7 @@ function ChatVotingPanel({ procurementId, user, participants }) {
         style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
         onClick={() => setIsExpanded((v) => !v)}
       >
-        <span style={{ fontSize: '0.75rem', color: 'var(--primary-color, #3390ec)', fontWeight: 600 }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--tg-primary)', fontWeight: 600 }}>
           📌 Голосование за поставщика
         </span>
         {voteResults && voteResults.total_votes > 0 && (
@@ -151,7 +151,7 @@ function ChatVotingPanel({ procurementId, user, participants }) {
           </span>
         )}
         {allClosed && (
-          <span style={{ fontSize: '0.7rem', color: 'var(--error-color, #e53935)', fontWeight: 600, marginLeft: '0.5rem' }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--tg-error)', fontWeight: 600, marginLeft: '0.5rem' }}>
             ЗАВЕРШЕНО
           </span>
         )}
@@ -170,9 +170,9 @@ function ChatVotingPanel({ procurementId, user, participants }) {
               {voteResults && voteResults.total_votes > 0 && (
                 <div style={{ marginBottom: '0.5rem' }}>
                   {(voteResults.results || []).map((r) => (
-                    <div key={r.supplier_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '0.2rem 0', borderBottom: '1px solid var(--border-color, #e0e0e0)' }}>
+                    <div key={r.supplier_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '0.2rem 0', borderBottom: '1px solid var(--tg-border)' }}>
                       <span>{r.supplier_name || `Поставщик #${r.supplier_id}`}</span>
-                      <span style={{ color: 'var(--primary-color, #3390ec)' }}>{r.vote_count} ({r.percentage}%)</span>
+                      <span style={{ color: 'var(--tg-primary)' }}>{r.vote_count} ({r.percentage}%)</span>
                     </div>
                   ))}
                 </div>
@@ -182,7 +182,7 @@ function ChatVotingPanel({ procurementId, user, participants }) {
               {userVote && (
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
                   Ваш голос: <strong>{userVote.supplier_name || `Поставщик #${userVote.supplier_id}`}</strong>
-                  <span style={{ marginLeft: '0.4rem', color: 'var(--primary-color, #3390ec)' }}>(можно изменить)</span>
+                  <span style={{ marginLeft: '0.4rem', color: 'var(--tg-primary)' }}>(можно изменить)</span>
                 </div>
               )}
 
@@ -254,14 +254,14 @@ function ChatVotingPanel({ procurementId, user, participants }) {
 
               {/* Close voting section */}
               {!allClosed && user && (
-                <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color, #e0e0e0)', paddingTop: '0.4rem' }}>
+                <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--tg-border)', paddingTop: '0.4rem' }}>
                   <button
                     className={`btn btn-round ${userAlreadyClosedVote ? 'btn-outline' : 'btn-outline'}`}
                     style={{
                       fontSize: '0.75rem',
                       padding: '0.3rem 0.75rem',
-                      color: userAlreadyClosedVote ? 'var(--text-secondary)' : 'var(--error-color, #e53935)',
-                      borderColor: userAlreadyClosedVote ? 'var(--text-secondary)' : 'var(--error-color, #e53935)',
+                      color: userAlreadyClosedVote ? 'var(--text-secondary)' : 'var(--tg-error)',
+                      borderColor: userAlreadyClosedVote ? 'var(--text-secondary)' : 'var(--tg-error)',
                       cursor: userAlreadyClosedVote ? 'default' : 'pointer',
                     }}
                     onClick={handleCloseVote}
@@ -280,7 +280,7 @@ function ChatVotingPanel({ procurementId, user, participants }) {
               )}
 
               {allClosed && (
-                <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: 'var(--error-color, #e53935)', fontWeight: 600 }}>
+                <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: 'var(--tg-error)', fontWeight: 600 }}>
                   Голосование завершено всеми участниками.
                 </div>
               )}

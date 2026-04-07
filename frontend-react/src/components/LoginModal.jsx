@@ -24,6 +24,34 @@ function validate(formData) {
   return errors;
 }
 
+/* Telegram-style phone icon */
+function TelegramPhoneIcon() {
+  return (
+    <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
+      <circle cx="80" cy="80" r="80" fill="var(--tg-primary)" opacity="0.1" />
+      <circle cx="80" cy="80" r="60" fill="var(--tg-primary)" opacity="0.15" />
+      <rect x="58" y="32" width="44" height="96" rx="10" fill="var(--tg-primary)" />
+      <rect x="62" y="42" width="36" height="68" rx="4" fill="white" />
+      <circle cx="80" cy="118" r="5" fill="white" opacity="0.8" />
+    </svg>
+  );
+}
+
+/* Telegram-style registration icon */
+function TelegramRegisterIcon() {
+  return (
+    <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
+      <circle cx="80" cy="80" r="80" fill="var(--tg-primary)" opacity="0.1" />
+      <circle cx="80" cy="80" r="60" fill="var(--tg-primary)" opacity="0.15" />
+      <circle cx="80" cy="62" r="20" fill="var(--tg-primary)" />
+      <path d="M50 110 C50 90 65 80 80 80 C95 80 110 90 110 110" stroke="var(--tg-primary)" strokeWidth="6" fill="none" strokeLinecap="round" />
+      <circle cx="110" cy="58" r="14" fill="var(--tg-success, #4fae4e)" />
+      <line x1="110" y1="52" x2="110" y2="64" stroke="white" strokeWidth="3" strokeLinecap="round" />
+      <line x1="104" y1="58" x2="116" y2="58" stroke="white" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function LoginModal() {
   const { loginModalOpen, closeLoginModal, register, login, isLoading, error } = useStore();
   const [activeTab, setActiveTab] = useState('login');
@@ -82,176 +110,205 @@ function LoginModal() {
   if (!loginModalOpen) return null;
 
   return (
-    <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && closeLoginModal()}>
-      <div className="modal">
-        <div className="modal-header">
-          <div className="login-tabs">
-            <button
-              className={`login-tab${activeTab === 'login' ? ' active' : ''}`}
-              onClick={() => setActiveTab('login')}
-              type="button"
-            >
-              Вход
-            </button>
-            <button
-              className={`login-tab${activeTab === 'register' ? ' active' : ''}`}
-              onClick={() => setActiveTab('register')}
-              type="button"
-            >
-              Регистрация
-            </button>
-          </div>
+    <div className="auth-screen">
+      <div className="auth-container">
+        {/* Tab switcher */}
+        <div className="auth-tabs">
+          <button
+            className={`auth-tab${activeTab === 'login' ? ' active' : ''}`}
+            onClick={() => setActiveTab('login')}
+            type="button"
+          >
+            Вход
+          </button>
+          <button
+            className={`auth-tab${activeTab === 'register' ? ' active' : ''}`}
+            onClick={() => setActiveTab('register')}
+            type="button"
+          >
+            Регистрация
+          </button>
         </div>
 
         {activeTab === 'login' ? (
           <>
-            <div className="modal-body">
-              <form id="login-form" onSubmit={handleLoginSubmit}>
-                {error && <div className="form-error-banner">{error}</div>}
-                <div className="form-group">
-                  <label className="form-label">Email *</label>
-                  <input
-                    type="email"
-                    className="form-input"
-                    name="email"
-                    required
-                    placeholder="email@example.com"
-                    value={loginData.email}
-                    onChange={handleLoginChange}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Телефон</label>
-                  <input
-                    type="tel"
-                    className="form-input"
-                    name="phone"
-                    placeholder="+7 999 123 4567"
-                    value={loginData.phone}
-                    onChange={handleLoginChange}
-                  />
-                </div>
-                <p className="form-hint">
-                  Нет аккаунта?{' '}
-                  <button
-                    type="button"
-                    className="form-link-btn"
-                    onClick={() => setActiveTab('register')}
-                  >
-                    Зарегистрироваться
-                  </button>
-                </p>
-              </form>
+            {/* Telegram-style illustration */}
+            <div className="auth-logo">
+              <TelegramPhoneIcon />
             </div>
-            <div className="modal-footer">
+
+            <h1 className="auth-title">GroupBuy</h1>
+            <p className="auth-subtitle">
+              Войдите по email или номеру телефона, привязанному к вашему аккаунту
+            </p>
+
+            <form className="auth-form" onSubmit={handleLoginSubmit}>
+              {error && <div className="form-error-banner">{error}</div>}
+
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  name="email"
+                  placeholder="email@example.com"
+                  value={loginData.email}
+                  onChange={handleLoginChange}
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Телефон</label>
+                <input
+                  type="tel"
+                  className="form-input"
+                  name="phone"
+                  placeholder="+7 999 123 4567"
+                  value={loginData.phone}
+                  onChange={handleLoginChange}
+                  autoComplete="tel"
+                />
+              </div>
+
               <button
-                className="btn btn-primary btn-round"
-                onClick={handleLoginSubmit}
+                type="submit"
+                className="auth-btn"
                 disabled={isLoading}
               >
-                {isLoading ? 'Загрузка...' : 'Войти'}
+                {isLoading && <span className="auth-spinner" />}
+                {isLoading ? 'Загрузка...' : 'Продолжить'}
               </button>
-            </div>
+
+              <p className="form-hint" style={{ textAlign: 'center' }}>
+                Нет аккаунта?{' '}
+                <button
+                  type="button"
+                  className="form-link-btn"
+                  onClick={() => setActiveTab('register')}
+                >
+                  Зарегистрироваться
+                </button>
+              </p>
+            </form>
           </>
         ) : (
           <>
-            <div className="modal-body">
-              <form id="register-form" onSubmit={handleRegisterSubmit}>
-                {error && <div className="form-error-banner">{error}</div>}
-                <div className="form-group">
-                  <label className="form-label">Имя *</label>
-                  <input
-                    type="text"
-                    className={`form-input${formErrors.first_name ? ' form-input-error' : ''}`}
-                    name="first_name"
-                    required
-                    placeholder="Введите имя"
-                    value={registerData.first_name}
-                    onChange={handleRegisterChange}
-                  />
-                  {formErrors.first_name && (
-                    <span className="form-field-error">{formErrors.first_name}</span>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Фамилия</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    name="last_name"
-                    placeholder="Введите фамилию"
-                    value={registerData.last_name}
-                    onChange={handleRegisterChange}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Телефон *</label>
-                  <input
-                    type="tel"
-                    className={`form-input${formErrors.phone ? ' form-input-error' : ''}`}
-                    name="phone"
-                    required
-                    placeholder="+7 999 123 4567"
-                    value={registerData.phone}
-                    onChange={handleRegisterChange}
-                  />
-                  {formErrors.phone && (
-                    <span className="form-field-error">{formErrors.phone}</span>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email *</label>
-                  <input
-                    type="email"
-                    className={`form-input${formErrors.email ? ' form-input-error' : ''}`}
-                    name="email"
-                    required
-                    placeholder="email@example.com"
-                    value={registerData.email}
-                    onChange={handleRegisterChange}
-                  />
-                  {formErrors.email && (
-                    <span className="form-field-error">{formErrors.email}</span>
-                  )}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Роль *</label>
-                  <select
-                    className={`form-input form-select${formErrors.role ? ' form-input-error' : ''}`}
-                    name="role"
-                    required
-                    value={registerData.role}
-                    onChange={handleRegisterChange}
-                  >
-                    <option value="buyer">Покупатель</option>
-                    <option value="organizer">Организатор</option>
-                    <option value="supplier">Поставщик</option>
-                  </select>
-                  {formErrors.role && (
-                    <span className="form-field-error">{formErrors.role}</span>
-                  )}
-                </div>
-                <p className="form-hint">
-                  Уже есть аккаунт?{' '}
-                  <button
-                    type="button"
-                    className="form-link-btn"
-                    onClick={() => setActiveTab('login')}
-                  >
-                    Войти
-                  </button>
-                </p>
-              </form>
+            {/* Registration illustration */}
+            <div className="auth-logo">
+              <TelegramRegisterIcon />
             </div>
-            <div className="modal-footer">
+
+            <h1 className="auth-title">Регистрация</h1>
+            <p className="auth-subtitle">
+              Создайте аккаунт для участия в совместных закупках
+            </p>
+
+            <form className="auth-form" onSubmit={handleRegisterSubmit}>
+              {error && <div className="form-error-banner">{error}</div>}
+
+              <div className="form-group">
+                <label className="form-label">Имя *</label>
+                <input
+                  type="text"
+                  className={`form-input${formErrors.first_name ? ' form-input-error' : ''}`}
+                  name="first_name"
+                  required
+                  placeholder="Введите имя"
+                  value={registerData.first_name}
+                  onChange={handleRegisterChange}
+                  autoComplete="given-name"
+                />
+                {formErrors.first_name && (
+                  <span className="form-field-error">{formErrors.first_name}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Фамилия</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  name="last_name"
+                  placeholder="Введите фамилию"
+                  value={registerData.last_name}
+                  onChange={handleRegisterChange}
+                  autoComplete="family-name"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Телефон *</label>
+                <input
+                  type="tel"
+                  className={`form-input${formErrors.phone ? ' form-input-error' : ''}`}
+                  name="phone"
+                  required
+                  placeholder="+7 999 123 4567"
+                  value={registerData.phone}
+                  onChange={handleRegisterChange}
+                  autoComplete="tel"
+                />
+                {formErrors.phone && (
+                  <span className="form-field-error">{formErrors.phone}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email *</label>
+                <input
+                  type="email"
+                  className={`form-input${formErrors.email ? ' form-input-error' : ''}`}
+                  name="email"
+                  required
+                  placeholder="email@example.com"
+                  value={registerData.email}
+                  onChange={handleRegisterChange}
+                  autoComplete="email"
+                />
+                {formErrors.email && (
+                  <span className="form-field-error">{formErrors.email}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Роль *</label>
+                <select
+                  className={`form-input form-select${formErrors.role ? ' form-input-error' : ''}`}
+                  name="role"
+                  required
+                  value={registerData.role}
+                  onChange={handleRegisterChange}
+                >
+                  <option value="buyer">Покупатель</option>
+                  <option value="organizer">Организатор</option>
+                  <option value="supplier">Поставщик</option>
+                </select>
+                {formErrors.role && (
+                  <span className="form-field-error">{formErrors.role}</span>
+                )}
+              </div>
+
               <button
-                className="btn btn-primary btn-round"
-                onClick={handleRegisterSubmit}
+                type="submit"
+                className="auth-btn"
                 disabled={isLoading}
               >
+                {isLoading && <span className="auth-spinner" />}
                 {isLoading ? 'Загрузка...' : 'Зарегистрироваться'}
               </button>
-            </div>
+
+              <p className="form-hint" style={{ textAlign: 'center' }}>
+                Уже есть аккаунт?{' '}
+                <button
+                  type="button"
+                  className="form-link-btn"
+                  onClick={() => setActiveTab('login')}
+                >
+                  Войти
+                </button>
+              </p>
+            </form>
           </>
         )}
       </div>

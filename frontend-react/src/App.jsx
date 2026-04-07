@@ -23,10 +23,18 @@ function MainApp() {
   const { user, loadUser, theme, setTheme } = useStore();
 
   useEffect(() => {
-    // Load theme from localStorage
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    setTheme(savedTheme);
-    document.documentElement.setAttribute('data-theme', savedTheme);
+    // Respect system preference (prefers-color-scheme) as default
+    const savedTheme = localStorage.getItem('theme');
+    let initialTheme;
+    if (savedTheme) {
+      initialTheme = savedTheme;
+    } else {
+      // Check system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      initialTheme = prefersDark ? 'dark' : 'light';
+    }
+    setTheme(initialTheme);
+    document.documentElement.setAttribute('data-theme', initialTheme);
 
     // Try to load user from storage
     const userId = localStorage.getItem('userId');
@@ -38,6 +46,20 @@ function MainApp() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Listen for system theme changes when no explicit preference is saved
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      // Only follow system preference if user hasn't set one explicitly
+      if (!localStorage.getItem('theme')) {
+        const newTheme = e.matches ? 'dark' : 'light';
+        setTheme(newTheme);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [setTheme]);
 
   return (
     <>

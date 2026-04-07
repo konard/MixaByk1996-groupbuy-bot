@@ -55,15 +55,15 @@ function UnderDevelopmentPage() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '2rem 1.5rem',
+      padding: '32px 24px',
       textAlign: 'center',
-      gap: '1rem',
+      gap: '16px',
     }}>
       <div style={{
-        width: '4rem',
-        height: '4rem',
+        width: '64px',
+        height: '64px',
         borderRadius: '50%',
-        background: 'var(--bg-secondary, #f0f2f5)',
+        background: 'var(--tg-bg-secondary)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -74,17 +74,17 @@ function UnderDevelopmentPage() {
       </div>
 
       <h2 style={{
-        fontSize: '1.2rem',
-        fontWeight: 600,
-        color: 'var(--text-primary, #000)',
+        fontSize: '20px',
+        fontWeight: 500,
+        color: 'var(--tg-text-primary)',
         margin: 0,
       }}>
         {section}
       </h2>
 
       <p style={{
-        fontSize: '0.875rem',
-        color: 'var(--text-secondary, #8e99a4)',
+        fontSize: '13px',
+        color: 'var(--tg-text-secondary)',
         margin: 0,
         maxWidth: '22rem',
         lineHeight: 1.5,
@@ -95,13 +95,13 @@ function UnderDevelopmentPage() {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.4rem',
-        background: 'var(--bg-secondary, #f0f2f5)',
-        borderRadius: '2rem',
-        padding: '0.4rem 1rem',
-        fontSize: '0.8rem',
-        color: 'var(--text-secondary, #8e99a4)',
-        marginTop: '0.25rem',
+        gap: '8px',
+        background: 'var(--tg-bg-secondary)',
+        borderRadius: '30px',
+        padding: '8px 16px',
+        fontSize: '13px',
+        color: 'var(--tg-text-secondary)',
+        marginTop: '4px',
       }}>
         <span>🔧</span>
         <span>В разработке</span>
@@ -109,7 +109,7 @@ function UnderDevelopmentPage() {
 
       <button
         className="btn btn-primary btn-round"
-        style={{ marginTop: '0.5rem' }}
+        style={{ marginTop: '8px' }}
         onClick={() => navigate(-1)}
       >
         Назад
