@@ -1967,6 +1967,15 @@ input, textarea, select {
   .lk-card { width: 240px; height: 96px; }
   .lk-section-block { padding: 8px 12px; }
   .lk-list-action-btn { font-size: 15px; }
+  /* Hide desktop-only cabinet sections; these are accessible via the burger menu */
+  .lk-mobile-hidden { display: none; }
+}
+
+/* Burger menu items shown only on mobile (role-specific shortcuts) */
+.burger-mobile-only { display: none; }
+@media (max-width: 600px) {
+  .burger-mobile-only { display: block; }
+  .burger-divider.burger-mobile-only { display: block; }
 }
 
 @media (max-width: 360px) {

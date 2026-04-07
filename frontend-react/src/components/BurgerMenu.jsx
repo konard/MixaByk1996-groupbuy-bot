@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { getInitials, getAvatarColor } from '../utils/helpers';
 import {
@@ -11,13 +12,20 @@ import {
   TelegramFeaturesIcon,
   NightModeIcon,
   LogoutIcon,
+  ShoppingBagIcon,
+  HistoryIcon,
+  PlusIcon,
+  RequestsIcon,
+  MailIcon,
 } from './Icons';
 
 function BurgerMenu() {
+  const navigate = useNavigate();
   const {
     user,
     burgerMenuOpen,
     closeBurgerMenu,
+    openCreateProcurementModal,
     theme,
     toggleTheme,
     logout,
@@ -132,6 +140,75 @@ function BurgerMenu() {
             </button>
           </li>
         </ul>
+
+        {/* Role-specific items — shown only on mobile (desktop uses Cabinet sidebar) */}
+        {user && (
+          <>
+            <div className="burger-divider burger-mobile-only" />
+            <ul className="burger-menu-list burger-mobile-only" role="list">
+              {(user.role === 'organizer') && (
+                <>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); openCreateProcurementModal(); }}>
+                      <PlusIcon />
+                      <span>Создать закупку</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                      <ShoppingBagIcon />
+                      <span>Мои закупки</span>
+                    </button>
+                  </li>
+                </>
+              )}
+              {(user.role === 'supplier') && (
+                <>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                      <ShoppingBagIcon />
+                      <span>Текущие отгрузки</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                      <HistoryIcon />
+                      <span>История отгрузок</span>
+                    </button>
+                  </li>
+                </>
+              )}
+              {(user.role === 'buyer' || !user.role) && (
+                <>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                      <ShoppingBagIcon />
+                      <span>Текущие закупки</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                      <RequestsIcon />
+                      <span>Мои запросы</span>
+                    </button>
+                  </li>
+                  <li>
+                    <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                      <HistoryIcon />
+                      <span>История закупок</span>
+                    </button>
+                  </li>
+                </>
+              )}
+              <li>
+                <button className="burger-menu-item" onClick={() => { closeBurgerMenu(); navigate('/cabinet'); }}>
+                  <MailIcon />
+                  <span>Подписки</span>
+                </button>
+              </li>
+            </ul>
+          </>
+        )}
 
         <div className="burger-divider" />
 
