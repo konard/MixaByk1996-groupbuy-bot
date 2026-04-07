@@ -88,58 +88,58 @@ function BurgerMenu() {
           </div>
         )}
 
-        <div className="burger-divider" />
+        {/*<div className="burger-divider" />*/}
 
         {/* Main menu items */}
-        <ul className="burger-menu-list" role="list">
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <NewGroupIcon />
-              <span>Новая группа</span>
-            </button>
-          </li>
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <NewChannelIcon />
-              <span>Новый канал</span>
-            </button>
-          </li>
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <SavedMessagesIcon />
-              <span>Избранное</span>
-            </button>
-          </li>
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <ContactsIcon />
-              <span>Контакты</span>
-            </button>
-          </li>
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <SettingsIcon />
-              <span>Настройки</span>
-            </button>
-          </li>
-        </ul>
+        {/*<ul className="burger-menu-list" role="list">*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <NewGroupIcon />*/}
+        {/*      <span>Новая группа</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <NewChannelIcon />*/}
+        {/*      <span>Новый канал</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <SavedMessagesIcon />*/}
+        {/*      <span>Избранное</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <ContactsIcon />*/}
+        {/*      <span>Контакты</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <SettingsIcon />*/}
+        {/*      <span>Настройки</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*</ul>*/}
 
-        <div className="burger-divider" />
+        {/*<div className="burger-divider" />*/}
 
-        <ul className="burger-menu-list" role="list">
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <AskQuestionIcon />
-              <span>Задать вопрос</span>
-            </button>
-          </li>
-          <li>
-            <button className="burger-menu-item" onClick={closeBurgerMenu}>
-              <TelegramFeaturesIcon />
-              <span>Возможности Telegram</span>
-            </button>
-          </li>
-        </ul>
+        {/*<ul className="burger-menu-list" role="list">*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <AskQuestionIcon />*/}
+        {/*      <span>Задать вопрос</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*  <li>*/}
+        {/*    <button className="burger-menu-item" onClick={closeBurgerMenu}>*/}
+        {/*      <TelegramFeaturesIcon />*/}
+        {/*      <span>Возможности Telegram</span>*/}
+        {/*    </button>*/}
+        {/*  </li>*/}
+        {/*</ul>*/}
 
         {/* Role-specific items — shown only on mobile (desktop uses Cabinet sidebar) */}
         {user && (
