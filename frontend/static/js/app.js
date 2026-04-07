@@ -375,7 +375,7 @@ const UI = {
 
     // Load theme from storage
     loadTheme() {
-        const theme = localStorage.getItem('theme') || 'light';
+        const theme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', theme);
     },
 
