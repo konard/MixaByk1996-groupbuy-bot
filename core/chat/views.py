@@ -152,7 +152,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='mark_read')
     def mark_read(self, request, pk=None):
         """Mark a notification as read"""
         notification = self.get_object()

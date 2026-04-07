@@ -4,6 +4,7 @@ async function request(endpoint, options = {}) {
   const url = `${API_URL}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
     ...options.headers,
   };
 
@@ -79,6 +80,12 @@ export const api = {
     request(`/procurements/${id}/add_participant/`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  inviteUser: (id, email, organizerId) =>
+    request(`/procurements/${id}/invite/`, {
+      method: 'POST',
+      body: JSON.stringify({ email, organizer_id: organizerId }),
     }),
 
   leaveProcurement: (id, data) =>
@@ -167,7 +174,7 @@ export const api = {
   getSuppliers: () => request('/users/?role=supplier'),
 
   // Chat voting endpoints
-  getChatVote: (procurementId) => request(`/procurements/${procurementId}/chat_vote/`).catch(() => null),
+  getChatVote: (procurementId) => request(`/procurements/${procurementId}/vote_results/`).catch(() => null),
 
   castChatVote: (procurementId, data) =>
     request(`/procurements/${procurementId}/cast_vote/`, {

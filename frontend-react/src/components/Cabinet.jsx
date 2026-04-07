@@ -251,6 +251,12 @@ function Cabinet() {
   const [addParticipantQuantity, setAddParticipantQuantity] = useState('1');
   const addParticipantSearchTimeout = useRef(null);
 
+  // Invite user modal state
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteProcurement, setInviteProcurement] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+
   // Subscriptions
   const [subscriptions, setSubscriptions] = useState([
     { id: 1, type: 'category', name: 'Биржа', active: true },
@@ -336,6 +342,8 @@ function Cabinet() {
             text: n.title ? `${n.title}: ${n.message}` : n.message,
             date: n.created_at,
             read: n.is_read,
+            procurement_id: n.procurement_id || n.related_object_id,
+            sender_id: n.sender_id,
           })));
         }
 
@@ -367,6 +375,16 @@ function Cabinet() {
       }
     };
     loadStats();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadStats();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [user]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
@@ -446,13 +464,16 @@ function Cabinet() {
     addToast('Подписка удалена', 'info');
   };
 
-  const handleMarkMessageRead = async (id) => {
+  const handleMarkMessageRead = async (message) => {
     try {
-      await api.markNotificationRead(id);
+      await api.markNotificationRead(message.id);
     } catch {
       // ignore
     }
-    setMessages((prev) => prev.map((m) => m.id === id ? { ...m, read: true } : m));
+    setMessages((prev) => prev.map((m) => m.id === message.id ? { ...m, read: true } : m));
+    if (message.procurement_id) {
+      navigate(`/chat/${message.procurement_id}`);
+    }
   };
 
   const handleMarkInvitationRead = async (id) => {
@@ -663,6 +684,26 @@ function Cabinet() {
     }
   };
 
+  const handleOpenInvite = (procurement) => {
+    setInviteProcurement(procurement);
+    setInviteEmail('');
+    setInviteOpen(true);
+  };
+
+  const handleInviteSubmit = async () => {
+    if (!inviteEmail.trim() || !inviteProcurement) return;
+    setInviteLoading(true);
+    try {
+      await api.inviteUser(inviteProcurement.id, inviteEmail.trim(), user.id);
+      addToast(`Приглашение отправлено на ${inviteEmail.trim()}`, 'success');
+      setInviteOpen(false);
+    } catch (err) {
+      addToast(err.message || 'Ошибка отправки приглашения', 'error');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
   const handleUserSearch = (query) => {
     setUserSearchQuery(query);
     if (userSearchTimeout.current) clearTimeout(userSearchTimeout.current);
@@ -707,7 +748,7 @@ function Cabinet() {
             <div key={m.id}>
               <div
                 className="lk-message-item"
-                onClick={() => { handleMarkMessageRead(m.id); setReplyTarget(m); }}
+                onClick={() => { handleMarkMessageRead(m); setReplyTarget(m); }}
                 style={!m.read ? { background: 'rgba(36,129,204,0.06)', borderLeft: '3px solid var(--tg-primary)' } : undefined}
               >
                 <div className="lk-message-avatar" style={{ background: getAvatarColor(m.from) }}>
@@ -994,6 +1035,11 @@ function Cabinet() {
                 {p.status === 'active' && (
                   <button className="lk-btn-invite-accept" style={{ fontSize: '0.7rem', padding: '2px 8px' }} onClick={() => handleOpenAddParticipant(p)}>
                     + Добавить участника
+                  </button>
+                )}
+                {p.organizer === user?.id && p.status === 'active' && (
+                  <button className="lk-btn-invite-accept" style={{ fontSize: '0.7rem', padding: '2px 8px' }} onClick={() => handleOpenInvite(p)}>
+                    Пригласить
                   </button>
                 )}
               </div>
@@ -1352,7 +1398,7 @@ function Cabinet() {
                 <div
                   key={m.id}
                   className="lk-message-item"
-                  onClick={() => { handleMarkMessageRead(m.id); setReplyTarget(m); }}
+                  onClick={() => { handleMarkMessageRead(m); setReplyTarget(m); }}
                 >
                   <div className="lk-message-avatar" style={{ background: getAvatarColor(m.from) }}>
                     {getInitials(m.from, '')}
@@ -1598,6 +1644,43 @@ function Cabinet() {
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button className="lk-btn-action lk-btn-action--outline" style={{ height: 36, flex: 'none', padding: '0 16px' }} onClick={() => setAddParticipantOpen(false)}>Отмена</button>
                 <button className="lk-btn-action" style={{ height: 36, flex: 'none', padding: '0 16px' }} disabled={!addParticipantSelected || !addParticipantAmount} onClick={handleAddParticipantSubmit}>Добавить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteOpen && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setInviteOpen(false)}>
+          <div className="modal" style={{ maxWidth: 360 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Пригласить пользователя</h3>
+              <button className="modal-close" onClick={() => setInviteOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {inviteProcurement && (
+                <p className="lk-purchase-meta" style={{ margin: 0 }}>
+                  Закупка: <strong>{inviteProcurement.title}</strong>
+                </p>
+              )}
+              <div>
+                <label className="lk-purchase-stats" style={{ display: 'block', marginBottom: 4 }}>Email пользователя</label>
+                <input
+                  type="email"
+                  className="lk-search-input"
+                  style={{ paddingLeft: 12, borderRadius: 8 }}
+                  placeholder="example@email.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleInviteSubmit()}
+                  autoFocus
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="lk-btn-action lk-btn-action--outline" style={{ height: 36, flex: 'none', padding: '0 16px' }} onClick={() => setInviteOpen(false)}>Отмена</button>
+                <button className="lk-btn-action" style={{ height: 36, flex: 'none', padding: '0 16px' }} disabled={!inviteEmail.trim() || inviteLoading} onClick={handleInviteSubmit}>
+                  {inviteLoading ? 'Отправка...' : 'Пригласить'}
+                </button>
               </div>
             </div>
           </div>

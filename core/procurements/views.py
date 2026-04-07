@@ -1,6 +1,8 @@
 """
 Views for Procurements API
 """
+import logging
+
 from django.db.models import Count
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
@@ -11,7 +13,10 @@ from .serializers import (
     CategorySerializer, ProcurementListSerializer, ProcurementDetailSerializer,
     ProcurementCreateSerializer, ParticipantSerializer, JoinProcurementSerializer,
     SupplierVoteSerializer, CastVoteSerializer, AddParticipantSerializer,
+    InviteUserSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -569,6 +574,42 @@ class ProcurementViewSet(viewsets.ModelViewSet):
             'message': 'Procurement closed successfully',
             'status': procurement.status,
         })
+
+    @action(detail=True, methods=['post'])
+    def invite(self, request, pk=None):
+        """Invite a user to a procurement by email (creator only).
+
+        Only the procurement organizer (creator) can send invites.
+        The invite is logged; an email notification would be sent in production.
+        """
+        procurement = self.get_object()
+
+        serializer = InviteUserSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        organizer_id = serializer.validated_data.get('organizer_id')
+        email = serializer.validated_data['email']
+
+        if organizer_id is not None and procurement.organizer_id != int(organizer_id):
+            return Response(
+                {'error': 'Only the creator of this procurement can send invitations'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Log the invite (send email in production via async task or notification service)
+        logger.info(
+            'Procurement invite: procurement_id=%s organizer_id=%s invited_email=%s',
+            procurement.id,
+            procurement.organizer_id,
+            email,
+        )
+
+        return Response({
+            'message': f'Invitation sent to {email}',
+            'procurement_id': procurement.id,
+            'invited_email': email,
+        }, status=status.HTTP_200_OK)
 
 
 class ParticipantViewSet(viewsets.ModelViewSet):

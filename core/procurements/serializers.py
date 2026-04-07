@@ -120,3 +120,9 @@ class AddParticipantSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=10, decimal_places=2, default=1)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class InviteUserSerializer(serializers.Serializer):
+    """Serializer for inviting a user to a procurement by email (creator only)"""
+    email = serializers.EmailField()
+    organizer_id = serializers.IntegerField(required=False)
