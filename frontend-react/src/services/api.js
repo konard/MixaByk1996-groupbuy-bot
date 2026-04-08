@@ -14,6 +14,7 @@ async function request(endpoint, options = {}) {
   }
 
   const response = await fetch(url, {
+    cache: 'no-store',
     ...options,
     headers,
   });

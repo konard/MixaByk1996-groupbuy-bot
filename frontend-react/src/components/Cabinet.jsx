@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { api } from '../services/api';
@@ -405,6 +405,7 @@ function CabinetChatSection() {
 
 function Cabinet() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, openDepositModal, openCreateProcurementModal, logout, addToast, openLoginModal } = useStore();
   const [userStats, setUserStats] = useState(null);
   const [companyCardOpen, setCompanyCardOpen] = useState(false);
@@ -585,7 +586,7 @@ function Cabinet() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user]);
+  }, [user, location.key]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
