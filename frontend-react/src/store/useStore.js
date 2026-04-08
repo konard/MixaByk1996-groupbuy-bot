@@ -42,6 +42,11 @@ export const useStore = create((set, get) => ({
     try {
       const user = await api.getUser(userId);
       set({ user, isLoading: false });
+      // Fetch a fresh WebSocket JWT token so the WS server can authenticate.
+      // Fire-and-forget: a failure here must not block the login flow.
+      api.getWsToken(userId).then(({ token }) => {
+        if (token) localStorage.setItem('authToken', token);
+      }).catch(() => {});
     } catch (error) {
       set({ error: error.message, isLoading: false });
       localStorage.removeItem('userId');

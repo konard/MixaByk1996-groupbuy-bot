@@ -1,6 +1,10 @@
 """
 Views for User API
 """
+import os
+import time
+
+import jwt
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,6 +16,9 @@ from .serializers import (
     UserSerializer, UserRegistrationSerializer, UserProfileUpdateSerializer,
     UserBalanceSerializer, UserSessionSerializer
 )
+
+# Token lifetime for WebSocket authentication tokens (24 hours)
+_WS_TOKEN_TTL = 86400
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -206,6 +213,31 @@ class UserViewSet(viewsets.ModelViewSet):
             'role': user.role,
             'role_display': user.role_display
         })
+
+    @action(detail=True, methods=['get'])
+    def ws_token(self, request, pk=None):
+        """Generate a short-lived JWT for WebSocket authentication.
+
+        The WebSocket server (infrastructure/websocket/chat_server.py) validates
+        this token via the shared JWT_SECRET environment variable.  The token
+        expires after 24 hours; the frontend should refresh it on next page load.
+
+        Returns:
+            {"token": "<JWT>", "expires_in": 86400}
+        """
+        user = self.get_object()
+        secret = os.environ.get('JWT_SECRET', 'your-secret-key')
+        now = int(time.time())
+        payload = {
+            'user_id': user.id,
+            'iat': now,
+            'exp': now + _WS_TOKEN_TTL,
+        }
+        token = jwt.encode(payload, secret, algorithm='HS256')
+        # PyJWT ≥ 2.0 returns str; older versions return bytes
+        if isinstance(token, bytes):
+            token = token.decode('utf-8')
+        return Response({'token': token, 'expires_in': _WS_TOKEN_TTL})
 
 
 class UserSessionViewSet(viewsets.ModelViewSet):
