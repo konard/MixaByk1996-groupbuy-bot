@@ -899,15 +899,31 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Redis — used for read-receipt buffering and message idempotency
-	redisAddr := getEnv("REDIS_URL", "redis://localhost:6379")
+	// Redis — used for read-receipt buffering and message idempotency.
+	// Fallback uses the "redis" service name, not localhost, which is incorrect inside Docker containers.
+	redisAddr := getEnv("REDIS_URL", "redis://redis:6379")
 	opt, err := redis.ParseURL(redisAddr)
 	if err != nil {
 		log.Fatalf("Redis URL parse failed: %v", err)
 	}
 	rdb := redis.NewClient(opt)
-	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		log.Printf("Redis connect warning: %v — read-receipt buffering disabled", err)
+	// Retry Redis connection up to 3 times before giving up (fail fast on misconfiguration).
+	const redisMaxRetries = 3
+	redisReady := false
+	for i := 1; i <= redisMaxRetries; i++ {
+		if _, pingErr := rdb.Ping(ctx).Result(); pingErr == nil {
+			redisReady = true
+			log.Printf("Connected to Redis at %s", redisAddr)
+			break
+		} else {
+			log.Printf("Redis connect attempt %d/%d failed: %v", i, redisMaxRetries, pingErr)
+			if i < redisMaxRetries {
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}
+	if !redisReady {
+		log.Fatalf("Redis unavailable after %d attempts — check REDIS_URL (%s). Aborting.", redisMaxRetries, redisAddr)
 	}
 	defer rdb.Close()
 

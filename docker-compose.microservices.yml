@@ -474,6 +474,7 @@ services:
     environment:
       PORT: 4004
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-chat:5432/${CHAT_DB_NAME:-chat_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
       CENTRIFUGO_URL: http://centrifugo:8000
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-centrifugo_api_key}
       CLICKHOUSE_DSN: clickhouse://clickhouse_user:clickhouse_password@clickhouse:9000/chat_history
@@ -481,6 +482,8 @@ services:
       postgres-chat:
         condition: service_healthy
       centrifugo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - microservices

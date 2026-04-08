@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 class ChatServer:
     """WebSocket server for procurement chats"""
 
+    # Heartbeat interval (seconds) between server-sent pings
+    PING_INTERVAL = 30
+    # Number of consecutive missed pongs before a connection is considered dead
+    MAX_MISSED_PONGS = 2
+
     def __init__(self, host: str = '0.0.0.0', port: int = 8765):
         self.host = host
         self.port = port
@@ -32,6 +37,9 @@ class ChatServer:
 
         # Connection storage: {procurement_id: {websocket1, websocket2, ...}}
         self.connections: Dict[int, Set[web.WebSocketResponse]] = {}
+
+        # Tracks missed pong count per websocket to detect dead connections
+        self._missed_pongs: Dict[web.WebSocketResponse, int] = {}
 
         # Message history (in production, use Redis)
         self.message_history: Dict[int, list] = {}
@@ -89,6 +97,9 @@ class ChatServer:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     await self.handle_message(procurement_id, user_id, msg.data, ws)
+                elif msg.type == aiohttp.WSMsgType.PONG:
+                    # Client is alive — reset the missed-pong counter
+                    self._missed_pongs[ws] = 0
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     logger.error(f'WebSocket error: {ws.exception()}')
 
@@ -131,6 +142,35 @@ class ChatServer:
             logger.error(f"Error checking access: {e}")
             return False
 
+    async def _heartbeat_loop(self, ws: web.WebSocketResponse, procurement_id: int):
+        """Send periodic pings and terminate connections that miss too many pongs.
+
+        aiohttp's WebSocketResponse automatically tracks pong responses; we count
+        how many consecutive intervals pass without a pong and close stale sockets.
+        """
+        try:
+            while not ws.closed:
+                await asyncio.sleep(self.PING_INTERVAL)
+                if ws.closed:
+                    break
+                try:
+                    await ws.ping()
+                    # Give the client one interval to reply before incrementing counter
+                    # aiohttp resets pong tracking on each ping; we maintain our own counter
+                    self._missed_pongs[ws] = self._missed_pongs.get(ws, 0) + 1
+                    if self._missed_pongs[ws] > self.MAX_MISSED_PONGS:
+                        logger.warning(
+                            f"No pong from user {getattr(ws, 'user_id', '?')} in "
+                            f"chat {procurement_id} after {self.MAX_MISSED_PONGS} pings — closing."
+                        )
+                        await ws.close(code=1001, message=b'Ping timeout')
+                        break
+                except Exception as e:
+                    logger.debug(f"Heartbeat ping failed: {e}")
+                    break
+        except asyncio.CancelledError:
+            pass
+
     async def register_connection(
         self,
         procurement_id: int,
@@ -144,6 +184,10 @@ class ChatServer:
         # Store user_id on the websocket object
         ws.user_id = user_id
         self.connections[procurement_id].add(ws)
+        self._missed_pongs[ws] = 0
+
+        # Start per-connection heartbeat task
+        asyncio.ensure_future(self._heartbeat_loop(ws, procurement_id))
 
         logger.info(f"User {user_id} connected to chat {procurement_id}")
 
@@ -160,6 +204,8 @@ class ChatServer:
             # Remove empty rooms
             if not self.connections[procurement_id]:
                 del self.connections[procurement_id]
+
+        self._missed_pongs.pop(ws, None)
 
         logger.info(f"User {user_id} disconnected from chat {procurement_id}")
 

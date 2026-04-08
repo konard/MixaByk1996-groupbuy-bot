@@ -452,7 +452,7 @@ function CabinetChatSection() {
 function Cabinet() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, openDepositModal, openCreateProcurementModal, logout, addToast, openLoginModal } = useStore();
+  const { user, openDepositModal, openCreateProcurementModal, logout, addToast, openLoginModal, createProcurementModalOpen } = useStore();
   const [userStats, setUserStats] = useState(null);
   const [companyCardOpen, setCompanyCardOpen] = useState(false);
   const [priceListOpen, setPriceListOpen] = useState(false);
@@ -464,6 +464,7 @@ function Cabinet() {
   const [roleSwitchOpen, setRoleSwitchOpen] = useState(false);
 
   const [myProcurements, setMyProcurements] = useState(null);
+  const [procurementsLoading, setProcurementsLoading] = useState(true);
   const [myRequests, setMyRequests] = useState([]);
   const [procurementHistory, setProcurementHistory] = useState([]);
   const [paymentProcurements, setPaymentProcurements] = useState([]);
@@ -571,66 +572,73 @@ function Cabinet() {
     });
   }, [user]);
 
+  // loadStats is extracted as a useCallback so it can be called from multiple effects
+  // (initial load, visibility change, and post-procurement-creation refresh).
+  const loadStats = useCallback(async () => {
+    if (!user) return;
+    setProcurementsLoading(true);
+    try {
+      const [balance, procurements, notifications] = await Promise.all([
+        api.getUserBalance(user.id).catch(() => null),
+        api.getUserProcurements(user.id).catch(() => null),
+        api.getNotifications(user.id).catch(() => null),
+      ]);
+
+      if (notifications) {
+        const notifList = notifications.results || notifications;
+        const invites = notifList.filter((n) => n.notification_type === 'invite' || n.notification_type === 'invitation');
+        const msgs = notifList.filter((n) => n.notification_type !== 'invite' && n.notification_type !== 'invitation');
+        setInvitations(invites.map((n) => ({
+          id: n.id,
+          from: n.sender_name || 'Организатор',
+          text: n.title ? `${n.title}: ${n.message}` : n.message,
+          date: n.created_at,
+          read: n.is_read,
+          procurement_id: n.procurement_id || n.related_object_id,
+        })));
+        setMessages(msgs.map((n) => ({
+          id: n.id,
+          from: n.notification_type === 'system' ? 'Система' : (n.sender_name || 'Администратор'),
+          text: n.title ? `${n.title}: ${n.message}` : n.message,
+          date: n.created_at,
+          read: n.is_read,
+          procurement_id: n.procurement_id || n.related_object_id,
+          sender_id: n.sender_id,
+        })));
+      }
+
+      let organized = [];
+      let participating = [];
+      if (procurements) {
+        if (Array.isArray(procurements)) {
+          organized = procurements.filter((p) => p.organizer === user.id);
+          participating = procurements.filter((p) => p.organizer !== user.id);
+        } else {
+          organized = procurements.organized || [];
+          participating = procurements.participating || [];
+        }
+      }
+      const procs = [...organized, ...participating];
+      setMyProcurements({ organized, participating });
+      setPaymentProcurements(organized.filter((p) => p.status === 'payment' || p.status === 'stopped'));
+      const history = procs.filter((p) => p.status === 'completed' || p.status === 'cancelled');
+      setProcurementHistory(history);
+
+      setUserStats({
+        balance: balance || {},
+        procurementsCount: procs.length,
+        activeProcurements: procs.filter((p) => p.status === 'active').length,
+        completedProcurements: procs.filter((p) => p.status === 'completed').length,
+      });
+    } catch {
+      // ignore stats loading errors
+    } finally {
+      setProcurementsLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
-    const loadStats = async () => {
-      try {
-        const [balance, procurements, notifications] = await Promise.all([
-          api.getUserBalance(user.id).catch(() => null),
-          api.getUserProcurements(user.id).catch(() => null),
-          api.getNotifications(user.id).catch(() => null),
-        ]);
-
-        if (notifications) {
-          const notifList = notifications.results || notifications;
-          const invites = notifList.filter((n) => n.notification_type === 'invite' || n.notification_type === 'invitation');
-          const msgs = notifList.filter((n) => n.notification_type !== 'invite' && n.notification_type !== 'invitation');
-          setInvitations(invites.map((n) => ({
-            id: n.id,
-            from: n.sender_name || 'Организатор',
-            text: n.title ? `${n.title}: ${n.message}` : n.message,
-            date: n.created_at,
-            read: n.is_read,
-            procurement_id: n.procurement_id || n.related_object_id,
-          })));
-          setMessages(msgs.map((n) => ({
-            id: n.id,
-            from: n.notification_type === 'system' ? 'Система' : (n.sender_name || 'Администратор'),
-            text: n.title ? `${n.title}: ${n.message}` : n.message,
-            date: n.created_at,
-            read: n.is_read,
-            procurement_id: n.procurement_id || n.related_object_id,
-            sender_id: n.sender_id,
-          })));
-        }
-
-        let organized = [];
-        let participating = [];
-        if (procurements) {
-          if (Array.isArray(procurements)) {
-            organized = procurements.filter((p) => p.organizer === user.id);
-            participating = procurements.filter((p) => p.organizer !== user.id);
-          } else {
-            organized = procurements.organized || [];
-            participating = procurements.participating || [];
-          }
-        }
-        const procs = [...organized, ...participating];
-        setMyProcurements({ organized, participating });
-        setPaymentProcurements(organized.filter((p) => p.status === 'payment' || p.status === 'stopped'));
-        const history = procs.filter((p) => p.status === 'completed' || p.status === 'cancelled');
-        setProcurementHistory(history);
-
-        setUserStats({
-          balance: balance || {},
-          procurementsCount: procs.length,
-          activeProcurements: procs.filter((p) => p.status === 'active').length,
-          completedProcurements: procs.filter((p) => p.status === 'completed').length,
-        });
-      } catch {
-        // ignore stats loading errors
-      }
-    };
     loadStats();
 
     const handleVisibilityChange = () => {
@@ -642,7 +650,17 @@ function Cabinet() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user, location.key]);
+  }, [user, location.key, loadStats]);
+
+  // Reload procurements immediately when the create-procurement modal closes.
+  // This ensures the new purchase appears in Cabinet without a manual page refresh.
+  const prevCreateModalOpen = useRef(createProcurementModalOpen);
+  useEffect(() => {
+    if (prevCreateModalOpen.current && !createProcurementModalOpen) {
+      loadStats();
+    }
+    prevCreateModalOpen.current = createProcurementModalOpen;
+  }, [createProcurementModalOpen, loadStats]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -1152,7 +1170,9 @@ function Cabinet() {
 
     return (
       <ContentPanel>
-        {activeProcs.length === 0 ? (
+        {procurementsLoading ? (
+          <p className="lk-purchase-stats" style={{ padding: '4px 0' }}>Загрузка...</p>
+        ) : activeProcs.length === 0 ? (
           <p className="lk-purchase-stats" style={{ padding: '4px 0' }}>Нет активных закупок</p>
         ) : (
           activeProcs.map((p) => {
@@ -1319,7 +1339,9 @@ function Cabinet() {
     const procs = myProcurements?.organized || [];
     return (
       <ContentPanel>
-        {procs.length === 0 ? (
+        {procurementsLoading ? (
+          <p className="lk-purchase-stats" style={{ padding: '4px 0' }}>Загрузка...</p>
+        ) : procs.length === 0 ? (
           <p className="lk-purchase-stats" style={{ padding: '4px 0' }}>Нет закупок</p>
         ) : (
           procs.map((p) => (
