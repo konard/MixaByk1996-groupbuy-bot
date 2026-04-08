@@ -1232,8 +1232,9 @@ input, textarea, select {
   inset: 0;
   z-index: 1100;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
   background-color: var(--tg-bg-secondary);
 }
 
@@ -1241,6 +1242,7 @@ input, textarea, select {
   width: 100%;
   max-width: 360px;
   padding: var(--tg-spacing-2xl);
+  margin: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1284,10 +1286,44 @@ input, textarea, select {
 
 .auth-form .form-group {
   margin-bottom: 0;
+  position: relative;
 }
 
 .auth-form .form-input {
   text-align: left;
+}
+
+/* Floating label effect for auth forms */
+.auth-form .form-label {
+  position: absolute;
+  left: var(--tg-spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--tg-font-size-base);
+  color: var(--tg-text-muted);
+  background-color: var(--tg-bg-primary);
+  padding: 0 4px;
+  pointer-events: none;
+  transition: top var(--tg-transition), font-size var(--tg-transition), color var(--tg-transition), transform var(--tg-transition);
+  line-height: 1;
+}
+
+.auth-form .form-group:focus-within .form-label,
+.auth-form .form-group.has-value .form-label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: var(--tg-font-size-sm);
+  color: var(--tg-primary);
+}
+
+.auth-form .form-group.form-group-error .form-label,
+.auth-form .form-group.form-group-error:focus-within .form-label {
+  color: var(--tg-error);
+}
+
+.auth-form .form-input {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .auth-btn {
