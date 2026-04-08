@@ -7,9 +7,11 @@
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
+    "@nestjs/config": "^3.2.0",
     "@nestjs/testing": "^10.3.0",
     "@nestjs/schedule": "^4.0.1",
     "@nestjs/typeorm": "^10.0.2",
+    "kafkajs": "^2.2.4",
     "reflect-metadata": "^0.2.1",
     "typeorm": "^0.3.20"
   },
@@ -32,6 +34,7 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^../../services/purchase-service/src/(.*)$": "<rootDir>/../../services/purchase-service/src/$1"
-    }
+    },
+    "modulePaths": ["<rootDir>/node_modules"]
   }
 }

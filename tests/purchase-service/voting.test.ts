@@ -35,10 +35,11 @@ function makePurchase(overrides: Partial<Purchase> = {}): Purchase {
     closedAt: null,
     metadata: {},
     votingSession: null,
+    commissionPercent: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  };
+  } as Purchase;
 }
 
 function makeSession(overrides: Partial<VotingSession> = {}): VotingSession {
@@ -52,13 +53,17 @@ function makeSession(overrides: Partial<VotingSession> = {}): VotingSession {
     allowAddCandidates: true,
     allowChangeVote: true,
     minVotesToClose: 1,
+    votingDuration: 24,
+    votingEndsAt: null,
+    tieBreaker: null,
+    candidateDeadline: null,
     winnerCandidateId: null,
     candidates: [],
     votes: [],
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  };
+  } as VotingSession;
 }
 
 function makeCandidate(overrides: Partial<Candidate> = {}): Candidate {
@@ -610,6 +615,76 @@ describe('VotingService', () => {
 
       const { winner } = await service.getSessionResults('session-1');
       expect(winner).toBeNull();
+    });
+
+    // ── voted flag (issue #282) ───────────────────────────────────────────
+
+    it('sets voted=true only on the candidate the requesting user voted for', async () => {
+      const c1 = makeCandidate({ id: 'c1', supplierName: 'Alpha' });
+      const c2 = makeCandidate({ id: 'c2', supplierName: 'Beta' });
+      const session = makeSession({
+        candidates: [c1, c2],
+        votes: [
+          makeVote({ id: 'v1', candidateId: 'c1', userId: 'user-42' }),
+          makeVote({ id: 'v2', candidateId: 'c2', userId: 'user-99' }),
+        ],
+      });
+      sessionRepo.findOne.mockResolvedValue(session);
+
+      const { tally, currentUserCandidateId } = await service.getSessionResults('session-1', 'user-42');
+
+      const c1Entry = tally.find((t) => t.candidate.id === 'c1');
+      const c2Entry = tally.find((t) => t.candidate.id === 'c2');
+
+      expect(c1Entry?.voted).toBe(true);   // user-42 voted for c1
+      expect(c2Entry?.voted).toBe(false);  // user-42 did NOT vote for c2
+      expect(currentUserCandidateId).toBe('c1');
+    });
+
+    it('sets voted=false for all candidates when userId is null (unauthenticated)', async () => {
+      const c1 = makeCandidate({ id: 'c1', supplierName: 'Alpha' });
+      const session = makeSession({
+        candidates: [c1],
+        votes: [makeVote({ candidateId: 'c1', userId: 'someone-else' })],
+      });
+      sessionRepo.findOne.mockResolvedValue(session);
+
+      const { tally, currentUserCandidateId } = await service.getSessionResults('session-1', null);
+
+      expect(tally[0].voted).toBe(false);
+      expect(currentUserCandidateId).toBeNull();
+    });
+
+    it('sets voted=false for all candidates when user has not voted', async () => {
+      const c1 = makeCandidate({ id: 'c1', supplierName: 'Alpha' });
+      const c2 = makeCandidate({ id: 'c2', supplierName: 'Beta' });
+      const session = makeSession({
+        candidates: [c1, c2],
+        votes: [makeVote({ candidateId: 'c1', userId: 'other-user' })],
+      });
+      sessionRepo.findOne.mockResolvedValue(session);
+
+      const { tally, currentUserCandidateId } = await service.getSessionResults('session-1', 'new-user-no-vote');
+
+      expect(tally.every((t) => t.voted === false)).toBe(true);
+      expect(currentUserCandidateId).toBeNull();
+    });
+
+    it('does not perform extra DB queries for voted flag (no N+1)', async () => {
+      // The votes are loaded once with the session via relations; no extra findOne calls.
+      const candidates = Array.from({ length: 50 }, (_, i) =>
+        makeCandidate({ id: `c${i}`, supplierName: `Supplier ${i}` }),
+      );
+      const votes = candidates.map((c, i) =>
+        makeVote({ id: `v${i}`, candidateId: c.id, userId: `user-${i}` }),
+      );
+      const session = makeSession({ candidates, votes });
+      sessionRepo.findOne.mockResolvedValue(session);
+
+      await service.getSessionResults('session-1', 'user-5');
+
+      // Only one findOne call for the session itself — no additional queries
+      expect(sessionRepo.findOne).toHaveBeenCalledTimes(1);
     });
   });
 });

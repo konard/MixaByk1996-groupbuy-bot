@@ -240,10 +240,26 @@ export class VotingService {
 
   // ─── Get Session Results ───────────────────────────────────────────────────
 
-  async getSessionResults(sessionId: string): Promise<{
+  /**
+   * Return tally with a `voted` flag per candidate for the requesting user.
+   *
+   * Avoids N+1: all votes are loaded once with the session, then a single
+   * subquery-equivalent lookup (`userId`-filtered scan of the loaded array)
+   * determines which candidate the user voted for.
+   *
+   * Response shape per tally entry:
+   *   { candidate, voteCount, voted: boolean }
+   *
+   * `voted` is true only for the ONE candidate the user cast their vote for.
+   */
+  async getSessionResults(
+    sessionId: string,
+    userId: string | null = null,
+  ): Promise<{
     session: VotingSession;
-    tally: Array<{ candidate: Candidate; voteCount: number }>;
+    tally: Array<{ candidate: Candidate; voteCount: number; voted: boolean }>;
     winner: Candidate | null;
+    currentUserCandidateId: string | null;
   }> {
     const session = await this.sessionRepo.findOne({
       where: { id: sessionId },
@@ -251,6 +267,13 @@ export class VotingService {
     });
     if (!session) throw new NotFoundException('Voting session not found');
 
+    // All votes already loaded — find the requesting user's choice in O(n)
+    const userVote = userId
+      ? session.votes.find((v) => v.userId === userId) ?? null
+      : null;
+    const currentUserCandidateId = userVote?.candidateId ?? null;
+
+    // Build count map from loaded votes (no extra DB query)
     const countMap = new Map<string, number>();
     for (const vote of session.votes) {
       countMap.set(vote.candidateId, (countMap.get(vote.candidateId) ?? 0) + 1);
@@ -259,6 +282,8 @@ export class VotingService {
     const tally = session.candidates.map((c) => ({
       candidate: c,
       voteCount: countMap.get(c.id) ?? 0,
+      // `voted` is true for the candidate the requesting user voted for
+      voted: c.id === currentUserCandidateId,
     }));
     tally.sort((a, b) => b.voteCount - a.voteCount);
 
@@ -267,7 +292,7 @@ export class VotingService {
         ? session.candidates.find((c) => c.id === session.winnerCandidateId) ?? null
         : null;
 
-    return { session, tally, winner };
+    return { session, tally, winner, currentUserCandidateId };
   }
 
   // ─── Manual Close ──────────────────────────────────────────────────────────

@@ -8,10 +8,19 @@ import {
   getAvatarColor,
 } from '../utils/helpers';
 import { batchProcessMessages } from '../services/wasm';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { BackIcon, MoreIcon, AttachIcon, SendIcon } from './Icons';
 
 // --- Chat Voting Panel (pinned message) ---
+/**
+ * ChatVotingPanel — Scenario C (issue #282 Part II §5):
+ *  - On vote click, button enters `loading` state and is disabled immediately
+ *  - Optimistic UI: update local vote count before server responds
+ *  - On server error, roll back optimistic update
+ *  - On 429, disable vote button and show countdown timer
+ *  - Only the changed option's count is updated (minimal re-renders)
+ *  - Subscribes to `vote_update` / `voting_closed` WebSocket events
+ */
 function ChatVotingPanel({ procurementId, user, participants }) {
   const { addToast } = useStore();
   const [voteResults, setVoteResults] = useState(null);
@@ -22,12 +31,31 @@ function ChatVotingPanel({ procurementId, user, participants }) {
   const [userVote, setUserVote] = useState(null); // current user's vote
   const [closeRequests, setCloseRequests] = useState([]); // user ids who requested close
   const [isLoading, setIsLoading] = useState(false);
+  const [isVoting, setIsVoting] = useState(false); // vote button in-flight state
+  const [retryAfter, setRetryAfter] = useState(null); // 429 countdown (seconds)
+  const retryTimerRef = useRef(null);
   const [newSupplierName, setNewSupplierName] = useState('');
   const [showAddSupplier, setShowAddSupplier] = useState(false);
 
   const totalParticipants = participants?.length || 0;
   const allClosed = totalParticipants > 0 && closeRequests.length >= totalParticipants;
   const userAlreadyClosedVote = user && closeRequests.includes(user.id);
+
+  // 429 countdown effect
+  useEffect(() => {
+    if (retryAfter === null || retryAfter <= 0) {
+      if (retryTimerRef.current) {
+        clearInterval(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      if (retryAfter === 0) setRetryAfter(null);
+      return;
+    }
+    retryTimerRef.current = setInterval(() => {
+      setRetryAfter((s) => (s !== null && s > 1 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(retryTimerRef.current);
+  }, [retryAfter]);
 
   const loadVoteData = useCallback(async () => {
     if (!procurementId) return;
@@ -67,21 +95,77 @@ function ChatVotingPanel({ procurementId, user, participants }) {
   }, [loadVoteData]);
 
   const handleCastVote = async () => {
-    if (!selectedSupplierId) {
-      addToast('Выберите поставщика', 'error');
-      return;
+    if (!selectedSupplierId || isVoting || retryAfter) return;
+    if (!user) return;
+
+    const supplierId = parseInt(selectedSupplierId, 10);
+
+    // --- Optimistic update: increment target option count before server responds ---
+    const prevResults = voteResults;
+    const prevUserVote = userVote;
+
+    setIsVoting(true);
+
+    if (voteResults) {
+      setVoteResults((prev) => {
+        if (!prev) return prev;
+        const updatedResults = (prev.results || []).map((r) => {
+          // Decrement old vote's count if changing vote
+          if (prevUserVote && r.supplier_id === prevUserVote.supplier_id) {
+            return { ...r, vote_count: Math.max(0, r.vote_count - 1) };
+          }
+          // Increment new vote's count
+          if (r.supplier_id === supplierId) {
+            return { ...r, vote_count: r.vote_count + 1 };
+          }
+          return r;
+        });
+        return {
+          ...prev,
+          results: updatedResults,
+          total_votes: prev.total_votes + (prevUserVote ? 0 : 1),
+          user_votes: {
+            ...(prev.user_votes || {}),
+            [user.id]: { supplier_id: supplierId },
+          },
+        };
+      });
+      setUserVote({ supplier_id: supplierId });
     }
+
     try {
       await api.castChatVote(procurementId, {
         voter_id: user.id,
-        supplier_id: parseInt(selectedSupplierId),
+        supplier_id: supplierId,
         comment: voteComment,
       });
-      addToast(userVote ? 'Голос изменён' : 'Голос учтён', 'success');
+      addToast(prevUserVote ? 'Голос изменён' : 'Голос учтён', 'success');
       setVoteComment('');
+      // Refresh from server to reconcile any discrepancies
       await loadVoteData();
-    } catch {
-      addToast('Ошибка при голосовании', 'error');
+    } catch (err) {
+      // --- Rollback optimistic update on error ---
+      setVoteResults(prevResults);
+      setUserVote(prevUserVote);
+      if (selectedSupplierId && prevUserVote) {
+        setSelectedSupplierId(String(prevUserVote.supplier_id));
+      }
+
+      if (err instanceof ApiError) {
+        if (err.status === 429) {
+          setRetryAfter(err.retryAfter ?? 60);
+          addToast(`Слишком много запросов. Повторите через ${err.retryAfter ?? 60} сек.`, 'error');
+        } else if (err.status === 409) {
+          addToast('Данные устарели — загружены актуальные', 'info');
+          await loadVoteData();
+        } else {
+          addToast(err.message || 'Ошибка при голосовании', 'error');
+        }
+      } else {
+        addToast('Ошибка при голосовании', 'error');
+      }
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -216,9 +300,13 @@ function ChatVotingPanel({ procurementId, user, participants }) {
                       className="btn btn-primary btn-round"
                       style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }}
                       onClick={handleCastVote}
-                      disabled={!selectedSupplierId}
+                      disabled={!selectedSupplierId || isVoting || !!retryAfter}
                     >
-                      {userVote ? 'Изменить голос' : 'Проголосовать'}
+                      {isVoting
+                        ? '...'
+                        : retryAfter
+                          ? `Подождите ${retryAfter}с`
+                          : userVote ? 'Изменить голос' : 'Проголосовать'}
                     </button>
                     <button
                       className="btn btn-outline btn-round"

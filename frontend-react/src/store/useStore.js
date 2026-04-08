@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import {batchProcessProcurements, generatePlatformUserId} from '../services/wasm';
 
 export const useStore = create((set, get) => ({
@@ -245,7 +245,24 @@ export const useStore = create((set, get) => ({
       });
       get().addToast('Голос учтён', 'success');
     } catch (error) {
-      get().addToast(error.message || 'Ошибка при голосовании', 'error');
+      if (error instanceof ApiError) {
+        if (error.status === 409) {
+          // Stale conflict: reload fresh data and notify user
+          get().loadProcurements();
+          get().addToast('Данные устарели — загружены актуальные', 'info');
+        } else if (error.status === 429) {
+          get().addToast(
+            `Слишком много запросов. Повторите через ${error.retryAfter ?? 60} сек.`,
+            'error',
+          );
+        } else if (error.status === 403) {
+          get().addToast('Нет доступа', 'error');
+        } else {
+          get().addToast(error.message || 'Ошибка при голосовании', 'error');
+        }
+      } else {
+        get().addToast(error.message || 'Ошибка при голосовании', 'error');
+      }
     }
   },
 
@@ -281,6 +298,23 @@ export const useStore = create((set, get) => ({
     } else {
       set({ messages: newMessages });
     }
+  },
+
+  // Update specific fields of a message in place (for edit/delete events).
+  // Only re-renders components that depend on the changed message.
+  updateMessage: (messageId, patch) => {
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m.id === messageId ? { ...m, ...patch } : m,
+      ),
+    }));
+  },
+
+  // Remove a message from local state (hard-remove, e.g. when admin purges)
+  removeMessage: (messageId) => {
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== messageId),
+    }));
   },
 
   sendMessage: async (text, msgType = 'text', mediaUrl = '') => {

@@ -140,8 +140,11 @@ export class VotingController {
   @Get('sessions/:sessionId/results')
   async getResults(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Headers() headers: Record<string, string>,
   ) {
-    const results = await this.votingService.getSessionResults(sessionId);
+    // userId is optional — unauthenticated callers get voted: false on all options
+    const userId = headers['x-user-id'] ?? null;
+    const results = await this.votingService.getSessionResults(sessionId, userId);
     return { success: true, data: results };
   }
 

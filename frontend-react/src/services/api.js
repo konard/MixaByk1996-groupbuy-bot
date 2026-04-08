@@ -1,6 +1,62 @@
+/**
+ * API client with:
+ *  - Structured error handling for 401/403/409/429/5xx
+ *  - Automatic token refresh on 401 (single retry)
+ *  - AbortController registration for forced-cancel on ban
+ *  - 429 → ApiError with retryAfter field so UI can show countdown
+ */
+import { registerFetchController } from './websocket.js';
+
 const API_URL = '/api';
 
-async function request(endpoint, options = {}) {
+// ─── Structured Error ────────────────────────────────────────────────────────
+
+export class ApiError extends Error {
+  constructor(status, code, message, retryAfter = null) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.retryAfter = retryAfter; // seconds; set for 429 responses
+  }
+}
+
+// ─── Token refresh state ─────────────────────────────────────────────────────
+
+let _refreshPromise = null;
+
+async function _doRefreshToken() {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) throw new ApiError(401, 'NO_REFRESH_TOKEN', 'No refresh token available');
+
+  const resp = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!resp.ok) {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userId');
+    throw new ApiError(401, 'REFRESH_FAILED', 'Session expired, please log in again');
+  }
+
+  const data = await resp.json();
+  if (data.access_token) localStorage.setItem('authToken', data.access_token);
+  if (data.refresh_token) localStorage.setItem('refreshToken', data.refresh_token);
+  return data.access_token;
+}
+
+function refreshToken() {
+  if (!_refreshPromise) {
+    _refreshPromise = _doRefreshToken().finally(() => { _refreshPromise = null; });
+  }
+  return _refreshPromise;
+}
+
+// ─── Core request ─────────────────────────────────────────────────────────────
+
+async function request(endpoint, options = {}, _isRetry = false) {
   const url = `${API_URL}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
@@ -9,19 +65,55 @@ async function request(endpoint, options = {}) {
   };
 
   const token = localStorage.getItem('authToken');
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  // Register AbortController so WebSocketManager can cancel on ban
+  const controller = new AbortController();
+  const unregister = registerFetchController(controller);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      cache: 'no-store',
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    unregister();
+    if (err.name === 'AbortError') {
+      throw new ApiError(0, 'REQUEST_ABORTED', 'Request was aborted');
+    }
+    throw err;
+  }
+  unregister();
+
+  // ── 401: attempt token refresh once ──────────────────────────────────────
+  if (response.status === 401 && !_isRetry) {
+    try {
+      await refreshToken();
+      return request(endpoint, options, true);
+    } catch (_) {
+      // Refresh failed → trigger logout via store (dispatched by caller/component)
+      throw new ApiError(401, 'SESSION_EXPIRED', 'Session expired, please log in again');
+    }
   }
 
-  const response = await fetch(url, {
-    cache: 'no-store',
-    ...options,
-    headers,
-  });
-
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    let errorBody = {};
+    try { errorBody = await response.json(); } catch (_) {}
+
+    const code = errorBody.code || `HTTP_${response.status}`;
+    const message = errorBody.message || errorBody.detail || `HTTP error ${response.status}`;
+
+    // ── 429: extract Retry-After header ───────────────────────────────────
+    let retryAfter = null;
+    if (response.status === 429) {
+      const ra = response.headers.get('Retry-After');
+      retryAfter = ra ? parseInt(ra, 10) : 60;
+    }
+
+    throw new ApiError(response.status, code, message, retryAfter);
   }
 
   return response.json();
@@ -33,20 +125,39 @@ async function requestFormData(endpoint, formData) {
   const token = localStorage.getItem('authToken');
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    cache: 'no-store',
-    headers,
-    body: formData,
-  });
+  const controller = new AbortController();
+  const unregister = registerFetchController(controller);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      cache: 'no-store',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    unregister();
+    if (err.name === 'AbortError') {
+      throw new ApiError(0, 'REQUEST_ABORTED', 'Request was aborted');
+    }
+    throw err;
+  }
+  unregister();
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    let errorBody = {};
+    try { errorBody = await response.json(); } catch (_) {}
+    const code = errorBody.code || `HTTP_${response.status}`;
+    const message = errorBody.message || errorBody.detail || `HTTP error ${response.status}`;
+    throw new ApiError(response.status, code, message);
   }
 
   return response.json();
 }
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export const api = {
   // User endpoints
@@ -192,7 +303,7 @@ export const api = {
 
   getTransactions: (userId) => request(`/payments/transactions/?user_id=${userId}`),
 
-  // Supplier profile endpoints (stored as user profile extensions)
+  // Supplier profile endpoints
   getSuppliers: () => request('/users/?role=supplier'),
 
   // Chat voting endpoints
@@ -230,5 +341,20 @@ export const api = {
   removePurchaseEditor: (purchaseId, userId) =>
     request(`/v1/purchases/${purchaseId}/editors/${userId}`, {
       method: 'DELETE',
+    }),
+
+  // v1 Voting (purchase-service)
+  getVotingSession: (sessionId) =>
+    request(`/v1/voting/sessions/${sessionId}`),
+
+  getVotingResults: (sessionId, userId) => {
+    const q = userId ? `?user_id=${encodeURIComponent(userId)}` : '';
+    return request(`/v1/voting/sessions/${sessionId}/results${q}`);
+  },
+
+  castVotingVote: (sessionId, data) =>
+    request(`/v1/voting/sessions/${sessionId}/votes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };

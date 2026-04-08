@@ -15,6 +15,7 @@ import Toast from './components/Toast';
 
 // Admin Panel
 import AdminApp from './admin/AdminApp';
+import BannedPage from './components/BannedPage';
 
 // Pre-load WASM module for high-performance processing
 loadWasm();
@@ -69,6 +70,7 @@ function MainApp() {
           <Route path="/chat/:procurementId" element={<ChatView />} />
           <Route path="/cabinet" element={<Cabinet />} />
           <Route path="/in-development" element={<UnderDevelopmentPage />} />
+          <Route path="/banned" element={<BannedPage />} />
         </Routes>
       </Layout>
       <LoginModal />
