@@ -4,3 +4,7 @@ deploy.py
 *.pem
 *.key
 core-rust/target/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
