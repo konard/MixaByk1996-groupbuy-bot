@@ -9,8 +9,9 @@ import {
   Get,
   Req,
 } from '@nestjs/common';
-import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
 import { AuthService } from './auth.service';
+import { UserRole } from '../users/users.entity';
 
 class RegisterDto {
   @IsEmail()
@@ -27,6 +28,10 @@ class RegisterDto {
   @IsString()
   @IsOptional()
   lastName?: string;
+
+  @IsEnum(UserRole)
+  @IsOptional()
+  role?: UserRole;
 }
 
 class LoginDto {
@@ -77,6 +82,7 @@ export class AuthController {
       dto.password,
       dto.firstName,
       dto.lastName,
+      dto.role,
     );
     return { success: true, data: tokens };
   }

@@ -28,10 +28,10 @@ async function _doRefreshToken() {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) throw new ApiError(401, 'NO_REFRESH_TOKEN', 'No refresh token available');
 
-  const resp = await fetch(`${API_URL}/auth/refresh`, {
+  const resp = await fetch(`${API_URL}/v1/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    body: JSON.stringify({ refreshToken }),
   });
 
   if (!resp.ok) {
@@ -42,9 +42,10 @@ async function _doRefreshToken() {
   }
 
   const data = await resp.json();
-  if (data.access_token) localStorage.setItem('authToken', data.access_token);
-  if (data.refresh_token) localStorage.setItem('refreshToken', data.refresh_token);
-  return data.access_token;
+  const tokens = data.data || data;
+  if (tokens.accessToken) localStorage.setItem('authToken', tokens.accessToken);
+  if (tokens.refreshToken) localStorage.setItem('refreshToken', tokens.refreshToken);
+  return tokens.accessToken;
 }
 
 function refreshToken() {
@@ -160,6 +161,22 @@ async function requestFormData(endpoint, formData) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export const api = {
+  // Auth-service endpoints
+  loginUser: (data) =>
+    request('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  registerAuthUser: (data) =>
+    request('/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  logoutUser: () =>
+    request('/v1/auth/logout', { method: 'POST' }),
+
   // User endpoints
   getUser: (userId) => request(`/users/${userId}/`),
 

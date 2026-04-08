@@ -56,28 +56,13 @@ export const useStore = create((set, get) => ({
   login: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      // Try to find user by email or phone (both are now supported by backend)
-      let user = null;
-      if (data.email) {
-        try {
-          user = await api.getUserByEmail(data.email);
-        } catch (e) {
-          // not found by email, try phone
-        }
-      }
-      if (!user && data.phone) {
-        try {
-          const normalizedPhone = data.phone.trim().startsWith('+')
-            ? data.phone.trim()
-            : '+' + data.phone.trim();
-          user = await api.getUserByPhone(normalizedPhone);
-        } catch (e) {
-          // not found by phone either
-        }
-      }
-      if (!user) {
-        throw new Error('Пользователь не найден. Проверьте email или телефон, либо зарегистрируйтесь.');
-      }
+      const result = await api.loginUser({ email: data.email, password: data.password });
+      const tokens = result.data || result;
+      if (tokens.accessToken) localStorage.setItem('authToken', tokens.accessToken);
+      if (tokens.refreshToken) localStorage.setItem('refreshToken', tokens.refreshToken);
+      // Fetch the user profile using the JWT payload sub
+      const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
+      const user = { id: payload.sub, email: payload.email, role: payload.role };
       localStorage.setItem('userId', user.id);
       set({ user, isLoading: false, loginModalOpen: false });
       get().loadProcurements();
@@ -92,22 +77,39 @@ export const useStore = create((set, get) => ({
   register: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const platformUserId = generatePlatformUserId();
-      const user = await api.registerUser({ ...data, platform: 'websocket', platform_user_id: platformUserId });
+      const result = await api.registerAuthUser({
+        email: data.email,
+        password: data.password,
+        firstName: data.first_name || undefined,
+        lastName: data.last_name || undefined,
+        role: data.role || undefined,
+      });
+      const tokens = result.data || result;
+      if (tokens.accessToken) localStorage.setItem('authToken', tokens.accessToken);
+      if (tokens.refreshToken) localStorage.setItem('refreshToken', tokens.refreshToken);
+      // Decode user info from JWT
+      const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
+      const user = { id: payload.sub, email: payload.email, role: payload.role };
       localStorage.setItem('userId', user.id);
       set({ user, isLoading: false, loginModalOpen: false });
       get().loadProcurements();
       return user;
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      get().addToast('Ошибка регистрации', 'error');
+      get().addToast('Ошибка регистрации: ' + error.message, 'error');
       throw error;
     }
   },
 
-  logout: () => {
+  logout: async () => {
+    try {
+      await api.logoutUser();
+    } catch (_) {
+      // Best-effort: clear local state regardless of server response
+    }
     localStorage.removeItem('userId');
     localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
     set({
       user: null,
       currentChat: null,

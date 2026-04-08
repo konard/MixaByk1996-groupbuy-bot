@@ -58,11 +58,12 @@ export class AuthService {
     password: string,
     firstName?: string,
     lastName?: string,
+    role?: UserRole,
   ): Promise<TokenPair> {
     if (!email || !password || password.length < 8) {
       throw new BadRequestException('Email and password (min 8 chars) are required');
     }
-    const user = await this.usersService.create(email, password, firstName, lastName);
+    const user = await this.usersService.create(email, password, firstName, lastName, role);
 
     // Mark 2FA as required for organizer/supplier roles
     if (ROLES_REQUIRING_2FA.includes(user.role)) {

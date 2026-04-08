@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 
-const REQUIRED_REGISTER_FIELDS = ['first_name', 'phone', 'email', 'role'];
-
 function validate(formData) {
   const errors = {};
   if (!formData.first_name || !formData.first_name.trim()) {
     errors.first_name = 'Имя обязательно';
   }
-  if (!formData.phone || !formData.phone.trim()) {
-    errors.phone = 'Телефон обязателен';
-  } else if (!/^\+?[\d\s\-()]{7,20}$/.test(formData.phone.trim())) {
-    errors.phone = 'Введите корректный номер телефона';
-  }
   if (!formData.email || !formData.email.trim()) {
     errors.email = 'Email обязателен';
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
     errors.email = 'Введите корректный email';
+  }
+  if (!formData.password || !formData.password.trim()) {
+    errors.password = 'Пароль обязателен';
+  } else if (formData.password.length < 8) {
+    errors.password = 'Пароль должен содержать минимум 8 символов';
   }
   if (!formData.role) {
     errors.role = 'Роль обязательна';
@@ -56,12 +54,12 @@ function LoginModal() {
   const { loginModalOpen, closeLoginModal, register, login, isLoading, error } = useStore();
   const [activeTab, setActiveTab] = useState('login');
 
-  const [loginData, setLoginData] = useState({ email: '', phone: '' });
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({
     first_name: '',
     last_name: '',
-    phone: '',
     email: '',
+    password: '',
     role: 'buyer',
   });
   const [formErrors, setFormErrors] = useState({});
@@ -82,7 +80,7 @@ function LoginModal() {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (!loginData.email && !loginData.phone) {
+    if (!loginData.email || !loginData.password) {
       return;
     }
     try {
@@ -139,7 +137,7 @@ function LoginModal() {
 
             <h1 className="auth-title">GroupBuy</h1>
             <p className="auth-subtitle">
-              Войдите по email или номеру телефона, привязанному к вашему аккаунту
+              Войдите по email и паролю
             </p>
 
             <form className="auth-form" onSubmit={handleLoginSubmit}>
@@ -157,15 +155,15 @@ function LoginModal() {
                 />
               </div>
 
-              <div className={`form-group${loginData.phone ? ' has-value' : ''}`}>
-                <label className="form-label">Телефон</label>
+              <div className={`form-group${loginData.password ? ' has-value' : ''}`}>
+                <label className="form-label">Пароль</label>
                 <input
-                  type="tel"
+                  type="password"
                   className="form-input"
-                  name="phone"
-                  value={loginData.phone}
+                  name="password"
+                  value={loginData.password}
                   onChange={handleLoginChange}
-                  autoComplete="tel"
+                  autoComplete="current-password"
                 />
               </div>
 
@@ -233,22 +231,6 @@ function LoginModal() {
                 />
               </div>
 
-              <div className={`form-group${registerData.phone ? ' has-value' : ''}${formErrors.phone ? ' form-group-error' : ''}`}>
-                <label className="form-label">Телефон *</label>
-                <input
-                  type="tel"
-                  className={`form-input${formErrors.phone ? ' form-input-error' : ''}`}
-                  name="phone"
-                  required
-                  value={registerData.phone}
-                  onChange={handleRegisterChange}
-                  autoComplete="tel"
-                />
-                {formErrors.phone && (
-                  <span className="form-field-error">{formErrors.phone}</span>
-                )}
-              </div>
-
               <div className={`form-group${registerData.email ? ' has-value' : ''}${formErrors.email ? ' form-group-error' : ''}`}>
                 <label className="form-label">Email *</label>
                 <input
@@ -262,6 +244,22 @@ function LoginModal() {
                 />
                 {formErrors.email && (
                   <span className="form-field-error">{formErrors.email}</span>
+                )}
+              </div>
+
+              <div className={`form-group${registerData.password ? ' has-value' : ''}${formErrors.password ? ' form-group-error' : ''}`}>
+                <label className="form-label">Пароль *</label>
+                <input
+                  type="password"
+                  className={`form-input${formErrors.password ? ' form-input-error' : ''}`}
+                  name="password"
+                  required
+                  value={registerData.password}
+                  onChange={handleRegisterChange}
+                  autoComplete="new-password"
+                />
+                {formErrors.password && (
+                  <span className="form-field-error">{formErrors.password}</span>
                 )}
               </div>
 
