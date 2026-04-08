@@ -292,11 +292,69 @@ function ChatVotingPanel({ procurementId, user, participants }) {
   );
 }
 
+// ─── Media constraints ────────────────────────────────────────────────────────
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+const MAX_FILES = 5;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'video/mp4', 'video/quicktime'];
+
+function MediaPreview({ files, onRemove }) {
+  if (!files || files.length === 0) return null;
+  return (
+    <div style={{
+      display: 'flex',
+      gap: '0.5rem',
+      padding: '0.5rem 1rem',
+      flexWrap: 'wrap',
+      background: 'var(--tg-bg-secondary)',
+      borderTop: '1px solid var(--tg-border)',
+    }}>
+      {files.map((f, idx) => (
+        <div key={idx} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          {f.type.startsWith('image/') ? (
+            <img
+              src={URL.createObjectURL(f)}
+              alt={f.name}
+              style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--tg-border)' }}
+            />
+          ) : (
+            <div style={{
+              width: 60, height: 60, borderRadius: 6, border: '1px solid var(--tg-border)',
+              background: 'var(--tg-bg)', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem',
+              color: 'var(--text-secondary)', padding: 4, textAlign: 'center',
+            }}>
+              <span style={{ fontSize: '1.2rem' }}>🎬</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 52 }}>
+                {f.name}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={() => onRemove(idx)}
+            style={{
+              position: 'absolute', top: -6, right: -6,
+              width: 18, height: 18, borderRadius: '50%',
+              background: 'var(--tg-error)', color: '#fff',
+              border: 'none', cursor: 'pointer', fontSize: 11, lineHeight: '18px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ChatView() {
   const { procurementId } = useParams();
   const navigate = useNavigate();
   const [messageText, setMessageText] = useState('');
   const [participants, setParticipants] = useState([]);
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const messageAreaRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -309,6 +367,7 @@ function ChatView() {
     setCurrentChat,
     closeSidebar,
     selectProcurement,
+    addToast,
   } = useStore();
 
   const { sendTyping } = useWebSocket(procurementId);
@@ -348,17 +407,74 @@ function ChatView() {
     }
   };
 
+  const handleAttachClick = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleFileChange = (e) => {
+    const selected = Array.from(e.target.files || []);
+    const existing = mediaFiles.length;
+    if (existing + selected.length > MAX_FILES) {
+      addToast && addToast(`Максимум ${MAX_FILES} файлов`, 'error');
+      return;
+    }
+    const valid = [];
+    for (const f of selected) {
+      if (!ALLOWED_TYPES.includes(f.type)) {
+        addToast && addToast(`Тип файла не поддерживается: ${f.name}`, 'error');
+        continue;
+      }
+      if (f.size > MAX_FILE_SIZE) {
+        addToast && addToast(`Файл слишком большой (макс. 25 МБ): ${f.name}`, 'error');
+        continue;
+      }
+      valid.push(f);
+    }
+    setMediaFiles((prev) => [...prev, ...valid]);
+    // Reset input so the same file can be re-selected
+    e.target.value = '';
+  };
+
+  const handleRemoveFile = (idx) => {
+    setMediaFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSendMessage = useCallback(async () => {
     const text = messageText.trim();
-    if (!text || !user) return;
+    if (!text && mediaFiles.length === 0) return;
+    if (!user) return;
 
     setMessageText('');
-    await sendMessage(text);
-
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [messageText, user, sendMessage]);
+
+    if (mediaFiles.length > 0) {
+      setMediaUploading(true);
+      try {
+        const formData = new FormData();
+        for (const f of mediaFiles) formData.append('files', f);
+        const resp = await api.uploadChatMedia(formData);
+        const uploaded = resp.data || [];
+        setMediaFiles([]);
+        // Send one message per uploaded file (preserving text with first file)
+        for (let i = 0; i < uploaded.length; i++) {
+          const u = uploaded[i];
+          await sendMessage(i === 0 ? (text || '') : '', u.type, u.url);
+        }
+        // If text exists but no media uploads succeeded, send text only
+        if (uploaded.length === 0 && text) {
+          await sendMessage(text);
+        }
+      } catch {
+        addToast && addToast('Ошибка загрузки файлов', 'error');
+      } finally {
+        setMediaUploading(false);
+      }
+    } else {
+      await sendMessage(text);
+    }
+  }, [messageText, mediaFiles, user, sendMessage, addToast]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -419,10 +535,33 @@ function ChatView() {
             {!msg.is_own && msg.sender_name && (
               <div className="message-sender">{msg.sender_name}</div>
             )}
-            <div
-              className="message-text"
-              dangerouslySetInnerHTML={{ __html: msg.formatted_text }}
-            />
+            {msg.media_url && msg.msg_type === 'image' && (
+              <a href={msg.media_url} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={msg.media_url}
+                  alt="Вложение"
+                  style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, display: 'block', marginBottom: 4 }}
+                />
+              </a>
+            )}
+            {msg.media_url && msg.msg_type === 'video' && (
+              <video
+                src={msg.media_url}
+                controls
+                style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8, display: 'block', marginBottom: 4 }}
+              />
+            )}
+            {msg.media_url && msg.msg_type === 'file' && (
+              <a href={msg.media_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: 4, color: 'var(--tg-primary)' }}>
+                📎 Скачать файл
+              </a>
+            )}
+            {msg.formatted_text && (
+              <div
+                className="message-text"
+                dangerouslySetInnerHTML={{ __html: msg.formatted_text }}
+              />
+            )}
             <div className="message-time">{msg.formatted_time}</div>
           </div>
         );
@@ -479,8 +618,17 @@ function ChatView() {
         {renderMessages()}
       </div>
 
+      <MediaPreview files={mediaFiles} onRemove={handleRemoveFile} />
       <div className="message-input-area">
-        <button className="btn btn-icon" aria-label="Attach file">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,video/mp4,video/quicktime"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        <button className="btn btn-icon" aria-label="Attach file" onClick={handleAttachClick}>
           <AttachIcon />
         </button>
         <div className="message-input-container">
@@ -493,14 +641,16 @@ function ChatView() {
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
+            disabled={mediaUploading}
           />
         </div>
         <button
           className="send-button"
           aria-label="Send message"
           onClick={handleSendMessage}
+          disabled={mediaUploading || (!messageText.trim() && mediaFiles.length === 0)}
         >
-          <SendIcon />
+          {mediaUploading ? '…' : <SendIcon />}
         </button>
       </div>
     </>

@@ -430,6 +430,16 @@ function Cabinet() {
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   const userSearchTimeout = useRef(null);
 
+  // Editors (shared access) state
+  const [editorsModalOpen, setEditorsModalOpen] = useState(false);
+  const [editorsProcurement, setEditorsProcurement] = useState(null);
+  const [editorsList, setEditorsList] = useState([]);
+  const [editorsLoading, setEditorsLoading] = useState(false);
+  const [editorSearchQuery, setEditorSearchQuery] = useState('');
+  const [editorSearchResults, setEditorSearchResults] = useState([]);
+  const [editorSearchLoading, setEditorSearchLoading] = useState(false);
+  const editorSearchTimeout = useRef(null);
+
   // Add participant modal state
   const [addParticipantOpen, setAddParticipantOpen] = useState(false);
   const [addParticipantProcurement, setAddParticipantProcurement] = useState(null);
@@ -841,6 +851,63 @@ function Cabinet() {
     setSelectedCarouselCategory(selectedCarouselCategory?.id === cat.id ? null : cat);
   };
 
+  const handleOpenEditors = async (procurement) => {
+    setEditorsProcurement(procurement);
+    setEditorsModalOpen(true);
+    setEditorSearchQuery('');
+    setEditorSearchResults([]);
+    setEditorsLoading(true);
+    try {
+      const resp = await api.getPurchaseEditors(procurement.id);
+      setEditorsList(resp.data || []);
+    } catch {
+      setEditorsList([]);
+    } finally {
+      setEditorsLoading(false);
+    }
+  };
+
+  const handleEditorSearch = (query) => {
+    setEditorSearchQuery(query);
+    if (editorSearchTimeout.current) clearTimeout(editorSearchTimeout.current);
+    if (!query.trim()) { setEditorSearchResults([]); return; }
+    editorSearchTimeout.current = setTimeout(async () => {
+      setEditorSearchLoading(true);
+      try {
+        const results = await api.searchUsers(query);
+        setEditorSearchResults(Array.isArray(results) ? results : (results.results || []));
+      } catch {
+        setEditorSearchResults([]);
+      } finally {
+        setEditorSearchLoading(false);
+      }
+    }, 400);
+  };
+
+  const handleAddEditor = async (targetUser) => {
+    if (!editorsProcurement) return;
+    try {
+      const resp = await api.addPurchaseEditor(editorsProcurement.id, targetUser.id);
+      setEditorsList((prev) => [...prev.filter((e) => e.userId !== targetUser.id), resp.data]);
+      addToast(`${targetUser.first_name || 'Пользователь'} добавлен как редактор`, 'success');
+      setEditorSearchQuery('');
+      setEditorSearchResults([]);
+    } catch (err) {
+      addToast(err.message || 'Ошибка добавления редактора', 'error');
+    }
+  };
+
+  const handleRemoveEditor = async (editorUserId) => {
+    if (!editorsProcurement) return;
+    try {
+      await api.removePurchaseEditor(editorsProcurement.id, editorUserId);
+      setEditorsList((prev) => prev.filter((e) => e.userId !== editorUserId));
+      addToast('Редактор удалён', 'success');
+    } catch (err) {
+      addToast(err.message || 'Ошибка удаления редактора', 'error');
+    }
+  };
+
   const handleOpenAddParticipant = (procurement) => {
     setAddParticipantProcurement(procurement);
     setAddParticipantOpen(true);
@@ -1241,6 +1308,11 @@ function Cabinet() {
                 {p.organizer === user?.id && p.status === 'active' && (
                   <button className="lk-btn-invite-accept" style={{ fontSize: '0.7rem', padding: '2px 8px' }} onClick={() => handleOpenInvite(p)}>
                     Пригласить
+                  </button>
+                )}
+                {p.organizer === user?.id && (
+                  <button className="lk-btn-invite-accept" style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'var(--tg-bg-secondary)', color: 'var(--tg-primary)', border: '1px solid var(--tg-primary)' }} onClick={() => handleOpenEditors(p)}>
+                    👥 Редакторы
                   </button>
                 )}
               </div>
@@ -1887,6 +1959,99 @@ function Cabinet() {
                 <button className="lk-btn-action" style={{ height: 36, flex: 'none', padding: '0 16px' }} disabled={!inviteEmail.trim() || inviteLoading} onClick={handleInviteSubmit}>
                   {inviteLoading ? 'Отправка...' : 'Пригласить'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Editors (shared access) modal */}
+      {editorsModalOpen && (
+        <div className="modal-overlay active" onClick={(e) => e.target === e.currentTarget && setEditorsModalOpen(false)}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">👥 Редакторы закупки</h3>
+              <button className="modal-close" onClick={() => setEditorsModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {editorsProcurement && (
+                <p className="lk-purchase-meta" style={{ margin: 0 }}>
+                  Закупка: <strong>{editorsProcurement.title}</strong>
+                </p>
+              )}
+              <p className="lk-purchase-stats" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                Редакторы могут просматривать, редактировать товары и цены, а также участвовать в чате. Отменить закупку или управлять другими редакторами может только владелец.
+              </p>
+
+              {/* Current editors list */}
+              <div>
+                <div className="lk-purchase-stats" style={{ fontWeight: 600, marginBottom: 6 }}>Текущие редакторы</div>
+                {editorsLoading ? (
+                  <p className="lk-purchase-stats">Загрузка...</p>
+                ) : editorsList.length === 0 ? (
+                  <p className="lk-purchase-stats">Редакторов нет</p>
+                ) : (
+                  <div className="lk-messages-list" style={{ border: '1px solid var(--tg-border-light)', borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
+                    {editorsList.map((e) => (
+                      <div key={e.id} className="lk-message-item" style={{ padding: '8px 12px' }}>
+                        <div className="lk-message-info">
+                          <div className="lk-message-name">ID: {e.userId}</div>
+                          <div className="lk-message-text" style={{ fontSize: '0.7rem' }}>
+                            Роль: {e.role} · Добавлен: {new Date(e.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          className="lk-category-panel-close"
+                          style={{ color: 'var(--tg-error)', fontWeight: 700 }}
+                          title="Удалить редактора"
+                          onClick={() => handleRemoveEditor(e.userId)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add editor */}
+              <div>
+                <div className="lk-purchase-stats" style={{ fontWeight: 600, marginBottom: 6 }}>Добавить редактора</div>
+                <input
+                  type="text"
+                  className="lk-search-input"
+                  style={{ paddingLeft: 12, borderRadius: 8, marginBottom: 4 }}
+                  placeholder="Поиск по имени, email, телефону..."
+                  value={editorSearchQuery}
+                  onChange={(e) => handleEditorSearch(e.target.value)}
+                />
+                {editorSearchLoading && <p className="lk-purchase-stats" style={{ marginTop: 4 }}>Поиск...</p>}
+                {editorSearchResults.length > 0 && (
+                  <div className="lk-messages-list" style={{ border: '1px solid var(--tg-border-light)', borderRadius: 8, overflow: 'hidden' }}>
+                    {editorSearchResults.map((u) => (
+                      <div key={u.id} className="lk-message-item" style={{ padding: '8px 12px', cursor: 'pointer' }}
+                        onClick={() => handleAddEditor(u)}>
+                        <div className="lk-message-avatar" style={{ background: getAvatarColor(u.first_name || ''), width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>
+                          {getInitials(u.first_name, u.last_name)}
+                        </div>
+                        <div className="lk-message-info">
+                          <div className="lk-message-name">{u.first_name || ''} {u.last_name || ''}</div>
+                          <div className="lk-message-text">{u.email || u.username || u.phone || getRoleText(u.role)}</div>
+                        </div>
+                        <span className="lk-message-badge" style={{ background: 'rgba(36,129,204,0.12)', color: 'var(--tg-primary)', fontSize: 11 }}>
+                          + Добавить
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!editorSearchLoading && editorSearchQuery.trim() && editorSearchResults.length === 0 && (
+                  <p className="lk-purchase-stats" style={{ marginTop: 4 }}>Пользователи не найдены</p>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button className="lk-btn-action lk-btn-action--outline" style={{ height: 36, flex: 'none', padding: '0 16px' }} onClick={() => setEditorsModalOpen(false)}>Закрыть</button>
               </div>
             </div>
           </div>

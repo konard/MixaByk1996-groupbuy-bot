@@ -24,6 +24,11 @@ import {
 } from 'class-validator';
 import { PurchasesService, CreatePurchaseDto as CreatePurchaseInput } from './purchases.service';
 
+class AddEditorDto {
+  @IsString()
+  user_id: string;
+}
+
 class CreatePurchaseDto {
   @IsString()
   @MinLength(3)
@@ -138,5 +143,38 @@ export class PurchasesController {
     const requesterId = getUserId(headers);
     const purchase = await this.purchasesService.cancel(id, requesterId);
     return { success: true, data: purchase };
+  }
+
+  /** List all editors of a purchase. */
+  @Get(':id/editors')
+  async listEditors(@Param('id', ParseUUIDPipe) id: string) {
+    const editors = await this.purchasesService.listEditors(id);
+    return { success: true, data: editors };
+  }
+
+  /** Add an editor to a purchase (owner only). */
+  @Post(':id/editors')
+  @HttpCode(HttpStatus.CREATED)
+  async addEditor(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddEditorDto,
+    @Headers() headers: Record<string, string>,
+  ) {
+    const requesterId = getUserId(headers);
+    const pu = await this.purchasesService.addEditor(id, requesterId, dto.user_id);
+    return { success: true, data: pu };
+  }
+
+  /** Remove an editor from a purchase (owner only). */
+  @Delete(':id/editors/:userId')
+  @HttpCode(HttpStatus.OK)
+  async removeEditor(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId') userId: string,
+    @Headers() headers: Record<string, string>,
+  ) {
+    const requesterId = getUserId(headers);
+    await this.purchasesService.removeEditor(id, requesterId, userId);
+    return { success: true };
   }
 }

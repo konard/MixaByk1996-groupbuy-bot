@@ -280,9 +280,11 @@ export const useStore = create((set, get) => ({
     }
   },
 
-  sendMessage: async (text) => {
+  sendMessage: async (text, msgType = 'text', mediaUrl = '') => {
     const { user, currentChat } = get();
     if (!user || !currentChat) return;
+
+    const resolvedType = mediaUrl ? msgType || 'file' : 'text';
 
     // Optimistic UI: add a temporary message immediately
     const tempId = `temp-${Date.now()}`;
@@ -292,7 +294,8 @@ export const useStore = create((set, get) => ({
       user: user.id,
       sender_name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
       text,
-      message_type: 'text',
+      message_type: resolvedType,
+      media_url: mediaUrl || undefined,
       created_at: new Date().toISOString(),
       _optimistic: true,
     };
@@ -303,7 +306,8 @@ export const useStore = create((set, get) => ({
         procurement: currentChat,
         user: user.id,
         text,
-        message_type: 'text',
+        message_type: resolvedType,
+        media_url: mediaUrl || undefined,
       });
       // Replace the optimistic message with the real one from the server
       set({ messages: get().messages.map((m) => (m.id === tempId ? message : m)) });

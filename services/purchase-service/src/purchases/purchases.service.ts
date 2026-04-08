@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Purchase, PurchaseStatus } from './purchases.entity';
+import { PurchaseUser, PurchaseUserRole } from './purchase-user.entity';
 import { KafkaProducer } from '../kafka/kafka.producer';
 
 const MAX_ACTIVE_PURCHASES = 50;
@@ -34,6 +35,8 @@ export class PurchasesService {
   constructor(
     @InjectRepository(Purchase)
     private readonly purchaseRepo: Repository<Purchase>,
+    @InjectRepository(PurchaseUser)
+    private readonly purchaseUserRepo: Repository<PurchaseUser>,
     private readonly kafkaProducer: KafkaProducer,
   ) {}
 
@@ -133,14 +136,96 @@ export class PurchasesService {
     return purchase;
   }
 
+  /** Returns the role of a user for a purchase, or null if they have no access. */
+  async getUserRole(purchaseId: string, userId: string): Promise<PurchaseUserRole | null> {
+    const purchase = await this.purchaseRepo.findOne({ where: { id: purchaseId } });
+    if (!purchase) return null;
+    if (purchase.organizerId === userId) return PurchaseUserRole.OWNER;
+    const pu = await this.purchaseUserRepo.findOne({ where: { purchaseId, userId } });
+    return pu ? pu.role : null;
+  }
+
+  /** Adds a user as editor to a purchase. Only the owner can do this. */
+  async addEditor(
+    purchaseId: string,
+    requesterId: string,
+    targetUserId: string,
+  ): Promise<PurchaseUser> {
+    const purchase = await this.findById(purchaseId);
+    if (purchase.organizerId !== requesterId) {
+      throw new ForbiddenException('Only the owner can add editors');
+    }
+    if (targetUserId === requesterId) {
+      throw new BadRequestException('Owner cannot add themselves as editor');
+    }
+
+    const existing = await this.purchaseUserRepo.findOne({
+      where: { purchaseId, userId: targetUserId },
+    });
+    if (existing) {
+      return existing; // Already an editor
+    }
+
+    const pu = this.purchaseUserRepo.create({
+      purchaseId,
+      userId: targetUserId,
+      role: PurchaseUserRole.EDITOR,
+      invitedBy: requesterId,
+    });
+    const saved = await this.purchaseUserRepo.save(pu);
+
+    await this.kafkaProducer.send('purchase.editor.added', {
+      purchaseId,
+      userId: targetUserId,
+      invitedBy: requesterId,
+    });
+
+    return saved;
+  }
+
+  /** Removes an editor from a purchase. Only the owner can do this. */
+  async removeEditor(purchaseId: string, requesterId: string, targetUserId: string): Promise<void> {
+    const purchase = await this.findById(purchaseId);
+    if (purchase.organizerId !== requesterId) {
+      throw new ForbiddenException('Only the owner can remove editors');
+    }
+
+    const existing = await this.purchaseUserRepo.findOne({
+      where: { purchaseId, userId: targetUserId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Editor not found for this purchase');
+    }
+    await this.purchaseUserRepo.remove(existing);
+
+    await this.kafkaProducer.send('purchase.editor.removed', {
+      purchaseId,
+      userId: targetUserId,
+      removedBy: requesterId,
+    });
+  }
+
+  /** Lists all editors of a purchase. */
+  async listEditors(purchaseId: string): Promise<PurchaseUser[]> {
+    await this.findById(purchaseId); // Ensure purchase exists
+    return this.purchaseUserRepo.find({ where: { purchaseId } });
+  }
+
   async update(
     id: string,
     requesterId: string,
     updates: Partial<CreatePurchaseDto>,
   ): Promise<Purchase> {
     const purchase = await this.findById(id);
-    if (purchase.organizerId !== requesterId) {
-      throw new ForbiddenException('Only the organizer can update this purchase');
+    const role = await this.getUserRole(id, requesterId);
+    if (role === null) {
+      throw new ForbiddenException('Only the organizer or an editor can update this purchase');
+    }
+    // Editors cannot change commission or escrow — owner-only fields
+    if (role === PurchaseUserRole.EDITOR) {
+      if (updates.commissionPercent != null || updates.escrowThreshold != null) {
+        throw new ForbiddenException('Editors cannot modify commission or escrow settings');
+      }
     }
     if (purchase.status !== PurchaseStatus.DRAFT && purchase.status !== PurchaseStatus.ACTIVE) {
       throw new BadRequestException('Can only update draft or active purchases');
@@ -161,6 +246,7 @@ export class PurchasesService {
 
   async cancel(id: string, requesterId: string): Promise<Purchase> {
     const purchase = await this.findById(id);
+    // Only the owner (organizer) can cancel; editors cannot
     if (purchase.organizerId !== requesterId) {
       throw new ForbiddenException('Only the organizer can cancel this purchase');
     }

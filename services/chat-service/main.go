@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
@@ -42,7 +46,8 @@ type ChatMessage struct {
 	RoomID    string    `json:"room_id"`
 	UserID    string    `json:"user_id"`
 	Content   string    `json:"content"`
-	Type      string    `json:"type"` // "text" | "system" | "file"
+	Type      string    `json:"type"` // "text" | "system" | "image" | "video" | "file"
+	MediaURL  string    `json:"media_url,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -53,6 +58,19 @@ type Server struct {
 	ch             clickhouse.Conn
 	centrifugoURL  string
 	centrifugoKey  string
+	mediaStorageDir string
+	mediaBaseURL   string
+}
+
+// Allowed media MIME types and max file size (25 MB).
+const maxMediaSize = 25 << 20 // 25 MB
+
+var allowedMediaTypes = map[string]string{
+	"image/jpeg": "jpg",
+	"image/png":  "png",
+	"image/gif":  "gif",
+	"video/mp4":  "mp4",
+	"video/quicktime": "mov",
 }
 
 // ─── Centrifugo API ───────────────────────────────────────────────────────────
@@ -266,6 +284,118 @@ func (s *Server) InviteParticipant(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }
 
+// UploadMedia handles multipart file upload, stores file, and returns URL.
+// Accepts up to 5 files per request, max 25 MB each.
+// Allowed types: JPEG, PNG, GIF, MP4, MOV.
+func (s *Server) UploadMedia(w http.ResponseWriter, r *http.Request) {
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		writeError(w, http.StatusBadRequest, "X-User-ID required")
+		return
+	}
+
+	// Limit total request body to avoid memory exhaustion (5 files * 25 MB + overhead)
+	r.Body = http.MaxBytesReader(w, r.Body, 5*maxMediaSize+1<<20)
+
+	if err := r.ParseMultipartForm(5 * maxMediaSize); err != nil {
+		writeError(w, http.StatusBadRequest, "failed to parse multipart form: "+err.Error())
+		return
+	}
+
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		writeError(w, http.StatusBadRequest, "no files provided")
+		return
+	}
+	if len(files) > 5 {
+		writeError(w, http.StatusBadRequest, "maximum 5 files per request")
+		return
+	}
+
+	type uploadResult struct {
+		URL      string `json:"url"`
+		Type     string `json:"type"`
+		Filename string `json:"filename"`
+		Size     int64  `json:"size"`
+	}
+
+	results := make([]uploadResult, 0, len(files))
+
+	for _, fh := range files {
+		if fh.Size > maxMediaSize {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("file %s exceeds 25 MB limit", fh.Filename))
+			return
+		}
+
+		// Detect MIME type from content type header or file extension
+		detectedType := fh.Header.Get("Content-Type")
+		if detectedType == "" {
+			ext := strings.ToLower(filepath.Ext(fh.Filename))
+			detectedType = mime.TypeByExtension(ext)
+		}
+		// Normalise (strip charset etc.)
+		mediaType, _, _ := mime.ParseMediaType(detectedType)
+
+		ext, allowed := allowedMediaTypes[mediaType]
+		if !allowed {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("file type %s not allowed; use JPEG, PNG, GIF, MP4, or MOV", mediaType))
+			return
+		}
+
+		// Determine message type category
+		msgType := "file"
+		if strings.HasPrefix(mediaType, "image/") {
+			msgType = "image"
+		} else if strings.HasPrefix(mediaType, "video/") {
+			msgType = "video"
+		}
+
+		f, err := fh.Open()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to read uploaded file")
+			return
+		}
+		defer func(file multipart.File) { file.Close() }(f)
+
+		data, err := io.ReadAll(io.LimitReader(f, maxMediaSize+1))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to read file data")
+			return
+		}
+
+		// Save to local storage directory
+		filename := uuid.New().String() + "." + ext
+		savePath := filepath.Join(s.mediaStorageDir, filename)
+		if err := os.WriteFile(savePath, data, 0644); err != nil {
+			log.Printf("UploadMedia write error: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to save file")
+			return
+		}
+
+		mediaURL := s.mediaBaseURL + "/" + filename
+		results = append(results, uploadResult{
+			URL:      mediaURL,
+			Type:     msgType,
+			Filename: fh.Filename,
+			Size:     fh.Size,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "data": results})
+}
+
+// ServeMedia serves uploaded media files from storage directory.
+func (s *Server) ServeMedia(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	// Basic path traversal protection
+	if strings.Contains(filename, "/") || strings.Contains(filename, "..") {
+		writeError(w, http.StatusBadRequest, "invalid filename")
+		return
+	}
+	http.ServeFile(w, r, filepath.Join(s.mediaStorageDir, filename))
+}
+
 // SendMessage saves message to ClickHouse and publishes to Centrifugo.
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -277,19 +407,24 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Content string `json:"content"`
-		Type    string `json:"type"`
+		Content  string `json:"content"`
+		Type     string `json:"type"`
+		MediaURL string `json:"media_url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if req.Content == "" {
-		writeError(w, http.StatusBadRequest, "content is required")
+	if req.Content == "" && req.MediaURL == "" {
+		writeError(w, http.StatusBadRequest, "content or media_url is required")
 		return
 	}
 	if req.Type == "" {
-		req.Type = "text"
+		if req.MediaURL != "" {
+			req.Type = "file"
+		} else {
+			req.Type = "text"
+		}
 	}
 
 	// Verify user is member
@@ -312,15 +447,16 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		UserID:    userID,
 		Content:   req.Content,
 		Type:      req.Type,
+		MediaURL:  req.MediaURL,
 		CreatedAt: time.Now(),
 	}
 
 	// Store in ClickHouse
 	if s.ch != nil {
 		if err := s.ch.Exec(r.Context(),
-			`INSERT INTO chat_messages (id, room_id, user_id, content, type, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			msg.ID, msg.RoomID, msg.UserID, msg.Content, msg.Type, msg.CreatedAt,
+			`INSERT INTO chat_messages (id, room_id, user_id, content, type, media_url, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			msg.ID, msg.RoomID, msg.UserID, msg.Content, msg.Type, msg.MediaURL, msg.CreatedAt,
 		); err != nil {
 			log.Printf("ClickHouse insert error: %v", err)
 			// Non-fatal
@@ -330,12 +466,13 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	// Publish to Centrifugo
 	channel := "chat:" + roomID
 	if err := s.centrifugoPublish(channel, map[string]any{
-		"type":    "message",
-		"id":      msg.ID,
-		"userId":  msg.UserID,
-		"content": msg.Content,
-		"msgType": msg.Type,
-		"ts":      msg.CreatedAt.Unix(),
+		"type":     "message",
+		"id":       msg.ID,
+		"userId":   msg.UserID,
+		"content":  msg.Content,
+		"msgType":  msg.Type,
+		"mediaUrl": msg.MediaURL,
+		"ts":       msg.CreatedAt.Unix(),
 	}); err != nil {
 		log.Printf("Centrifugo publish error: %v", err)
 	}
@@ -354,7 +491,7 @@ func (s *Server) GetHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := s.ch.Query(r.Context(),
-		`SELECT id, room_id, user_id, content, type, created_at
+		`SELECT id, room_id, user_id, content, type, media_url, created_at
 		 FROM chat_messages
 		 WHERE room_id = ?
 		 ORDER BY created_at DESC
@@ -368,7 +505,7 @@ func (s *Server) GetHistory(w http.ResponseWriter, r *http.Request) {
 	var messages []ChatMessage
 	for rows.Next() {
 		var msg ChatMessage
-		if err := rows.Scan(&msg.ID, &msg.RoomID, &msg.UserID, &msg.Content, &msg.Type, &msg.CreatedAt); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.RoomID, &msg.UserID, &msg.Content, &msg.Type, &msg.MediaURL, &msg.CreatedAt); err != nil {
 			continue
 		}
 		messages = append(messages, msg)
@@ -440,6 +577,7 @@ func main() {
 					user_id    UUID,
 					content    String,
 					type       String,
+					media_url  String,
 					created_at DateTime64(3)
 				) ENGINE = MergeTree()
 				ORDER BY (room_id, created_at)
@@ -447,11 +585,20 @@ func main() {
 		}
 	}
 
+	// Media storage directory
+	mediaDir := getEnv("MEDIA_STORAGE_DIR", "./media")
+	if err := os.MkdirAll(mediaDir, 0755); err != nil {
+		log.Fatalf("Failed to create media storage dir: %v", err)
+	}
+	mediaBaseURL := getEnv("MEDIA_BASE_URL", "http://localhost:4004/media")
+
 	srv := &Server{
-		db:            pool,
-		ch:            chConn,
-		centrifugoURL: getEnv("CENTRIFUGO_URL", "http://localhost:8000"),
-		centrifugoKey: getEnv("CENTRIFUGO_API_KEY", "centrifugo_api_key"),
+		db:              pool,
+		ch:              chConn,
+		centrifugoURL:   getEnv("CENTRIFUGO_URL", "http://localhost:8000"),
+		centrifugoKey:   getEnv("CENTRIFUGO_API_KEY", "centrifugo_api_key"),
+		mediaStorageDir: mediaDir,
+		mediaBaseURL:    mediaBaseURL,
 	}
 
 	r := mux.NewRouter()
@@ -462,6 +609,8 @@ func main() {
 	r.HandleFunc("/rooms/{roomId}/invite", srv.InviteParticipant).Methods(http.MethodPost)
 	r.HandleFunc("/rooms/{roomId}/messages", srv.SendMessage).Methods(http.MethodPost)
 	r.HandleFunc("/rooms/{roomId}/history", srv.GetHistory).Methods(http.MethodGet)
+	r.HandleFunc("/media/upload", srv.UploadMedia).Methods(http.MethodPost)
+	r.HandleFunc("/media/{filename}", srv.ServeMedia).Methods(http.MethodGet)
 
 	port := getEnv("PORT", "4004")
 	server := &http.Server{

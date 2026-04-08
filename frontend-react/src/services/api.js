@@ -27,6 +27,27 @@ async function request(endpoint, options = {}) {
   return response.json();
 }
 
+async function requestFormData(endpoint, formData) {
+  const url = `${API_URL}${endpoint}`;
+  const headers = { 'Cache-Control': 'no-cache' };
+  const token = localStorage.getItem('authToken');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    cache: 'no-store',
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export const api = {
   // User endpoints
   getUser: (userId) => request(`/users/${userId}/`),
@@ -191,4 +212,23 @@ export const api = {
 
   getVoteCloseStatus: (procurementId) =>
     request(`/procurements/${procurementId}/vote_close_status/`).catch(() => null),
+
+  // Media upload (chat)
+  uploadChatMedia: (formData) =>
+    requestFormData('/v1/chat/media/upload', formData),
+
+  // Purchase editors (shared access)
+  getPurchaseEditors: (purchaseId) =>
+    request(`/v1/purchases/${purchaseId}/editors`),
+
+  addPurchaseEditor: (purchaseId, userId) =>
+    request(`/v1/purchases/${purchaseId}/editors`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }),
+
+  removePurchaseEditor: (purchaseId, userId) =>
+    request(`/v1/purchases/${purchaseId}/editors/${userId}`, {
+      method: 'DELETE',
+    }),
 };
