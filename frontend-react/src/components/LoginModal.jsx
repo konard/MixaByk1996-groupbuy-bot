@@ -145,26 +145,24 @@ function LoginModal() {
             <form className="auth-form" onSubmit={handleLoginSubmit}>
               {error && <div className="form-error-banner">{error}</div>}
 
-              <div className="form-group">
+              <div className={`form-group${loginData.email ? ' has-value' : ''}`}>
                 <label className="form-label">Email</label>
                 <input
                   type="email"
                   className="form-input"
                   name="email"
-                  placeholder="email@example.com"
                   value={loginData.email}
                   onChange={handleLoginChange}
                   autoComplete="email"
                 />
               </div>
 
-              <div className="form-group">
+              <div className={`form-group${loginData.phone ? ' has-value' : ''}`}>
                 <label className="form-label">Телефон</label>
                 <input
                   type="tel"
                   className="form-input"
                   name="phone"
-                  placeholder="+7 999 123 4567"
                   value={loginData.phone}
                   onChange={handleLoginChange}
                   autoComplete="tel"
@@ -207,14 +205,13 @@ function LoginModal() {
             <form className="auth-form" onSubmit={handleRegisterSubmit}>
               {error && <div className="form-error-banner">{error}</div>}
 
-              <div className="form-group">
+              <div className={`form-group${registerData.first_name ? ' has-value' : ''}${formErrors.first_name ? ' form-group-error' : ''}`}>
                 <label className="form-label">Имя *</label>
                 <input
                   type="text"
                   className={`form-input${formErrors.first_name ? ' form-input-error' : ''}`}
                   name="first_name"
                   required
-                  placeholder="Введите имя"
                   value={registerData.first_name}
                   onChange={handleRegisterChange}
                   autoComplete="given-name"
@@ -224,27 +221,25 @@ function LoginModal() {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className={`form-group${registerData.last_name ? ' has-value' : ''}`}>
                 <label className="form-label">Фамилия</label>
                 <input
                   type="text"
                   className="form-input"
                   name="last_name"
-                  placeholder="Введите фамилию"
                   value={registerData.last_name}
                   onChange={handleRegisterChange}
                   autoComplete="family-name"
                 />
               </div>
 
-              <div className="form-group">
+              <div className={`form-group${registerData.phone ? ' has-value' : ''}${formErrors.phone ? ' form-group-error' : ''}`}>
                 <label className="form-label">Телефон *</label>
                 <input
                   type="tel"
                   className={`form-input${formErrors.phone ? ' form-input-error' : ''}`}
                   name="phone"
                   required
-                  placeholder="+7 999 123 4567"
                   value={registerData.phone}
                   onChange={handleRegisterChange}
                   autoComplete="tel"
@@ -254,14 +249,13 @@ function LoginModal() {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className={`form-group${registerData.email ? ' has-value' : ''}${formErrors.email ? ' form-group-error' : ''}`}>
                 <label className="form-label">Email *</label>
                 <input
                   type="email"
                   className={`form-input${formErrors.email ? ' form-input-error' : ''}`}
                   name="email"
                   required
-                  placeholder="email@example.com"
                   value={registerData.email}
                   onChange={handleRegisterChange}
                   autoComplete="email"
@@ -271,7 +265,7 @@ function LoginModal() {
                 )}
               </div>
 
-              <div className="form-group">
+              <div className="form-group has-value">
                 <label className="form-label">Роль *</label>
                 <select
                   className={`form-input form-select${formErrors.role ? ' form-input-error' : ''}`}
