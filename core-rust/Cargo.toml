@@ -47,4 +47,4 @@ futures-util = "0.3"
 
 # OpenAPI / Swagger documentation
 utoipa = { version = "4", features = ["actix_extras", "chrono", "decimal"] }
-utoipa-swagger-ui = { version = "7", features = ["actix-web"] }
+utoipa-swagger-ui = { version = "7", features = ["actix-web", "vendored"] }

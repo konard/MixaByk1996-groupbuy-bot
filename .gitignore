@@ -4,3 +4,6 @@ deploy.py
 *.pem
 *.key
 core-rust/target/
+__pycache__/
+*.py[cod]
+*$py.class

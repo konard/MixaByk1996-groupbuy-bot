@@ -163,6 +163,8 @@ export const api = {
   // User endpoints
   getUser: (userId) => request(`/users/${userId}/`),
 
+  getWsToken: (userId) => request(`/users/${userId}/ws_token/`),
+
   getUserByPlatform: (platform, platformUserId) =>
     request(`/users/by_platform/?platform=${platform}&platform_user_id=${platformUserId}`),
 
