@@ -478,11 +478,23 @@ const kafka = new Kafka({
   logLevel: logLevel.WARN,
   retry: {
     initialRetryTime: 300,
-    retries: 8,
+    retries: 10,
+    maxRetryTime: 30000,
+    factor: 0.2,
   },
 });
 
-const consumer = kafka.consumer({ groupId: config.kafka.groupId });
+const consumer = kafka.consumer({
+  groupId: config.kafka.groupId,
+  sessionTimeout: 30000,
+  heartbeatInterval: 3000,
+  maxWaitTimeInMs: 5000,
+  retry: {
+    initialRetryTime: 300,
+    retries: 10,
+    maxRetryTime: 30000,
+  },
+});
 
 const TOPICS = Object.keys(eventHandlers);
 
@@ -601,6 +613,8 @@ async function startConsumerWithRetry(maxRetries = 10, baseDelay = 3000) {
       if (attempt === maxRetries) {
         throw err;
       }
+      // Disconnect before retrying to reset consumer state and allow a clean reconnect
+      try { await consumer.disconnect(); } catch (_) { /* ignore disconnect errors */ }
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }

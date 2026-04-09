@@ -156,12 +156,12 @@ pub async fn mark_notification_read(
     }
 }
 
-/// GET /api/chat/notifications/?user=...
+/// GET /api/chat/notifications/?user_id=...
 #[utoipa::path(
     get,
     path = "/api/chat/notifications/",
     tag = "chat",
-    params(("user" = Option<i32>, Query, description = "Filter by user ID")),
+    params(("user_id" = Option<i32>, Query, description = "Filter by user ID")),
     responses(
         (status = 200, description = "List of notifications", body = Vec<Notification>)
     )
@@ -170,7 +170,7 @@ pub async fn list_notifications(
     pool: web::Data<PgPool>,
     query: web::Query<NotificationQuery>,
 ) -> HttpResponse {
-    let notifications = if let Some(user_id) = query.user {
+    let notifications = if let Some(user_id) = query.user_id {
         sqlx::query_as::<_, Notification>(
             "SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC",
         )

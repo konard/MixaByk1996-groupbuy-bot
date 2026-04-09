@@ -1,8 +1,19 @@
 use actix_web::{web, HttpResponse};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::models::user::*;
+
+const WS_TOKEN_TTL_SECS: u64 = 86400; // 24 hours
+
+#[derive(Debug, Serialize, Deserialize)]
+struct WsClaims {
+    user_id: i32,
+    iat: u64,
+    exp: u64,
+}
 
 /// GET /api/users/
 #[utoipa::path(
@@ -611,6 +622,64 @@ pub async fn search_users(
         Err(e) => {
             tracing::error!("Failed to search users: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({"error": "Database error"}))
+        }
+    }
+}
+
+/// GET /api/users/{id}/ws_token/
+#[utoipa::path(
+    get,
+    path = "/api/users/{id}/ws_token/",
+    tag = "users",
+    params(("id" = i32, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "WebSocket JWT token"),
+        (status = 404, description = "User not found")
+    )
+)]
+pub async fn get_ws_token(pool: web::Data<PgPool>, path: web::Path<i32>) -> HttpResponse {
+    let user_id = path.into_inner();
+    // Verify the user exists before issuing a token
+    match sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+        .bind(user_id)
+        .fetch_one(pool.get_ref())
+        .await
+    {
+        Ok(true) => {}
+        Ok(false) => {
+            return HttpResponse::NotFound()
+                .json(serde_json::json!({"detail": "Not found."}));
+        }
+        Err(e) => {
+            tracing::error!("Failed to check user for ws_token: {}", e);
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": "Database error"}));
+        }
+    }
+
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let claims = WsClaims {
+        user_id,
+        iat: now,
+        exp: now + WS_TOKEN_TTL_SECS,
+    };
+    match encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    ) {
+        Ok(token) => HttpResponse::Ok().json(serde_json::json!({
+            "token": token,
+            "expires_in": WS_TOKEN_TTL_SECS,
+        })),
+        Err(e) => {
+            tracing::error!("Failed to encode ws_token JWT: {}", e);
+            HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": "Token generation failed"}))
         }
     }
 }

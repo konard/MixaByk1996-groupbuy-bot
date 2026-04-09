@@ -31,6 +31,7 @@ use handlers::websocket::WsState;
         handlers::users::get_user_balance,
         handlers::users::update_user_balance,
         handlers::users::get_user_role,
+        handlers::users::get_ws_token,
         handlers::users::search_users,
         handlers::users::set_session_state,
         handlers::users::clear_session_state,
@@ -171,6 +172,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/users/{id}/balance/", web::get().to(handlers::users::get_user_balance))
             .route("/api/users/{id}/update_balance/", web::post().to(handlers::users::update_user_balance))
             .route("/api/users/{id}/role/", web::get().to(handlers::users::get_user_role))
+            .route("/api/users/{id}/ws_token/", web::get().to(handlers::users::get_ws_token))
             // Procurement endpoints
             .route("/api/procurements/", web::get().to(handlers::procurements::list_procurements))
             .route("/api/procurements/", web::post().to(handlers::procurements::create_procurement))
