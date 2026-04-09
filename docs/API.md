@@ -131,14 +131,33 @@ GET /api/users/?platform=telegram&role=organizer
 
 **Авторизация**: нет
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `platform` | string | **да** | Платформа: `telegram`, `vk` |
+| `platform_user_id` | string | **да** | ID пользователя на платформе |
+| `username` | string | **да** | Имя пользователя |
+| `first_name` | string | нет | Имя (по умолчанию `""`) |
+| `last_name` | string | нет | Фамилия (по умолчанию `""`) |
+| `phone` | string | нет | Номер телефона (по умолчанию `""`; если передаётся — должен начинаться с `+`) |
+| `email` | string (email) | нет | Электронная почта (по умолчанию `""`) |
+| `role` | string | нет | Роль: `organizer`, `buyer`, `supplier` (по умолчанию `buyer`) |
+| `language_code` | string | нет | Языковой код (например, `ru`, `en`) |
+| `selfie_file_id` | string | нет | ID файла с селфи (только запись, в ответе не возвращается) |
+
+**Пример запроса**:
 ```json
 {
-  "username": "user123",
-  "email": "user@example.com",
   "platform": "telegram",
   "platform_user_id": "123456789",
-  "role": "buyer"
+  "username": "user123",
+  "first_name": "Иван",
+  "last_name": "Петров",
+  "phone": "+79001234567",
+  "email": "user@example.com",
+  "role": "buyer",
+  "language_code": "ru"
 }
 ```
 
@@ -146,11 +165,15 @@ GET /api/users/?platform=telegram&role=organizer
 ```json
 {
   "id": 42,
-  "username": "user123",
-  "email": "user@example.com",
-  "role": "buyer",
   "platform": "telegram",
   "platform_user_id": "123456789",
+  "username": "user123",
+  "first_name": "Иван",
+  "last_name": "Петров",
+  "phone": "+79001234567",
+  "email": "user@example.com",
+  "role": "buyer",
+  "language_code": "ru",
   "balance": "0.00",
   "is_active": true,
   "created_at": "2024-01-15T12:00:00Z"
@@ -193,11 +216,24 @@ GET /api/users/42/
 
 **Авторизация**: владелец или администратор
 
-**Тело запроса**:
+**Поля запроса** (все необязательные при PATCH; при PUT — все обязательные):
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `first_name` | string | Имя |
+| `last_name` | string | Фамилия |
+| `phone` | string | Номер телефона |
+| `email` | string (email) | Электронная почта |
+| `role` | string | Роль: `organizer`, `buyer`, `supplier` |
+
+**Пример запроса**:
 ```json
 {
-  "username": "new_username",
-  "email": "new@example.com"
+  "first_name": "Иван",
+  "last_name": "Петров",
+  "phone": "+79001234567",
+  "email": "new@example.com",
+  "role": "organizer"
 }
 ```
 
@@ -412,6 +448,27 @@ GET /api/users/42/balance/
 
 Создать сессию.
 
+**Авторизация**: требуется
+
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `dialog_type` | string | **да** | Тип диалога (например, `procurement_creation`) |
+| `dialog_state` | string | нет | Текущее состояние диалога |
+| `dialog_data` | object | нет | Данные диалога (произвольный JSON) |
+| `expires_at` | datetime | нет | Время истечения сессии (ISO 8601) |
+
+**Пример запроса**:
+```json
+{
+  "dialog_type": "procurement_creation",
+  "dialog_state": "waiting_title",
+  "dialog_data": {"step": 1},
+  "expires_at": "2024-01-16T12:00:00Z"
+}
+```
+
 ---
 
 #### `GET /api/users/sessions/{id}/`
@@ -514,18 +571,44 @@ GET /api/procurements/?status=open&city=Москва&ordering=-created_at
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `title` | string (макс. 200) | **да** | Название закупки |
+| `description` | string | **да** | Описание закупки |
+| `category` | integer | **да** | ID категории |
+| `organizer` | integer | **да** | ID организатора |
+| `city` | string (макс. 100) | **да** | Город |
+| `target_amount` | decimal (12,2) | **да** | Целевая сумма закупки |
+| `deadline` | datetime | **да** | Дедлайн (ISO 8601) |
+| `delivery_address` | string | нет | Адрес доставки |
+| `stop_at_amount` | decimal (12,2) | нет | Сумма автоостановки приёма заявок |
+| `unit` | string (макс. 20) | нет | Единица измерения (по умолчанию `units`): `кг`, `шт`, `л` и др. |
+| `price_per_unit` | decimal (10,2) | нет | Цена за единицу товара |
+| `commission_percent` | decimal (4,2) | нет | Комиссия организатора в % (1–4; по умолчанию `0`) |
+| `min_quantity` | decimal (10,2) | нет | Минимальное общее количество для запуска |
+| `payment_deadline` | datetime | нет | Дедлайн оплаты (ISO 8601) |
+| `image_url` | string (URL) | нет | Ссылка на изображение |
+
+**Пример запроса**:
 ```json
 {
   "title": "Закупка зимней одежды",
   "description": "Куртки и пуховики оптом",
   "category": 5,
-  "organizer_id": "42",
-  "target_amount": "50000.00",
-  "commission_percent": "3.00",
+  "organizer": 42,
   "city": "Москва",
+  "target_amount": "50000.00",
+  "deadline": "2024-03-01T00:00:00Z",
+  "delivery_address": "ул. Ленина, 1",
+  "stop_at_amount": "60000.00",
   "unit": "шт",
-  "deadline": "2024-03-01T00:00:00Z"
+  "price_per_unit": "2500.00",
+  "commission_percent": "3.00",
+  "min_quantity": "10",
+  "payment_deadline": "2024-03-15T00:00:00Z",
+  "image_url": "https://example.com/image.jpg"
 }
 ```
 
@@ -546,6 +629,8 @@ GET /api/procurements/?status=open&city=Москва&ordering=-created_at
 Обновить закупку.
 
 **Авторизация**: организатор
+
+**Поля запроса**: те же, что и для `POST /api/procurements/`. При PATCH все поля необязательные; при PUT — обязательные присутствуют в соответствии с таблицей выше.
 
 ---
 
@@ -591,7 +676,16 @@ GET /api/procurements/101/participants/
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID пользователя |
+| `amount` | decimal (12,2) | **да** | Сумма участия |
+| `quantity` | decimal (10,2) | нет | Количество единиц товара (по умолчанию `1`) |
+| `notes` | string | нет | Примечания (особые пожелания) |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "10",
@@ -611,7 +705,17 @@ GET /api/procurements/101/participants/
 
 **Авторизация**: организатор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID добавляемого пользователя |
+| `organizer_id` | integer | **да** | ID организатора (подтверждение прав) |
+| `amount` | decimal (12,2) | **да** | Сумма участия |
+| `quantity` | decimal (10,2) | нет | Количество единиц товара (по умолчанию `1`) |
+| `notes` | string | нет | Примечания |
+
+**Пример запроса**:
 ```json
 {
   "organizer_id": "42",
@@ -630,7 +734,13 @@ GET /api/procurements/101/participants/
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID пользователя, покидающего закупку |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "10"
@@ -675,7 +785,13 @@ GET /api/procurements/user/42/
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID проверяемого пользователя |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "10"
@@ -695,11 +811,18 @@ GET /api/procurements/user/42/
 
 **Авторизация**: организатор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID организатора |
+| `status` | string | **да** | Новый статус: `draft`, `active`, `stopped`, `payment`, `completed`, `cancelled` |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "42",
-  "status": "closed"
+  "status": "active"
 }
 ```
 
@@ -719,11 +842,19 @@ GET /api/procurements/user/42/
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `voter_id` | integer | **да** | ID голосующего пользователя |
+| `supplier_id` | integer | **да** | ID поставщика (пользователь с ролью `supplier`) |
+| `comment` | string | нет | Комментарий к голосу |
+
+**Пример запроса**:
 ```json
 {
-  "voter_id": "10",
-  "supplier_id": "supplier_abc",
+  "voter_id": 10,
+  "supplier_id": 55,
   "comment": "Хороший поставщик"
 }
 ```
@@ -758,7 +889,13 @@ GET /api/procurements/user/42/
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID пользователя, подтверждающего закрытие голосования |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "10"
@@ -801,10 +938,16 @@ GET /api/procurements/user/42/
 
 **Авторизация**: организатор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `supplier_id` | integer | **да** | ID поставщика (пользователь с ролью `supplier`) |
+
+**Пример запроса**:
 ```json
 {
-  "supplier_id": "supplier_abc"
+  "supplier_id": 55
 }
 ```
 
@@ -870,7 +1013,16 @@ GET /api/procurements/user/42/
 
 **Авторизация**: организатор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `organizer_id` | integer | **да** | ID организатора |
+| `idempotency_key` | string | **да** | Уникальный ключ идемпотентности (для предотвращения дублирования) |
+| `supplier_api_url` | string | нет | URL API поставщика для отправки заказа |
+| `job_type` | string | нет | Тип задания (по умолчанию `receipt_table`): `receipt_table`, `order_placement` |
+
+**Пример запроса**:
 ```json
 {
   "organizer_id": "42",
@@ -903,6 +1055,8 @@ GET /api/procurements/user/42/
 
 **Авторизация**: организатор
 
+**Тело запроса**: не требуется.
+
 **Ответ**:
 ```json
 {
@@ -919,7 +1073,14 @@ GET /api/procurements/user/42/
 
 **Авторизация**: организатор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `email` | string (email) | **да** | Email приглашаемого пользователя |
+| `organizer_id` | integer | нет | ID организатора |
+
+**Пример запроса**:
 ```json
 {
   "organizer_id": "42",
@@ -974,11 +1135,24 @@ GET /api/procurements/user/42/
 
 **Авторизация**: администратор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `name` | string (макс. 100) | **да** | Название категории |
+| `description` | string | нет | Описание категории |
+| `parent` | integer | нет | ID родительской категории (для вложенных категорий) |
+| `icon` | string (макс. 50) | нет | Иконка (emoji или название иконки) |
+| `is_active` | boolean | нет | Активна ли категория (по умолчанию `true`) |
+
+**Пример запроса**:
 ```json
 {
   "name": "Электроника",
-  "parent": null
+  "description": "Электронные устройства и гаджеты",
+  "parent": null,
+  "icon": "📱",
+  "is_active": true
 }
 ```
 
@@ -1019,6 +1193,18 @@ GET /api/procurements/user/42/
 
 Создать участие. **Авторизация**: требуется
 
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `procurement` | integer | **да** | ID закупки |
+| `user` | integer | **да** | ID пользователя |
+| `amount` | decimal (12,2) | **да** | Сумма участия |
+| `quantity` | decimal (10,2) | нет | Количество единиц товара (по умолчанию `1`) |
+| `status` | string | нет | Статус: `pending`, `confirmed`, `paid`, `delivered`, `cancelled` (по умолчанию `pending`) |
+| `notes` | string | нет | Примечания |
+| `is_active` | boolean | нет | Активен ли участник (по умолчанию `true`) |
+
 ---
 
 #### `GET /api/procurements/participants/{id}/`
@@ -1030,6 +1216,8 @@ GET /api/procurements/user/42/
 #### `PUT /api/procurements/participants/{id}/`
 
 Обновить участие. **Авторизация**: владелец или администратор
+
+**Поля запроса**: те же, что и для `POST /api/procurements/participants/`. При PATCH все поля необязательные.
 
 ---
 
@@ -1045,7 +1233,13 @@ GET /api/procurements/user/42/
 
 **Авторизация**: участник или организатор
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `status` | string | **да** | Новый статус: `pending`, `confirmed`, `paid`, `delivered`, `cancelled` |
+
+**Пример запроса**:
 ```json
 {
   "status": "confirmed"
@@ -1104,12 +1298,22 @@ GET /api/payments/?user_id=42&status=success
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID пользователя |
+| `amount` | decimal (12,2) | **да** | Сумма платежа |
+| `description` | string | нет | Описание платежа |
+| `procurement_id` | integer | нет | ID закупки (если платёж связан с закупкой) |
+
+**Пример запроса**:
 ```json
 {
   "user_id": 42,
   "amount": "1500.00",
-  "description": "Пополнение баланса"
+  "description": "Пополнение баланса",
+  "procurement_id": 101
 }
 ```
 
@@ -1316,7 +1520,17 @@ GET /api/chat/messages/?procurement_id=101
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `procurement_id` | integer | **да** | ID закупки |
+| `user_id` | integer | **да** | ID отправителя |
+| `text` | string | **да** | Текст сообщения |
+| `message_type` | string | нет | Тип сообщения: `text`, `image`, `file` (по умолчанию `text`) |
+| `attachment_url` | string (URL) | нет | Ссылка на вложение |
+
+**Пример запроса**:
 ```json
 {
   "procurement_id": 101,
@@ -1355,7 +1569,15 @@ GET /api/chat/messages/?procurement_id=101
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID пользователя |
+| `procurement_id` | integer | **да** | ID закупки |
+| `message_id` | integer | нет | ID конкретного сообщения; если не указан — отмечаются все сообщения закупки |
+
+**Пример запроса**:
 ```json
 {
   "user_id": 42,
@@ -1363,8 +1585,6 @@ GET /api/chat/messages/?procurement_id=101
   "message_id": 2001
 }
 ```
-
-`message_id` — необязательный; если не указан, отмечаются все сообщения.
 
 **Ответ**:
 ```json
@@ -1417,6 +1637,16 @@ GET /api/chat/messages/?procurement_id=101
 
 Создать уведомление. **Авторизация**: требуется
 
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID получателя |
+| `notification_type` | string | **да** | Тип уведомления (например, `procurement_update`, `system`) |
+| `title` | string | **да** | Заголовок уведомления |
+| `message` | string | **да** | Текст уведомления |
+| `procurement_id` | integer | нет | ID связанной закупки |
+
 ---
 
 #### `GET /api/chat/notifications/{id}/`
@@ -1428,6 +1658,8 @@ GET /api/chat/messages/?procurement_id=101
 #### `PUT /api/chat/notifications/{id}/`
 
 Обновить уведомление. **Авторизация**: владелец или администратор
+
+**Поля запроса**: те же, что и для `POST /api/chat/notifications/`. При PATCH все поля необязательные.
 
 ---
 
@@ -1526,7 +1758,15 @@ GET /api/chat/messages/?procurement_id=101
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `model_type` | string | **да** | Тип модели: `success_prediction`, `demand_forecast` |
+| `max_iterations` | integer | нет | Максимальное число итераций обучения |
+| `work_dir` | string | нет | Рабочая директория для сохранения модели |
+
+**Пример запроса**:
 ```json
 {
   "model_type": "success_prediction",
@@ -1574,15 +1814,20 @@ GET /api/chat/messages/?procurement_id=101
 
 **Авторизация**: требуется
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `procurement_id` | integer | **да** | ID закупки для предсказания |
+| `prediction_type` | string | нет | Тип предсказания: `success_prediction`, `demand_forecast` |
+
+**Пример запроса**:
 ```json
 {
   "procurement_id": 101,
   "prediction_type": "success_prediction"
 }
 ```
-
-`prediction_type` — необязательный. Возможные значения: `success_prediction`, `demand_forecast`.
 
 **Ответ** (`201 Created`):
 ```json
@@ -1610,7 +1855,14 @@ GET /api/chat/messages/?procurement_id=101
 
 Авторизация администратора.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `username` | string | **да** | Имя пользователя администратора |
+| `password` | string | **да** | Пароль |
+
+**Пример запроса**:
 ```json
 {
   "username": "admin",
@@ -1732,7 +1984,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Изменить баланс пользователя вручную.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `amount` | decimal | **да** | Сумма изменения баланса (положительная — пополнение, отрицательная — списание) |
+| `description` | string | нет | Причина изменения баланса |
+
+**Пример запроса**:
 ```json
 {
   "amount": "500.00",
@@ -1755,15 +2014,20 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Массовые действия над пользователями.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `ids` | array of integer | **да** | Список ID пользователей |
+| `action` | string | **да** | Действие: `activate`, `deactivate`, `verify`, `unverify` |
+
+**Пример запроса**:
 ```json
 {
   "ids": [10, 15, 22, 30],
   "action": "verify"
 }
 ```
-
-Доступные действия: `activate`, `deactivate`, `verify`, `unverify`
 
 **Ответ**:
 ```json
@@ -1776,10 +2040,16 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Изменить статус закупки (от имени администратора).
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `status` | string | **да** | Новый статус: `draft`, `active`, `stopped`, `payment`, `completed`, `cancelled` |
+
+**Пример запроса**:
 ```json
 {
-  "status": "open"
+  "status": "active"
 }
 ```
 
@@ -1804,19 +2074,24 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 ---
 
-#### `GET /api/admin/procurements/bulk_action/`
+#### `POST /api/admin/procurements/bulk_action/`
 
 Массовые действия над закупками.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `ids` | array of integer | **да** | Список ID закупок |
+| `action` | string | **да** | Действие: `feature`, `unfeature`, или любой статус (`draft`, `active`, `stopped`, `payment`, `completed`, `cancelled`) |
+
+**Пример запроса**:
 ```json
 {
   "ids": [101, 102, 103],
   "action": "feature"
 }
 ```
-
-Доступные действия: `feature`, `unfeature`, или любой статус
 
 **Ответ**:
 ```json
@@ -1861,7 +2136,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Отправить сообщение пользователю от имени администратора.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | integer | **да** | ID получателя |
+| `text` | string | **да** | Текст сообщения |
+
+**Пример запроса**:
 ```json
 {
   "user_id": 42,
@@ -1884,7 +2166,16 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Массовая рассылка уведомлений.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_ids` | array of integer | **да** | Список ID получателей |
+| `notification_type` | string | **да** | Тип уведомления: `system`, `procurement_update`, и др. |
+| `title` | string | **да** | Заголовок уведомления |
+| `message` | string | **да** | Текст уведомления |
+
+**Пример запроса**:
 ```json
 {
   "user_ids": [10, 15, 22, 30, 42],
@@ -1915,7 +2206,17 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Регистрация нового пользователя.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `email` | string (email) | **да** | Email пользователя |
+| `password` | string | **да** | Пароль |
+| `firstName` | string | нет | Имя |
+| `lastName` | string | нет | Фамилия |
+| `role` | string | нет | Роль: `buyer`, `organizer`, `supplier` |
+
+**Пример запроса**:
 ```json
 {
   "email": "user@example.com",
@@ -1925,8 +2226,6 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
   "role": "buyer"
 }
 ```
-
-`firstName`, `lastName`, `role` — необязательные.
 
 **Ответ** (`201 Created`):
 ```json
@@ -2144,7 +2443,22 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 **Заголовки**: `x-user-id: <userId>`
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `title` | string | **да** | Название закупки |
+| `description` | string | нет | Описание |
+| `minParticipants` | integer | нет | Минимальное число участников |
+| `maxParticipants` | integer | нет | Максимальное число участников |
+| `targetAmount` | number | нет | Целевая сумма |
+| `currency` | string | нет | Валюта (например, `RUB`) |
+| `category` | string | нет | Категория (например, `electronics`) |
+| `commissionPercent` | number | нет | Комиссия организатора в % |
+| `escrowThreshold` | number | нет | Порог эскроу |
+| `deadlineAt` | datetime | нет | Дедлайн (ISO 8601) |
+
+**Пример запроса**:
 ```json
 {
   "title": "Совместная закупка ноутбуков",
@@ -2159,8 +2473,6 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
   "deadlineAt": "2024-03-01T00:00:00Z"
 }
 ```
-
-Все поля кроме `title` — необязательные.
 
 **Ответ** (`201 Created`):
 ```json
@@ -2276,7 +2588,18 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 **Заголовки**: `x-user-id: <userId>`
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `purchaseId` | string (uuid) | **да** | ID закупки |
+| `closesAt` | datetime | нет | Время закрытия голосования (ISO 8601) |
+| `allowAddCandidates` | boolean | нет | Разрешить добавлять кандидатов |
+| `allowChangeVote` | boolean | нет | Разрешить менять голос |
+| `minVotesToClose` | integer | нет | Минимальное число голосов для закрытия |
+| `votingDuration` | integer | нет | Длительность голосования в часах |
+
+**Пример запроса**:
 ```json
 {
   "purchaseId": "uuid-...",
@@ -2309,7 +2632,17 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 **Заголовки**: `x-user-id: <userId>`
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `supplierName` | string | **да** | Название поставщика |
+| `description` | string | нет | Описание поставщика |
+| `pricePerUnit` | number | нет | Цена за единицу товара |
+| `unit` | string | нет | Единица измерения |
+| `supplierUrl` | string (URL) | нет | Ссылка на поставщика |
+
+**Пример запроса**:
 ```json
 {
   "supplierName": "ООО Поставщик",
@@ -2330,7 +2663,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 **Заголовки**: `x-user-id: <userId>`
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `candidateId` | string (uuid) | **да** | ID кандидата-поставщика |
+| `comment` | string | нет | Комментарий к голосу |
+
+**Пример запроса**:
 ```json
 {
   "candidateId": "uuid-candidate",
@@ -2420,7 +2760,15 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Пополнить кошелёк.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя |
+| `amount` | number | **да** | Сумма пополнения |
+| `idempotency_key` | string | **да** | Ключ идемпотентности |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user",
@@ -2437,7 +2785,16 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Заморозить средства для участия в закупке.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя |
+| `purchase_id` | string (uuid) | **да** | ID закупки |
+| `amount` | number | **да** | Сумма заморозки |
+| `idempotency_key` | string | **да** | Ключ идемпотентности |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user",
@@ -2455,7 +2812,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Подтвердить списание замороженных средств.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя |
+| `hold_tx_id` | string (uuid) | **да** | ID транзакции заморозки |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user",
@@ -2469,7 +2833,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Разморозить средства (отмена участия).
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя |
+| `hold_tx_id` | string (uuid) | **да** | ID транзакции заморозки |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user",
@@ -2483,7 +2854,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Создать счёт эскроу для закупки.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `purchase_id` | string (uuid) | **да** | ID закупки |
+| `threshold` | number | нет | Порог суммы для автоматического разблокирования |
+
+**Пример запроса**:
 ```json
 {
   "purchase_id": "uuid-purchase",
@@ -2514,7 +2892,15 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Внести средства в эскроу.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя |
+| `amount` | number | **да** | Сумма взноса |
+| `idempotency_key` | string | **да** | Ключ идемпотентности |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user",
@@ -2529,7 +2915,13 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Подтвердить завершение закупки (получение товара).
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя, подтверждающего получение |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user"
@@ -2542,7 +2934,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Выплатить средства поставщику.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `recipient_id` | string (uuid) | **да** | ID получателя (поставщика) |
+| `amount` | number | **да** | Сумма выплаты |
+
+**Пример запроса**:
 ```json
 {
   "recipient_id": "uuid-supplier",
@@ -2556,7 +2955,14 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Открыть спор по эскроу.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `user_id` | string (uuid) | **да** | ID пользователя, открывающего спор |
+| `reason` | string | **да** | Причина спора |
+
+**Пример запроса**:
 ```json
 {
   "user_id": "uuid-user",
@@ -2570,7 +2976,16 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Зарезервировать комиссию.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `purchase_id` | string (uuid) | **да** | ID закупки |
+| `organizer_wallet_id` | string (uuid) | **да** | ID кошелька организатора |
+| `amount` | number | **да** | Общая сумма закупки |
+| `percent` | number | **да** | Процент комиссии |
+
+**Пример запроса**:
 ```json
 {
   "purchase_id": "uuid-purchase",
@@ -2586,7 +3001,13 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Подтвердить комиссию.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `commission_hold_id` | string (uuid) | **да** | ID резервирования комиссии |
+
+**Пример запроса**:
 ```json
 {
   "commission_hold_id": "uuid-hold"
@@ -2599,7 +3020,13 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Вернуть комиссию (при отмене).
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `commission_hold_id` | string (uuid) | **да** | ID резервирования комиссии |
+
+**Пример запроса**:
 ```json
 {
   "commission_hold_id": "uuid-hold"
@@ -2648,7 +3075,20 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Оставить отзыв.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `reviewerId` | string (uuid) | **да** | ID автора отзыва |
+| `targetId` | string (uuid) | **да** | ID оцениваемого пользователя |
+| `role` | string | **да** | Роль рецензента: `buyer`, `organizer` |
+| `rating` | integer (1–5) | **да** | Общая оценка |
+| `purchaseId` | string (uuid) | нет | ID закупки |
+| `categories` | object | нет | Оценки по категориям: `reliability`, `speed`, `quality`, `timeliness` (каждая 1–5) |
+| `comment` | string | нет | Комментарий |
+| `expiresAt` | datetime | нет | Время истечения отзыва (ISO 8601) |
+
+**Пример запроса**:
 ```json
 {
   "reviewerId": "uuid-reviewer",
@@ -2735,7 +3175,18 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Подать жалобу.
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `reporterId` | string (uuid) | **да** | ID пользователя, подающего жалобу |
+| `targetId` | string (uuid) | **да** | ID пользователя, на которого жалоба |
+| `type` | string | **да** | Тип жалобы: `fraud`, и др. |
+| `description` | string (мин. 10 символов) | **да** | Описание жалобы |
+| `purchaseId` | string (uuid) | нет | ID связанной закупки |
+| `evidenceUrls` | array of string (URL) | нет | Ссылки на доказательства |
+
+**Пример запроса**:
 ```json
 {
   "reporterId": "uuid-reporter",
@@ -2746,8 +3197,6 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
   "evidenceUrls": ["https://example.com/screenshot1.png"]
 }
 ```
-
-`purchaseId` и `evidenceUrls` — необязательные. Минимальная длина `description` — 10 символов.
 
 **Ответ** (`201 Created`): объект жалобы
 
@@ -2779,7 +3228,15 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 Разрешить жалобу (администратор).
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `adminId` | string (uuid) | **да** | ID администратора |
+| `status` | string | **да** | Новый статус: `RESOLVED`, `REJECTED` |
+| `resolution` | string (мин. 5 символов) | **да** | Решение по жалобе |
+
+**Пример запроса**:
 ```json
 {
   "adminId": "uuid-admin",
@@ -2787,8 +3244,6 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
   "resolution": "Пользователь предупреждён. Средства возвращены участникам."
 }
 ```
-
-Минимальная длина `resolution` — 5 символов.
 
 ---
 
@@ -2814,7 +3269,19 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 **Заголовки**: `X-User-ID: <userId>` (для сохранения истории)
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `query` | string | **да** | Поисковый запрос |
+| `category` | string | нет | Фильтр по категории |
+| `city` | string | нет | Фильтр по городу |
+| `priceMin` | number | нет | Минимальная сумма |
+| `priceMax` | number | нет | Максимальная сумма |
+| `page` | integer | нет | Номер страницы (по умолчанию `1`) |
+| `perPage` | integer | нет | Количество результатов на страницу (по умолчанию `20`) |
+
+**Пример запроса**:
 ```json
 {
   "query": "куртки зима",
@@ -2826,8 +3293,6 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
   "perPage": 20
 }
 ```
-
-Все поля кроме `query` — необязательные.
 
 **Ответ**:
 ```json
@@ -2885,7 +3350,17 @@ GET /api/admin/analytics/?date_from=2024-01-01&date_to=2024-01-31&period=week
 
 **Заголовки**: `X-User-ID: <userId>` (обязательно)
 
-**Тело запроса**:
+**Поля запроса**:
+
+| Поле | Тип | Обязательное | Описание |
+|---|---|---|---|
+| `name` | string | **да** | Название фильтра |
+| `category` | string | нет | Категория |
+| `city` | string | нет | Город |
+| `priceMin` | number | нет | Минимальная сумма |
+| `priceMax` | number | нет | Максимальная сумма |
+
+**Пример запроса**:
 ```json
 {
   "name": "Зимняя одежда в Москве",
