@@ -46,5 +46,5 @@ pub struct Notification {
 
 #[derive(Debug, Deserialize)]
 pub struct NotificationQuery {
-    pub user: Option<i32>,
+    pub user_id: Option<i32>,
 }

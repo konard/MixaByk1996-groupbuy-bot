@@ -47,7 +47,6 @@
   ],
 
   "log_level": "info",
-  "log_format": "json",
 
   "websocket_compression": true,
   "websocket_compression_min_size": 512,

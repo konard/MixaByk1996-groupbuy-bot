@@ -312,9 +312,11 @@ services:
     volumes:
       - ./services/chat-service/centrifugo/centrifugo.json:/centrifugo/config.json
     command: centrifugo -c /centrifugo/config.json
-    # Pass Redis password via env var — centrifugo v5 uses CENTRIFUGO_REDIS_PASSWORD
-    # which maps to the "redis_password" key in centrifugo.json and overrides it.
-    # (v6 renamed this to broker_redis_password; v5 uses the plain redis_* keys.)
+    # Pass secrets via env vars — centrifugo v5 maps CENTRIFUGO_<KEY> env vars
+    # to the corresponding JSON config keys, overriding file values at runtime.
+    # Set CENTRIFUGO_ALLOWED_ORIGINS in your .env file to restrict WebSocket
+    # origins (e.g. CENTRIFUGO_ALLOWED_ORIGINS=https://yourdomain.com) to remove
+    # the security warning about using the wildcard origin "*".
     environment:
       CENTRIFUGO_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
     ports:
