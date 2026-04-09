@@ -140,11 +140,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-
         user_id = self.request.query_params.get('user_id')
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
+        if not user_id:
+            return Notification.objects.none()
+
+        queryset = Notification.objects.filter(user_id=user_id)
 
         unread_only = self.request.query_params.get('unread_only')
         if unread_only and unread_only.lower() == 'true':

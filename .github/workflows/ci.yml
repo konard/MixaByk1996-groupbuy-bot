@@ -193,4 +193,4 @@ jobs:
           context: ./services/${{ matrix.service }}
           push: false
           cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }},ignore-error=true
