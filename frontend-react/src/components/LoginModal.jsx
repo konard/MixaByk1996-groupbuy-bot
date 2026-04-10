@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 
-function validate(formData) {
+// ─── Validation helpers ────────────────────────────────────────────────────────
+
+function validatePhone(phone) {
+  if (!phone || !phone.trim()) return 'Номер телефона обязателен';
+  if (!/^\+?[1-9]\d{6,19}$/.test(phone.trim())) return 'Введите корректный номер телефона (напр. +79001234567)';
+  return null;
+}
+
+function validateRegisterForm(formData) {
   const errors = {};
-  if (!formData.first_name || !formData.first_name.trim()) {
-    errors.first_name = 'Имя обязательно';
-  }
+  const phoneErr = validatePhone(formData.phone);
+  if (phoneErr) errors.phone = phoneErr;
   if (!formData.email || !formData.email.trim()) {
     errors.email = 'Email обязателен';
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
     errors.email = 'Введите корректный email';
-  }
-  if (!formData.password || !formData.password.trim()) {
-    errors.password = 'Пароль обязателен';
-  } else if (formData.password.length < 8) {
-    errors.password = 'Пароль должен содержать минимум 8 символов';
   }
   if (!formData.role) {
     errors.role = 'Роль обязательна';
@@ -22,7 +24,8 @@ function validate(formData) {
   return errors;
 }
 
-/* Telegram-style phone icon */
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 function TelegramPhoneIcon() {
   return (
     <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
@@ -35,7 +38,6 @@ function TelegramPhoneIcon() {
   );
 }
 
-/* Telegram-style registration icon */
 function TelegramRegisterIcon() {
   return (
     <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
@@ -50,49 +52,90 @@ function TelegramRegisterIcon() {
   );
 }
 
+function OtpIcon() {
+  return (
+    <svg width="160" height="160" viewBox="0 0 160 160" fill="none">
+      <circle cx="80" cy="80" r="80" fill="var(--tg-primary)" opacity="0.1" />
+      <circle cx="80" cy="80" r="60" fill="var(--tg-primary)" opacity="0.15" />
+      <rect x="40" y="55" width="80" height="56" rx="8" fill="var(--tg-primary)" />
+      <path d="M40 75 L80 95 L120 75" stroke="white" strokeWidth="4" fill="none" strokeLinecap="round" />
+      <circle cx="80" cy="118" r="14" fill="var(--tg-success, #4fae4e)" />
+      <path d="M73 118 L78 123 L88 113" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 function LoginModal() {
-  const { loginModalOpen, closeLoginModal, register, login, isLoading, error } = useStore();
+  const {
+    loginModalOpen,
+    login, confirmLogin,
+    register, confirmRegistration,
+    isLoading, error,
+    otpPending,
+  } = useStore();
+
   const [activeTab, setActiveTab] = useState('login');
 
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  // Login step 1: phone
+  const [loginData, setLoginData] = useState({ phone: '' });
+  const [loginErrors, setLoginErrors] = useState({});
+
+  // Registration step 1: phone + email + name + role
   const [registerData, setRegisterData] = useState({
     first_name: '',
     last_name: '',
+    phone: '',
     email: '',
-    password: '',
     role: 'buyer',
   });
   const [formErrors, setFormErrors] = useState({});
 
+  // OTP step (shared for login and registration)
+  const [otpValue, setOtpValue] = useState('');
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
   const handleLoginChange = (e) => {
     const { name, value } = e.target;
     setLoginData((prev) => ({ ...prev, [name]: value }));
+    if (loginErrors[name]) setLoginErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
   const handleRegisterChange = (e) => {
     const { name, value } = e.target;
     setRegisterData((prev) => ({ ...prev, [name]: value }));
-    // Clear error for this field when user starts typing
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
+  // Step 1: submit phone to initiate login
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (!loginData.email || !loginData.password) {
+    const phoneErr = validatePhone(loginData.phone);
+    if (phoneErr) {
+      setLoginErrors({ phone: phoneErr });
       return;
     }
+    setLoginErrors({});
     try {
       await login(loginData);
-    } catch (err) {
-      // Error handled in store
-    }
+    } catch (_) {}
   };
 
+  // Step 2: submit OTP to confirm login
+  const handleLoginOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!otpValue.trim()) return;
+    try {
+      await confirmLogin({ phone: otpPending.phone, otp: otpValue.trim() });
+    } catch (_) {}
+  };
+
+  // Step 1: submit phone+email to initiate registration
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    const errors = validate(registerData);
+    const errors = validateRegisterForm(registerData);
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -100,12 +143,86 @@ function LoginModal() {
     setFormErrors({});
     try {
       await register(registerData);
-    } catch (err) {
-      // Error handled in store
-    }
+    } catch (_) {}
+  };
+
+  // Step 2: submit OTP to confirm registration
+  const handleRegisterOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!otpValue.trim()) return;
+    try {
+      await confirmRegistration({ phone: otpPending.phone, otp: otpValue.trim() });
+    } catch (_) {}
+  };
+
+  const handleBackFromOtp = () => {
+    useStore.setState({ otpPending: null });
+    setOtpValue('');
   };
 
   if (!loginModalOpen) return null;
+
+  // ─── OTP confirmation screen ───────────────────────────────────────────────
+
+  if (otpPending) {
+    const isLogin = otpPending.context === 'login';
+    const handleOtpSubmit = isLogin ? handleLoginOtpSubmit : handleRegisterOtpSubmit;
+
+    return (
+      <div className="auth-screen">
+        <div className="auth-container">
+          <div className="auth-logo">
+            <OtpIcon />
+          </div>
+
+          <h1 className="auth-title">Введите код</h1>
+          <p className="auth-subtitle">
+            Код подтверждения отправлен на вашу электронную почту.
+          </p>
+
+          <form className="auth-form" onSubmit={handleOtpSubmit}>
+            {error && <div className="form-error-banner">{error}</div>}
+
+            <div className={`form-group${otpValue ? ' has-value' : ''}`}>
+              <label className="form-label">Код подтверждения</label>
+              <input
+                type="text"
+                className="form-input"
+                name="otp"
+                value={otpValue}
+                onChange={(e) => setOtpValue(e.target.value)}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={8}
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="auth-btn"
+              disabled={isLoading || !otpValue.trim()}
+            >
+              {isLoading && <span className="auth-spinner" />}
+              {isLoading ? 'Проверка...' : 'Подтвердить'}
+            </button>
+
+            <p className="form-hint" style={{ textAlign: 'center' }}>
+              <button
+                type="button"
+                className="form-link-btn"
+                onClick={handleBackFromOtp}
+              >
+                Назад
+              </button>
+            </p>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Main login / register screen ─────────────────────────────────────────
 
   return (
     <div className="auth-screen">
@@ -130,41 +247,32 @@ function LoginModal() {
 
         {activeTab === 'login' ? (
           <>
-            {/* Telegram-style illustration */}
             <div className="auth-logo">
               <TelegramPhoneIcon />
             </div>
 
             <h1 className="auth-title">GroupBuy</h1>
             <p className="auth-subtitle">
-              Войдите по email и паролю
+              Войдите по номеру телефона
             </p>
 
             <form className="auth-form" onSubmit={handleLoginSubmit}>
               {error && <div className="form-error-banner">{error}</div>}
 
-              <div className={`form-group${loginData.email ? ' has-value' : ''}`}>
-                <label className="form-label">Email</label>
+              <div className={`form-group${loginData.phone ? ' has-value' : ''}${loginErrors.phone ? ' form-group-error' : ''}`}>
+                <label className="form-label">Номер телефона</label>
                 <input
-                  type="email"
-                  className="form-input"
-                  name="email"
-                  value={loginData.email}
+                  type="tel"
+                  className={`form-input${loginErrors.phone ? ' form-input-error' : ''}`}
+                  name="phone"
+                  value={loginData.phone}
                   onChange={handleLoginChange}
-                  autoComplete="email"
+                  autoComplete="tel"
+                  placeholder="+79001234567"
                 />
-              </div>
-
-              <div className={`form-group${loginData.password ? ' has-value' : ''}`}>
-                <label className="form-label">Пароль</label>
-                <input
-                  type="password"
-                  className="form-input"
-                  name="password"
-                  value={loginData.password}
-                  onChange={handleLoginChange}
-                  autoComplete="current-password"
-                />
+                {loginErrors.phone && (
+                  <span className="form-field-error">{loginErrors.phone}</span>
+                )}
               </div>
 
               <button
@@ -173,7 +281,7 @@ function LoginModal() {
                 disabled={isLoading}
               >
                 {isLoading && <span className="auth-spinner" />}
-                {isLoading ? 'Загрузка...' : 'Продолжить'}
+                {isLoading ? 'Загрузка...' : 'Получить код'}
               </button>
 
               <p className="form-hint" style={{ textAlign: 'center' }}>
@@ -190,7 +298,6 @@ function LoginModal() {
           </>
         ) : (
           <>
-            {/* Registration illustration */}
             <div className="auth-logo">
               <TelegramRegisterIcon />
             </div>
@@ -203,32 +310,21 @@ function LoginModal() {
             <form className="auth-form" onSubmit={handleRegisterSubmit}>
               {error && <div className="form-error-banner">{error}</div>}
 
-              <div className={`form-group${registerData.first_name ? ' has-value' : ''}${formErrors.first_name ? ' form-group-error' : ''}`}>
-                <label className="form-label">Имя *</label>
+              <div className={`form-group${registerData.phone ? ' has-value' : ''}${formErrors.phone ? ' form-group-error' : ''}`}>
+                <label className="form-label">Номер телефона *</label>
                 <input
-                  type="text"
-                  className={`form-input${formErrors.first_name ? ' form-input-error' : ''}`}
-                  name="first_name"
+                  type="tel"
+                  className={`form-input${formErrors.phone ? ' form-input-error' : ''}`}
+                  name="phone"
                   required
-                  value={registerData.first_name}
+                  value={registerData.phone}
                   onChange={handleRegisterChange}
-                  autoComplete="given-name"
+                  autoComplete="tel"
+                  placeholder="+79001234567"
                 />
-                {formErrors.first_name && (
-                  <span className="form-field-error">{formErrors.first_name}</span>
+                {formErrors.phone && (
+                  <span className="form-field-error">{formErrors.phone}</span>
                 )}
-              </div>
-
-              <div className={`form-group${registerData.last_name ? ' has-value' : ''}`}>
-                <label className="form-label">Фамилия</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  name="last_name"
-                  value={registerData.last_name}
-                  onChange={handleRegisterChange}
-                  autoComplete="family-name"
-                />
               </div>
 
               <div className={`form-group${registerData.email ? ' has-value' : ''}${formErrors.email ? ' form-group-error' : ''}`}>
@@ -247,20 +343,28 @@ function LoginModal() {
                 )}
               </div>
 
-              <div className={`form-group${registerData.password ? ' has-value' : ''}${formErrors.password ? ' form-group-error' : ''}`}>
-                <label className="form-label">Пароль *</label>
+              <div className={`form-group${registerData.first_name ? ' has-value' : ''}`}>
+                <label className="form-label">Имя</label>
                 <input
-                  type="password"
-                  className={`form-input${formErrors.password ? ' form-input-error' : ''}`}
-                  name="password"
-                  required
-                  value={registerData.password}
+                  type="text"
+                  className="form-input"
+                  name="first_name"
+                  value={registerData.first_name}
                   onChange={handleRegisterChange}
-                  autoComplete="new-password"
+                  autoComplete="given-name"
                 />
-                {formErrors.password && (
-                  <span className="form-field-error">{formErrors.password}</span>
-                )}
+              </div>
+
+              <div className={`form-group${registerData.last_name ? ' has-value' : ''}`}>
+                <label className="form-label">Фамилия</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  name="last_name"
+                  value={registerData.last_name}
+                  onChange={handleRegisterChange}
+                  autoComplete="family-name"
+                />
               </div>
 
               <div className="form-group has-value">

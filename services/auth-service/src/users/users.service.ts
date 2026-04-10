@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -15,29 +15,38 @@ export class UsersService {
     return this.usersRepo.findOne({ where: { email: email.toLowerCase() } });
   }
 
+  async findByPhone(phone: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { phone } });
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.usersRepo.findOne({ where: { id } });
   }
 
-  async create(email: string, password: string, firstName?: string, lastName?: string, role?: UserRole): Promise<User> {
-    const existing = await this.findByEmail(email);
-    if (existing) {
+  async create(
+    phone: string,
+    email: string,
+    firstName?: string,
+    lastName?: string,
+    role?: UserRole,
+  ): Promise<User> {
+    const existingByPhone = await this.findByPhone(phone);
+    if (existingByPhone) {
+      throw new ConflictException('User with this phone number already exists');
+    }
+    const existingByEmail = await this.findByEmail(email);
+    if (existingByEmail) {
       throw new ConflictException('User with this email already exists');
     }
-    const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
-    const passwordHash = await bcrypt.hash(password, rounds);
     const user = this.usersRepo.create({
+      phone,
       email: email.toLowerCase(),
-      passwordHash,
+      passwordHash: null,
       firstName: firstName ?? null,
       lastName: lastName ?? null,
       ...(role ? { role } : {}),
     });
     return this.usersRepo.save(user);
-  }
-
-  async validatePassword(user: User, password: string): Promise<boolean> {
-    return bcrypt.compare(password, user.passwordHash);
   }
 
   async setRefreshToken(userId: string, refreshToken: string | null): Promise<void> {

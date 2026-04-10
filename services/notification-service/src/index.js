@@ -542,6 +542,38 @@ const server = http.createServer((req, res) => {
   if (req.url === '/health' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', service: 'notification-service' }));
+  } else if (req.url === '/internal/send-otp' && req.method === 'POST') {
+    // Internal endpoint for auth-service to trigger OTP email delivery.
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { email, otp, subject, context } = JSON.parse(body);
+        if (!email || !otp) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'email and otp are required' }));
+          return;
+        }
+        const safeSubject = subject || (context === 'registration'
+          ? 'Groupbuy — код подтверждения регистрации'
+          : 'Groupbuy — код для входа');
+        const html = `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
+            <h2 style="color:#2481cc;">GroupBuy</h2>
+            <p>${context === 'registration' ? 'Для завершения регистрации введите код подтверждения:' : 'Ваш код для входа:'}</p>
+            <div style="font-size:2rem;font-weight:bold;letter-spacing:0.3em;color:#2481cc;padding:12px 0;">${otp}</div>
+            <p style="color:#999;font-size:0.9rem;">Код действителен 10 минут. Не передавайте его никому.</p>
+          </div>`;
+        const text = `Ваш код GroupBuy: ${otp}. Действителен 10 минут.`;
+        await sendEmail(email, safeSubject, html, text);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ sent: true }));
+      } catch (err) {
+        console.error(`[OTP] Handler error: ${err.message}`);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'internal error' }));
+      }
+    });
   } else if (req.url === '/webhooks/telegram' && req.method === 'POST') {
     // Handle Telegram bot callbacks (interactive buttons)
     let body = '';

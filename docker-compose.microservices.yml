@@ -404,11 +404,14 @@ services:
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       BCRYPT_ROUNDS: 10
+      NOTIFICATION_SERVICE_URL: http://notification-service:4005
     depends_on:
       postgres-auth:
         condition: service_healthy
       redis:
         condition: service_healthy
+      notification-service:
+        condition: service_started
     networks:
       - microservices
     restart: unless-stopped

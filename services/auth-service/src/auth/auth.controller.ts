@@ -9,17 +9,26 @@ import {
   Get,
   Req,
 } from '@nestjs/common';
-import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsOptional,
+  IsEnum,
+  Matches,
+  Length,
+} from 'class-validator';
 import { AuthService } from './auth.service';
 import { UserRole } from '../users/users.entity';
 
+// ─── DTOs ──────────────────────────────────────────────────────────────────────
+
 class RegisterDto {
+  @IsString()
+  @Matches(/^\+?[1-9]\d{6,19}$/, { message: 'Invalid phone number format' })
+  phone: string;
+
   @IsEmail()
   email: string;
-
-  @IsString()
-  @MinLength(8)
-  password: string;
 
   @IsString()
   @IsOptional()
@@ -34,12 +43,30 @@ class RegisterDto {
   role?: UserRole;
 }
 
-class LoginDto {
-  @IsEmail()
-  email: string;
+class ConfirmRegistrationDto {
+  @IsString()
+  @Matches(/^\+?[1-9]\d{6,19}$/, { message: 'Invalid phone number format' })
+  phone: string;
 
   @IsString()
-  password: string;
+  @Length(4, 8)
+  otp: string;
+}
+
+class LoginDto {
+  @IsString()
+  @Matches(/^\+?[1-9]\d{6,19}$/, { message: 'Invalid phone number format' })
+  phone: string;
+}
+
+class ConfirmLoginDto {
+  @IsString()
+  @Matches(/^\+?[1-9]\d{6,19}$/, { message: 'Invalid phone number format' })
+  phone: string;
+
+  @IsString()
+  @Length(4, 8)
+  otp: string;
 }
 
 class RefreshDto {
@@ -70,27 +97,55 @@ class TwoFactorBackupCodesDto {
   code: string;
 }
 
+// ─── Controller ────────────────────────────────────────────────────────────────
+
 @Controller()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  /**
+   * Step 1: Start registration — validates phone+email uniqueness, sends OTP to email.
+   */
   @Post('register')
-  @HttpCode(HttpStatus.CREATED)
+  @HttpCode(HttpStatus.OK)
   async register(@Body() dto: RegisterDto) {
-    const tokens = await this.authService.register(
+    const result = await this.authService.registerWithPhone(
+      dto.phone,
       dto.email,
-      dto.password,
       dto.firstName,
       dto.lastName,
       dto.role,
     );
+    return { success: true, data: result };
+  }
+
+  /**
+   * Step 2: Confirm registration — verify OTP and receive JWT tokens.
+   */
+  @Post('register/confirm')
+  @HttpCode(HttpStatus.CREATED)
+  async confirmRegistration(@Body() dto: ConfirmRegistrationDto) {
+    const tokens = await this.authService.confirmRegistration(dto.phone, dto.otp);
     return { success: true, data: tokens };
   }
 
+  /**
+   * Step 1: Start login by phone — sends OTP to the user's registered email.
+   */
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
-    const result = await this.authService.login(dto.email, dto.password);
+    const result = await this.authService.loginWithPhone(dto.phone);
+    return { success: true, data: result };
+  }
+
+  /**
+   * Step 2: Confirm login — verify OTP and receive JWT tokens (or 2FA temp token).
+   */
+  @Post('login/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmLogin(@Body() dto: ConfirmLoginDto) {
+    const result = await this.authService.confirmLogin(dto.phone, dto.otp);
     return { success: true, data: result };
   }
 
@@ -108,7 +163,6 @@ export class AuthController {
       throw new UnauthorizedException('No token provided');
     }
     const token = authHeader.slice(7);
-    // Validate to get userId
     const payload = await this.authService.validateToken(token);
     await this.authService.logout(token, payload.sub);
     return { success: true, message: 'Logged out successfully' };

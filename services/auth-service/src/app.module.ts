@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { User } from './users/users.entity';
 import { CreateUsers1000000000001 } from './migrations/001_create_users';
+import { AddPhoneColumn1000000000004 } from './migrations/004_add_phone_column';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { CreateUsers1000000000001 } from './migrations/001_create_users';
         entities: [User],
         synchronize: false,
         migrationsRun: true,
-        migrations: [CreateUsers1000000000001],
+        migrations: [CreateUsers1000000000001, AddPhoneColumn1000000000004],
         ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
       }),
     }),

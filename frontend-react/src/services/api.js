@@ -162,14 +162,31 @@ async function requestFormData(endpoint, formData) {
 
 export const api = {
   // Auth-service endpoints
+
+  // Step 1: send phone number to initiate login (OTP is dispatched to registered email)
   loginUser: (data) =>
     request('/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
+  // Step 2: confirm login by submitting the OTP received by email
+  confirmLogin: (data) =>
+    request('/v1/auth/login/confirm', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Step 1: send phone + email to initiate registration (OTP dispatched to provided email)
   registerAuthUser: (data) =>
     request('/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Step 2: confirm registration by submitting the OTP received by email
+  confirmRegistration: (data) =>
+    request('/v1/auth/register/confirm', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

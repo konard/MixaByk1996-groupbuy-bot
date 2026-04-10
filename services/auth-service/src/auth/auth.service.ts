@@ -10,6 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticator } from 'otplib';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import * as http from 'http';
+import * as https from 'https';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { User, UserRole } from '../users/users.entity';
@@ -40,9 +42,17 @@ export interface LoginResult {
   expiresIn?: number;
 }
 
+/** Result returned after initiating login or registration with phone — awaits OTP confirmation */
+export interface OtpPendingResult {
+  otpSent: boolean;
+  message: string;
+}
+
 const ROLES_REQUIRING_2FA: string[] = [UserRole.ORGANIZER, UserRole.SUPPLIER];
 const BACKUP_CODE_COUNT = 10;
 const TEMP_TOKEN_TTL_SECONDS = 300; // 5 minutes
+const OTP_TTL_SECONDS = 600;        // 10 minutes
+const OTP_LENGTH = 6;
 
 @Injectable()
 export class AuthService {
@@ -53,19 +63,83 @@ export class AuthService {
     private readonly redisService: RedisService,
   ) {}
 
-  async register(
+  // ─── Phone-based Registration ─────────────────────────────────────────────
+
+  /**
+   * Step 1 of registration: store pending data in Redis and send OTP to email.
+   */
+  async registerWithPhone(
+    phone: string,
     email: string,
-    password: string,
     firstName?: string,
     lastName?: string,
     role?: UserRole,
-  ): Promise<TokenPair> {
-    if (!email || !password || password.length < 8) {
-      throw new BadRequestException('Email and password (min 8 chars) are required');
+  ): Promise<OtpPendingResult> {
+    if (!phone || !email) {
+      throw new BadRequestException('Phone number and email are required');
     }
-    const user = await this.usersService.create(email, password, firstName, lastName, role);
+    if (!/^\+?[1-9]\d{6,19}$/.test(phone)) {
+      throw new BadRequestException('Invalid phone number format');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Invalid email format');
+    }
 
-    // Mark 2FA as required for organizer/supplier roles
+    // Check for existing users before generating OTP
+    const existingByPhone = await this.usersService.findByPhone(phone);
+    if (existingByPhone) {
+      throw new BadRequestException('User with this phone number already exists');
+    }
+    const existingByEmail = await this.usersService.findByEmail(email);
+    if (existingByEmail) {
+      throw new BadRequestException('User with this email already exists');
+    }
+
+    const otp = this.generateNumericOtp(OTP_LENGTH);
+
+    // Store pending registration data keyed by phone
+    await this.redisService.set(
+      `reg:pending:${phone}`,
+      JSON.stringify({ phone, email, firstName, lastName, role, otp }),
+      OTP_TTL_SECONDS,
+    );
+
+    await this.sendOtpEmail(email, otp, 'registration');
+
+    return { otpSent: true, message: 'Verification code sent to your email' };
+  }
+
+  /**
+   * Step 2 of registration: verify OTP and create the user account.
+   */
+  async confirmRegistration(phone: string, otp: string): Promise<TokenPair> {
+    const raw = await this.redisService.get(`reg:pending:${phone}`);
+    if (!raw) {
+      throw new BadRequestException('Registration session expired or not found. Please start over.');
+    }
+
+    let pending: { phone: string; email: string; firstName?: string; lastName?: string; role?: UserRole; otp: string };
+    try {
+      pending = JSON.parse(raw);
+    } catch {
+      throw new BadRequestException('Invalid registration session data');
+    }
+
+    if (pending.otp !== otp.trim()) {
+      throw new UnauthorizedException('Invalid verification code');
+    }
+
+    // Consume the pending session
+    await this.redisService.del(`reg:pending:${phone}`);
+
+    const user = await this.usersService.create(
+      pending.phone,
+      pending.email,
+      pending.firstName,
+      pending.lastName,
+      pending.role as UserRole | undefined,
+    );
+
     if (ROLES_REQUIRING_2FA.includes(user.role)) {
       await this.usersService.setTwoFactorRequired(user.id, true);
     }
@@ -73,16 +147,72 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async login(email: string, password: string): Promise<LoginResult> {
-    const user = await this.usersService.findByEmail(email);
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+  // ─── Phone-based Login ────────────────────────────────────────────────────
+
+  /**
+   * Step 1 of login: look up user by phone, send OTP to their registered email.
+   */
+  async loginWithPhone(phone: string): Promise<OtpPendingResult> {
+    if (!phone) {
+      throw new BadRequestException('Phone number is required');
+    }
+
+    const user = await this.usersService.findByPhone(phone);
+    if (!user) {
+      // Return same message to avoid user enumeration
+      return { otpSent: true, message: 'If this number is registered, a code will be sent to the associated email' };
+    }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is disabled');
+    }
+    if (user.isBanned) {
+      throw new ForbiddenException({ status: 403, code: 'USER_BANNED', message: 'Your account has been suspended' });
+    }
+
+    const otp = this.generateNumericOtp(OTP_LENGTH);
+
+    await this.redisService.set(
+      `login:otp:${phone}`,
+      JSON.stringify({ userId: user.id, otp }),
+      OTP_TTL_SECONDS,
+    );
+
+    await this.sendOtpEmail(user.email, otp, 'login');
+
+    return { otpSent: true, message: 'If this number is registered, a code will be sent to the associated email' };
+  }
+
+  /**
+   * Step 2 of login: verify OTP and issue tokens.
+   */
+  async confirmLogin(phone: string, otp: string): Promise<LoginResult> {
+    const raw = await this.redisService.get(`login:otp:${phone}`);
+    if (!raw) {
+      throw new UnauthorizedException('Verification code expired or not found. Please request a new code.');
+    }
+
+    let session: { userId: string; otp: string };
+    try {
+      session = JSON.parse(raw);
+    } catch {
+      throw new UnauthorizedException('Invalid login session');
+    }
+
+    if (session.otp !== otp.trim()) {
+      throw new UnauthorizedException('Invalid verification code');
+    }
+
+    // Consume the OTP
+    await this.redisService.del(`login:otp:${phone}`);
+
+    const user = await this.usersService.findById(session.userId);
+    if (!user) throw new UnauthorizedException('User not found');
     if (!user.isActive) throw new UnauthorizedException('Account is disabled');
-    if (user.isBanned) throw new ForbiddenException({ status: 403, code: 'USER_BANNED', message: 'Your account has been suspended' });
+    if (user.isBanned) {
+      throw new ForbiddenException({ status: 403, code: 'USER_BANNED', message: 'Your account has been suspended' });
+    }
 
-    const valid = await this.usersService.validatePassword(user, password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
-
-    // If 2FA is enabled, return a temporary token instead of full JWT
+    // If TOTP-based 2FA is enabled, issue a temporary token instead of full JWT
     if (user.twoFactorEnabled) {
       const tempToken = uuidv4();
       await this.redisService.set(
@@ -93,15 +223,11 @@ export class AuthService {
       return { requires2FA: true, tempToken };
     }
 
-    // If 2FA is required but not yet set up, still allow login but flag it
-    if (user.twoFactorRequired && !user.twoFactorEnabled) {
-      const tokens = await this.generateTokens(user);
-      return { requires2FA: false, ...tokens };
-    }
-
     const tokens = await this.generateTokens(user);
     return { requires2FA: false, ...tokens };
   }
+
+  // ─── 2FA (TOTP) ───────────────────────────────────────────────────────────
 
   async loginWith2FA(tempToken: string, code: string): Promise<TokenPair> {
     const userId = await this.redisService.get(`2fa:temp:${tempToken}`);
@@ -172,7 +298,6 @@ export class AuthService {
       throw new BadRequestException('Two-factor authentication is not enabled');
     }
 
-    // Organizer/supplier roles cannot disable 2FA
     if (ROLES_REQUIRING_2FA.includes(user.role)) {
       throw new ForbiddenException('Two-factor authentication is mandatory for your role and cannot be disabled');
     }
@@ -204,6 +329,8 @@ export class AuthService {
     return plainCodes;
   }
 
+  // ─── Token management ─────────────────────────────────────────────────────
+
   async refresh(refreshToken: string): Promise<TokenPair> {
     let payload: JwtPayload;
     try {
@@ -226,11 +353,9 @@ export class AuthService {
   }
 
   async logout(accessToken: string, userId: string): Promise<void> {
-    // Blacklist the access token until it expires
     const jwtExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '15m');
     const ttl = this.parseDurationSeconds(jwtExpiresIn);
     await this.redisService.set(`jwt:blacklist:${accessToken}`, '1', ttl);
-    // Clear refresh token in DB
     await this.usersService.setRefreshToken(userId, null);
   }
 
@@ -247,21 +372,77 @@ export class AuthService {
     }
   }
 
-  // --- Private helpers ---
+  // ─── Private helpers ──────────────────────────────────────────────────────
+
+  private generateNumericOtp(length: number): string {
+    const digits = crypto.randomInt(Math.pow(10, length - 1), Math.pow(10, length));
+    return digits.toString();
+  }
+
+  /**
+   * Sends OTP email via the notification-service internal HTTP endpoint.
+   * Falls back to a no-op log if the service URL is not configured.
+   */
+  private async sendOtpEmail(email: string, otp: string, context: 'registration' | 'login'): Promise<void> {
+    const notificationServiceUrl = this.configService.get<string>(
+      'NOTIFICATION_SERVICE_URL',
+      'http://notification-service:4005',
+    );
+
+    const subject = context === 'registration'
+      ? 'Groupbuy — код подтверждения регистрации'
+      : 'Groupbuy — код для входа';
+
+    const body = JSON.stringify({ email, otp, subject, context });
+
+    const url = new URL('/internal/send-otp', notificationServiceUrl);
+    const isHttps = url.protocol === 'https:';
+    const lib = isHttps ? https : http;
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: 5000,
+      };
+
+      const req = lib.request(options, (res) => {
+        console.log(`[OTP] Email dispatch status for ${email}: ${res.statusCode}`);
+        resolve();
+      });
+
+      req.on('error', (err) => {
+        console.error(`[OTP] Failed to dispatch OTP email to ${email}: ${err.message}`);
+        resolve(); // Non-fatal: log but don't block auth flow
+      });
+
+      req.on('timeout', () => {
+        console.error(`[OTP] Timeout dispatching OTP email to ${email}`);
+        req.destroy();
+        resolve();
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
 
   private async validate2FACode(user: User, code: string): Promise<boolean> {
     if (!user.twoFactorSecret) return false;
 
-    // Try TOTP first
     const totpValid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
     if (totpValid) return true;
 
-    // Try backup codes
     if (user.backupCodes && user.backupCodes.length > 0) {
       for (let i = 0; i < user.backupCodes.length; i++) {
         const match = await bcrypt.compare(code, user.backupCodes[i]);
         if (match) {
-          // Remove the used backup code
           const updatedCodes = [...user.backupCodes];
           updatedCodes.splice(i, 1);
           await this.usersService.setBackupCodes(user.id, updatedCodes);
@@ -279,7 +460,7 @@ export class AuthService {
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10);
 
     for (let i = 0; i < BACKUP_CODE_COUNT; i++) {
-      const code = crypto.randomBytes(4).toString('hex'); // 8-char hex code
+      const code = crypto.randomBytes(4).toString('hex');
       plainCodes.push(code);
       hashedCodes.push(await bcrypt.hash(code, rounds));
     }

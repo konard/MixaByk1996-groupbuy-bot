@@ -53,18 +53,34 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // Pending OTP state: { phone, context: 'login' | 'registration' }
+  otpPending: null,
+
+  // Step 1: initiate login by phone — OTP is sent to the user's registered email
   login: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const result = await api.loginUser({ email: data.email, password: data.password });
+      await api.loginUser({ phone: data.phone });
+      set({ isLoading: false, otpPending: { phone: data.phone, context: 'login' } });
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      get().addToast(error.message, 'error');
+      throw error;
+    }
+  },
+
+  // Step 2: confirm login by submitting the OTP code
+  confirmLogin: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await api.confirmLogin({ phone: data.phone, otp: data.otp });
       const tokens = result.data || result;
       if (tokens.accessToken) localStorage.setItem('authToken', tokens.accessToken);
       if (tokens.refreshToken) localStorage.setItem('refreshToken', tokens.refreshToken);
-      // Fetch the user profile using the JWT payload sub
       const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
       const user = { id: payload.sub, email: payload.email, role: payload.role };
       localStorage.setItem('userId', user.id);
-      set({ user, isLoading: false, loginModalOpen: false });
+      set({ user, isLoading: false, loginModalOpen: false, otpPending: null });
       get().loadProcurements();
       return user;
     } catch (error) {
@@ -74,29 +90,42 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // Step 1: initiate registration with phone + email — OTP is sent to the provided email
   register: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const result = await api.registerAuthUser({
+      await api.registerAuthUser({
+        phone: data.phone,
         email: data.email,
-        password: data.password,
         firstName: data.first_name || undefined,
         lastName: data.last_name || undefined,
         role: data.role || undefined,
       });
+      set({ isLoading: false, otpPending: { phone: data.phone, context: 'registration' } });
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      get().addToast('Ошибка регистрации: ' + error.message, 'error');
+      throw error;
+    }
+  },
+
+  // Step 2: confirm registration by submitting the OTP code
+  confirmRegistration: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const result = await api.confirmRegistration({ phone: data.phone, otp: data.otp });
       const tokens = result.data || result;
       if (tokens.accessToken) localStorage.setItem('authToken', tokens.accessToken);
       if (tokens.refreshToken) localStorage.setItem('refreshToken', tokens.refreshToken);
-      // Decode user info from JWT
       const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
       const user = { id: payload.sub, email: payload.email, role: payload.role };
       localStorage.setItem('userId', user.id);
-      set({ user, isLoading: false, loginModalOpen: false });
+      set({ user, isLoading: false, loginModalOpen: false, otpPending: null });
       get().loadProcurements();
       return user;
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      get().addToast('Ошибка регистрации: ' + error.message, 'error');
+      get().addToast('Ошибка подтверждения: ' + error.message, 'error');
       throw error;
     }
   },
