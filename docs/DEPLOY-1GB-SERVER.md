@@ -99,10 +99,13 @@ REDIS_PASSWORD=надёжный_пароль_для_redis
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
 
 # SMTP для отправки писем (опционально)
+# Яндекс: используйте пароль приложения (не пароль аккаунта).
+# Адрес в SMTP_FROM должен совпадать с SMTP_USER — Яндекс отклоняет несовпадающих отправителей.
 SMTP_HOST=smtp.yandex.ru
 SMTP_PORT=587
 SMTP_USER=your@yandex.ru
 SMTP_PASS=пароль_приложения
+SMTP_FROM=GroupBuy <your@yandex.ru>
 
 # Платёжная система (опционально, для тестирования можно оставить пустым)
 STRIPE_SECRET_KEY=

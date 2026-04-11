@@ -47,7 +47,11 @@ const config = {
 const mailer = nodemailer.createTransport({
   host: config.smtp.host,
   port: config.smtp.port,
+  // port 465 → implicit TLS/SSL; port 587 → STARTTLS (requireTLS ensures the
+  // upgrade is mandatory — Yandex and many other providers reject plain-text
+  // connections even on 587, so we must not allow a downgrade).
   secure: config.smtp.port === 465,
+  requireTLS: config.smtp.port !== 465,
   auth: {
     user: config.smtp.user,
     pass: config.smtp.pass,
