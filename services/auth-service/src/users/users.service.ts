@@ -41,7 +41,6 @@ export class UsersService {
     const user = this.usersRepo.create({
       phone,
       email: email.toLowerCase(),
-      passwordHash: null,
       firstName: firstName ?? null,
       lastName: lastName ?? null,
       ...(role ? { role } : {}),
