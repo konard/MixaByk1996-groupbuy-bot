@@ -2,9 +2,21 @@ import { create } from 'zustand';
 import { api, ApiError } from '../services/api';
 import {batchProcessProcurements, generatePlatformUserId} from '../services/wasm';
 
+function restoreUserFromToken() {
+  try {
+    const token = localStorage.getItem('authToken');
+    const userId = localStorage.getItem('userId');
+    if (!token || !userId) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return { id: payload.sub || userId, email: payload.email, role: payload.role };
+  } catch (_) {
+    return null;
+  }
+}
+
 export const useStore = create((set, get) => ({
-  // User state
-  user: null,
+  // User state — restored synchronously from JWT so the session survives page reloads
+  user: restoreUserFromToken(),
   isLoading: false,
   error: null,
 
@@ -49,11 +61,13 @@ export const useStore = create((set, get) => ({
       }).catch(() => {});
     } catch (error) {
       set({ error: error.message, isLoading: false });
-      localStorage.removeItem('userId');
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('wsToken');
-      set({ loginModalOpen: true });
+      if (error instanceof ApiError && error.status === 401) {
+        localStorage.removeItem('userId');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('wsToken');
+        set({ user: null, loginModalOpen: true });
+      }
     }
   },
 
