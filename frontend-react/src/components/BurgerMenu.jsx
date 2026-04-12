@@ -40,7 +40,7 @@ function BurgerMenu() {
   if (!burgerMenuOpen) return null;
 
   const go = (path) => { closeBurgerMenu(); navigate(path); };
-  const openSettings = () => { closeBurgerMenu(); setSidebarTab('settings'); };
+  const openSettings = () => { closeBurgerMenu(); setSidebarTab('settings'); navigate('/settings'); };
 
   return (
     <>
