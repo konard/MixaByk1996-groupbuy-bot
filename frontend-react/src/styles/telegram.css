@@ -2845,16 +2845,18 @@ input, textarea, select {
   padding: var(--tg-spacing-sm);
 }
 
-.modal {
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  border-radius: var(--tg-radius-lg) var(--tg-radius-lg) 0 0;
-  max-height: 90vh;
-}
+@media (max-width: 480px) {
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: var(--tg-radius-lg) var(--tg-radius-lg) 0 0;
+    max-height: 90vh;
+  }
 
-.modal-overlay {
-  align-items: flex-end;
+  .modal-overlay {
+    align-items: flex-end;
+  }
 }
 
 .form-input,
