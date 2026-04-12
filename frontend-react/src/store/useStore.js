@@ -45,13 +45,14 @@ export const useStore = create((set, get) => ({
       // Fetch a fresh WebSocket JWT token so the WS server can authenticate.
       // Fire-and-forget: a failure here must not block the login flow.
       api.getWsToken(userId).then(({ token }) => {
-        if (token) localStorage.setItem('authToken', token);
+        if (token) localStorage.setItem('wsToken', token);
       }).catch(() => {});
     } catch (error) {
       set({ error: error.message, isLoading: false });
       localStorage.removeItem('userId');
       localStorage.removeItem('authToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('wsToken');
       set({ loginModalOpen: true });
     }
   },
@@ -158,6 +159,7 @@ export const useStore = create((set, get) => ({
     localStorage.removeItem('userId');
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('wsToken');
     set({
       user: null,
       currentChat: null,

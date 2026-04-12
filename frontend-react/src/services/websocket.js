@@ -39,7 +39,7 @@ class WebSocketManager {
 
   connect(procurementId) {
     this._currentProcurementId = procurementId;
-    const token = localStorage.getItem('authToken') || '';
+    const token = localStorage.getItem('wsToken') || localStorage.getItem('authToken') || '';
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/procurement/${procurementId}/?token=${token}`;
 

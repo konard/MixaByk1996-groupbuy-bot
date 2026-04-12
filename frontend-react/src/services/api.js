@@ -37,6 +37,7 @@ async function _doRefreshToken() {
   if (!resp.ok) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('wsToken');
     localStorage.removeItem('userId');
     throw new ApiError(401, 'REFRESH_FAILED', 'Session expired, please log in again');
   }
