@@ -1685,6 +1685,11 @@ input, textarea, select {
   text-decoration: underline;
 }
 
+.form-hint-muted {
+  color: var(--tg-text-muted);
+  font-size: var(--tg-font-size-sm);
+}
+
 /* ============================================
    CABINET STAT CARDS
    ============================================ */

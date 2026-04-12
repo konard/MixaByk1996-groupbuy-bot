@@ -14,6 +14,7 @@ import {
   IsString,
   IsOptional,
   IsEnum,
+  IsIn,
   Matches,
   Length,
 } from 'class-validator';
@@ -67,6 +68,16 @@ class ConfirmLoginDto {
   @IsString()
   @Length(4, 8)
   otp: string;
+}
+
+class ResendOtpDto {
+  @IsString()
+  @Matches(/^\+?[1-9]\d{6,19}$/, { message: 'Invalid phone number format' })
+  phone: string;
+
+  @IsString()
+  @IsIn(['login', 'registration'])
+  context: 'login' | 'registration';
 }
 
 class RefreshDto {
@@ -136,6 +147,17 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
     const result = await this.authService.loginWithPhone(dto.phone);
+    return { success: true, data: result };
+  }
+
+  /**
+   * Resend OTP code for an ongoing login or registration session.
+   * Limited to once every 30 seconds per phone number.
+   */
+  @Post('resend-code')
+  @HttpCode(HttpStatus.OK)
+  async resendCode(@Body() dto: ResendOtpDto) {
+    const result = await this.authService.resendOtp(dto.phone, dto.context);
     return { success: true, data: result };
   }
 

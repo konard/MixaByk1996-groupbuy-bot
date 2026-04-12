@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 
 // ─── Validation helpers ────────────────────────────────────────────────────────
@@ -67,11 +67,14 @@ function OtpIcon() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const RESEND_COOLDOWN_SECONDS = 30;
+
 function LoginModal() {
   const {
     loginModalOpen,
     login, confirmLogin,
     register, confirmRegistration,
+    resendOtp,
     isLoading, error,
     otpPending,
   } = useStore();
@@ -94,6 +97,49 @@ function LoginModal() {
 
   // OTP step (shared for login and registration)
   const [otpValue, setOtpValue] = useState('');
+
+  // Resend cooldown timer
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendTimerRef = useRef(null);
+
+  // Start 30-second cooldown when OTP screen is shown
+  useEffect(() => {
+    if (otpPending) {
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    } else {
+      setResendCooldown(0);
+      if (resendTimerRef.current) {
+        clearInterval(resendTimerRef.current);
+        resendTimerRef.current = null;
+      }
+    }
+  }, [otpPending]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      if (resendTimerRef.current) {
+        clearInterval(resendTimerRef.current);
+        resendTimerRef.current = null;
+      }
+      return;
+    }
+    resendTimerRef.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(resendTimerRef.current);
+          resendTimerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (resendTimerRef.current) {
+        clearInterval(resendTimerRef.current);
+        resendTimerRef.current = null;
+      }
+    };
+  }, [resendCooldown]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -160,6 +206,14 @@ function LoginModal() {
     setOtpValue('');
   };
 
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isLoading) return;
+    try {
+      await resendOtp();
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (_) {}
+  };
+
   if (!loginModalOpen) return null;
 
   // ─── OTP confirmation screen ───────────────────────────────────────────────
@@ -206,6 +260,23 @@ function LoginModal() {
               {isLoading && <span className="auth-spinner" />}
               {isLoading ? 'Проверка...' : 'Подтвердить'}
             </button>
+
+            <p className="form-hint" style={{ textAlign: 'center' }}>
+              {resendCooldown > 0 ? (
+                <span className="form-hint-muted">
+                  Отправить код повторно через {resendCooldown} с.
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="form-link-btn"
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
+                >
+                  Отправить код повторно
+                </button>
+              )}
+            </p>
 
             <p className="form-hint" style={{ textAlign: 'center' }}>
               <button

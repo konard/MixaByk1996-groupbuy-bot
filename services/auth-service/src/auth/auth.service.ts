@@ -53,6 +53,7 @@ const BACKUP_CODE_COUNT = 10;
 const TEMP_TOKEN_TTL_SECONDS = 300; // 5 minutes
 const OTP_TTL_SECONDS = 600;        // 10 minutes
 const OTP_LENGTH = 6;
+const OTP_RESEND_COOLDOWN_SECONDS = 30; // Minimum seconds between resend requests
 
 @Injectable()
 export class AuthService {
@@ -180,6 +181,79 @@ export class AuthService {
     await this.sendOtpEmail(user.email, otp, 'login');
 
     return { otpSent: true, message: 'If this number is registered, a code will be sent to the associated email' };
+  }
+
+  /**
+   * Resend OTP for an in-progress login or registration session.
+   * Enforces a 30-second cooldown between resend requests.
+   */
+  async resendOtp(phone: string, context: 'login' | 'registration'): Promise<OtpPendingResult> {
+    if (!phone) {
+      throw new BadRequestException('Phone number is required');
+    }
+
+    const cooldownKey = `otp:resend:cooldown:${context}:${phone}`;
+    const onCooldown = await this.redisService.get(cooldownKey);
+    if (onCooldown) {
+      throw new BadRequestException(`Please wait ${OTP_RESEND_COOLDOWN_SECONDS} seconds before requesting a new code`);
+    }
+
+    const otp = this.generateNumericOtp(OTP_LENGTH);
+
+    if (context === 'login') {
+      const raw = await this.redisService.get(`login:otp:${phone}`);
+      if (!raw) {
+        // Return same generic message to avoid user enumeration
+        return { otpSent: true, message: 'If this number is registered, a new code will be sent to the associated email' };
+      }
+
+      let session: { userId: string; otp: string };
+      try {
+        session = JSON.parse(raw);
+      } catch {
+        throw new BadRequestException('Invalid login session');
+      }
+
+      const user = await this.usersService.findById(session.userId);
+      if (!user) {
+        return { otpSent: true, message: 'If this number is registered, a new code will be sent to the associated email' };
+      }
+
+      // Overwrite existing OTP session with a new code, keeping same TTL
+      await this.redisService.set(
+        `login:otp:${phone}`,
+        JSON.stringify({ userId: user.id, otp }),
+        OTP_TTL_SECONDS,
+      );
+
+      await this.sendOtpEmail(user.email, otp, 'login');
+    } else {
+      const raw = await this.redisService.get(`reg:pending:${phone}`);
+      if (!raw) {
+        throw new BadRequestException('Registration session expired or not found. Please start over.');
+      }
+
+      let pending: { phone: string; email: string; firstName?: string; lastName?: string; role?: UserRole; otp: string };
+      try {
+        pending = JSON.parse(raw);
+      } catch {
+        throw new BadRequestException('Invalid registration session data');
+      }
+
+      // Overwrite with new OTP, keeping same TTL
+      await this.redisService.set(
+        `reg:pending:${phone}`,
+        JSON.stringify({ ...pending, otp }),
+        OTP_TTL_SECONDS,
+      );
+
+      await this.sendOtpEmail(pending.email, otp, 'registration');
+    }
+
+    // Set cooldown to prevent spamming resend
+    await this.redisService.set(cooldownKey, '1', OTP_RESEND_COOLDOWN_SECONDS);
+
+    return { otpSent: true, message: 'A new verification code has been sent' };
   }
 
   /**

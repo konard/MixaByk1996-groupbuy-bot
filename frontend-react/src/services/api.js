@@ -191,6 +191,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Resend OTP code for an ongoing login or registration session (max once per 30s)
+  resendOtp: (data) =>
+    request('/v1/auth/resend-code', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   logoutUser: () =>
     request('/v1/auth/logout', { method: 'POST' }),
 

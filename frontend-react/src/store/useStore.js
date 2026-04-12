@@ -112,6 +112,22 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // Resend OTP for an in-progress login or registration session
+  resendOtp: async () => {
+    const { otpPending } = get();
+    if (!otpPending) return;
+    set({ isLoading: true, error: null });
+    try {
+      await api.resendOtp({ phone: otpPending.phone, context: otpPending.context });
+      set({ isLoading: false });
+      get().addToast('Новый код отправлен на вашу почту', 'success');
+    } catch (error) {
+      set({ error: error.message, isLoading: false });
+      get().addToast(error.message, 'error');
+      throw error;
+    }
+  },
+
   // Step 2: confirm registration by submitting the OTP code
   confirmRegistration: async (data) => {
     set({ isLoading: true, error: null });
