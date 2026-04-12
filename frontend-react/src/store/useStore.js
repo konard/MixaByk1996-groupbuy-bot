@@ -260,14 +260,41 @@ export const useStore = create((set, get) => ({
   createProcurement: async (data) => {
     set({ isLoading: true });
     try {
-      const procurement = await api.createProcurement(data);
+      // Ensure we have an integer organizer id before calling the API.
+      // After login the coreId is fetched asynchronously; if the user opens
+      // the modal very quickly that async call may not have finished yet.
+      // Retry once so the race condition is handled transparently.
+      let { user } = get();
+      if (!user?.coreId && user?.email) {
+        try {
+          const coreUser = await api.getUserByEmail(user.email);
+          if (coreUser?.id) {
+            localStorage.setItem('coreUserId', String(coreUser.id));
+            set((state) => ({
+              user: state.user ? { ...state.user, coreId: coreUser.id } : state.user,
+            }));
+            user = get().user;
+          }
+        } catch (_) {
+          // Best-effort; will fail below if coreId is still missing
+        }
+      }
+      const organizerId = user?.coreId;
+      if (!organizerId || typeof organizerId !== 'number') {
+        set({ isLoading: false });
+        get().addToast('Не удалось определить организатора. Попробуйте перезайти в систему.', 'error');
+        throw new Error('organizer coreId is not available');
+      }
+      const procurement = await api.createProcurement({ ...data, organizer: organizerId });
       const procurements = [...get().procurements, procurement];
       set({ procurements, isLoading: false, createProcurementModalOpen: false });
       get().addToast('Закупка успешно создана', 'success');
       return procurement;
     } catch (error) {
       set({ isLoading: false });
-      get().addToast('Ошибка создания закупки', 'error');
+      if (!error.message?.includes('organizer coreId')) {
+        get().addToast('Ошибка создания закупки', 'error');
+      }
       throw error;
     }
   },
