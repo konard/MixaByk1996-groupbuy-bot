@@ -178,15 +178,15 @@ jobs:
 
       - name: Build
         working-directory: test_assignment_358
-        run: dotnet build
+        run: dotnet build GeometrySolver.csproj
 
       - name: Run tests
-        working-directory: test_assignment_358
-        run: dotnet test tests/
+        working-directory: test_assignment_358/tests
+        run: dotnet test
 
       - name: Run application
         working-directory: test_assignment_358
-        run: dotnet run
+        run: dotnet run --project GeometrySolver.csproj
 
   # Build microservices Docker images
   microservices-build:
