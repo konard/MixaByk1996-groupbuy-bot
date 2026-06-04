@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="620" viewBox="0 0 800 620">
+  <rect width="100%" height="100%" fill="white"/>
+  <polygon points="209.2,456.1 590.8,456.1 590.8,494.3 209.2,494.3" fill="#5588DD" stroke="#224488" stroke-width="1.5" opacity="0.85"/>
+  <polygon points="247.4,227.2 552.6,227.2 552.6,265.3 247.4,265.3" fill="#5588DD" stroke="#224488" stroke-width="1.5" opacity="0.85"/>
+  <polygon points="197.2,477.8 335.5,228.9 362.2,243.7 223.9,492.6" fill="#FFD700" stroke="#CC8800" stroke-width="1.5" opacity="0.85"/>
+  <polygon points="565.0,472.6 448.9,263.7 475.6,248.9 591.7,457.8" fill="#FFD700" stroke="#CC8800" stroke-width="1.5" opacity="0.85"/>
+  <line x1="178.7" y1="475.2" x2="621.3" y2="475.2" stroke="#224488" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <line x1="228.3" y1="246.3" x2="571.7" y2="246.3" stroke="#224488" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <line x1="210.5" y1="485.2" x2="348.8" y2="236.3" stroke="#CC8800" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <line x1="578.4" y1="465.2" x2="462.3" y2="256.3" stroke="#CC8800" stroke-width="1.2" stroke-dasharray="6,3"/>
+  <line x1="400.0" y1="475.2" x2="400.0" y2="120.4" stroke="#888888" stroke-width="1" stroke-dasharray="4,3"/>
+  <circle cx="209.2" cy="475.2" r="5" fill="#333333" stroke="white" stroke-width="1"/>
+  <text x="201.2" y="465.2" font-size="13" fill="#333333" text-anchor="end" font-weight="bold">P1</text>
+  <circle cx="590.8" cy="475.2" r="5" fill="#333333" stroke="white" stroke-width="1"/>
+  <text x="598.8" y="465.2" font-size="13" fill="#333333" text-anchor="start" font-weight="bold">P2</text>
+  <circle cx="247.4" cy="246.3" r="5" fill="#333333" stroke="white" stroke-width="1"/>
+  <text x="239.4" y="236.3" font-size="13" fill="#333333" text-anchor="end" font-weight="bold">P3</text>
+  <circle cx="552.6" cy="246.3" r="5" fill="#333333" stroke="white" stroke-width="1"/>
+  <text x="560.6" y="236.3" font-size="13" fill="#333333" text-anchor="start" font-weight="bold">P4</text>
+  <circle cx="400.0" cy="131.8" r="5" fill="#333333" stroke="white" stroke-width="1"/>
+  <text x="400.0" y="121.8" font-size="13" fill="#333333" text-anchor="middle" font-weight="bold">P5</text>
+  <circle cx="216.1" cy="475.2" r="5" fill="#0055FF" stroke="white" stroke-width="1"/>
+  <text x="208.1" y="465.2" font-size="13" fill="#0055FF" text-anchor="end" font-weight="bold">t1</text>
+  <circle cx="343.3" cy="246.3" r="5" fill="#0055FF" stroke="white" stroke-width="1"/>
+  <text x="343.3" y="236.3" font-size="13" fill="#0055FF" text-anchor="middle" font-weight="bold">t2</text>
+  <circle cx="583.9" cy="475.2" r="5" fill="#0055FF" stroke="white" stroke-width="1"/>
+  <text x="591.9" y="465.2" font-size="13" fill="#0055FF" text-anchor="start" font-weight="bold">t3</text>
+  <circle cx="456.7" cy="246.3" r="5" fill="#0055FF" stroke="white" stroke-width="1"/>
+  <text x="456.7" y="236.3" font-size="13" fill="#0055FF" text-anchor="middle" font-weight="bold">t4</text>
+  <circle cx="400.0" cy="265.3" r="5" fill="#CC0000" stroke="white" stroke-width="1"/>
+  <circle cx="209.2" cy="456.1" r="5" fill="#00AA00" stroke="white" stroke-width="1"/>
+  <text x="217.2" y="446.1" font-size="13" fill="#00AA00" text-anchor="start" font-weight="bold">(0; h₁/2)</text>
+  <circle cx="590.8" cy="456.1" r="5" fill="#00AA00" stroke="white" stroke-width="1"/>
+  <text x="582.8" y="446.1" font-size="13" fill="#00AA00" text-anchor="end" font-weight="bold">(L; h₁/2)</text>
+  <line x1="209.2" y1="527.4" x2="209.2" y2="537.4" stroke="#333" stroke-width="1.5"/>
+  <line x1="590.8" y1="527.4" x2="590.8" y2="537.4" stroke="#333" stroke-width="1.5"/>
+  <line x1="209.2" y1="532.4" x2="590.8" y2="532.4" stroke="#333" stroke-width="1.5"/>
+  <text x="400.0" y="550.4" font-size="12" fill="#333" text-anchor="middle">L = 10.0</text>
+  <text x="400" y="28" font-size="16" fill="#222" text-anchor="middle" font-weight="bold">Geometric Element Positioning Solution</text>
+  <text x="400" y="612" font-size="11" fill="#444" text-anchor="middle">t1=(0.180,0.000)  t2=(3.513,6.000)  t3=(9.820,0.000)  t4=(6.487,6.000)</text>
+</svg>

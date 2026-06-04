@@ -10,3 +10,8 @@ __pycache__/
 ci-logs/
 node_modules/
 dist/
+test_assignment_358/bin/
+test_assignment_358/obj/
+test_assignment_358/tests/bin/
+test_assignment_358/tests/obj/
+test_assignment_358/output.svg

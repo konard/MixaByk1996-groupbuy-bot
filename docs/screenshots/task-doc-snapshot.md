@@ -1,0 +1,58 @@
+- application [ref=e1]:
+  - iframe [ref=e2]:
+    
+  - iframe [ref=e3]:
+    
+  - banner "Menüleiste" [ref=e4]:
+    - generic [ref=e7]:
+      - link "Google Docs-Startbildschirm" [ref=e9] [cursor=pointer]:
+        - /url: https://docs.google.com/document/?usp=docs_web
+      - generic [ref=e16]:
+        - generic "САПР-АРТ. Тестовое задание. C#. 2026" [ref=e18]:
+          - generic [ref=e20]: САПР-АРТ. Тестовое задание. C#. 2026
+          - 'button "Dokumentstatus: In Google Drive gespeichert." [ref=e24]'
+        - generic [ref=e32]:
+          - button "Bearbeitungszugriff anfordern. Sie können dieses Dokument nur ansehen. Sie müssen in einem Google-Konto angemeldet sein, um beim Eigentümer den Bearbeitungszugriff anfordern zu können." [disabled] [ref=e34]: Bearbeitungszugriff anfordern
+          - button "Anonymes Nashorn" [ref=e125]:
+            - img "Anonymes Nashorn" [ref=e130] [cursor=pointer]
+          - generic [ref=e38]:
+            - button "Freigeben. Jeder, der über den Link verfügt. Jeder, der über den Link verfügt, ist zum Zugriff berechtigt. Es ist keine Anmeldung erforderlich." [disabled] [ref=e39]: Teilen
+            - button "Aktionen für die schnelle Freigabe" [disabled] [ref=e41]
+          - link "Anmelden" [ref=e45] [cursor=pointer]:
+            - /url: https://accounts.google.com/ServiceLogin?service=wise&passive=1209600&osid=1&continue=https://docs.google.com/document/d/1zEkxo7dAb8rTQgb3IG479i1cNz11Ak1AYOBUv1gQCN0/edit&followup=https://docs.google.com/document/d/1zEkxo7dAb8rTQgb3IG479i1cNz11Ak1AYOBUv1gQCN0/edit&ltmpl=docs&ec=GAZAGQ
+    - menubar [ref=e48]:
+      - menuitem "Datei" [ref=e49] [cursor=pointer]
+      - menuitem "Bearbeiten" [ref=e50] [cursor=pointer]
+      - menuitem "Ansicht" [ref=e51] [cursor=pointer]
+      - menuitem "Tools" [ref=e52] [cursor=pointer]
+      - menuitem "Hilfe" [ref=e53] [cursor=pointer]
+  - generic [ref=e56]:
+    - generic [ref=e62]:
+      - button
+    - img [ref=e63]
+    - generic "Dokumenttabs" [ref=e66]:
+      - button "Tabs und Gliederungen ausblenden" [ref=e68] [cursor=pointer]:
+        - button "Zurück" [disabled] [ref=e69]:
+          - button "Zurück" [disabled] [ref=e73]
+      - generic [ref=e79]:
+        - heading "Dokumenttabs" [ref=e82]
+        - tree "Dokumenttabs" [ref=e85]:
+          - generic [ref=e87] [cursor=pointer]:
+            - treeitem "Tab 1" [selected] [ref=e88]:
+              - generic [ref=e95]: Tab 1
+              - button "Tab-Optionen" [ref=e98]
+            - generic [ref=e102]:
+              - menuitem "Тестовое задание Ebene 1" [ref=e103]:
+                - generic "Тестовое задание Ebene 1" [ref=e108]:
+                  - generic [ref=e109]: Тестовое задание
+              - menuitem "Задание. Математика. C#. Ebene 1" [ref=e110]:
+                - generic "Задание. Математика. C#. Ebene 1" [ref=e115]:
+                  - generic [ref=e116]: Задание. Математика. C#.
+  - iframe [active] [ref=e117]:
+    - textbox "Inhalt des Dokuments" [active] [ref=f1e1]
+    - group
+  - link "Screenreader-Unterstützung aktivieren" [ref=e118] [cursor=pointer]:
+    - /url: "#"
+  - region [ref=e119]: Drücken Sie zum Aktivieren des Screenreaders Strg+Alt+Z. Informationen zu Tastaturkürzeln erhalten Sie, indem Sie Strg+Schrägstrich drücken.
+  - generic [ref=e120]: Banner ausgeblendet
+  - region
