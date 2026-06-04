@@ -1,0 +1,29 @@
+{
+  "name": "payment-service",
+  "version": "1.0.0",
+  "description": "Payment service for test assignment 360",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --forceExit --detectOpenHandles"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.3.0",
+    "redis": "^4.6.13",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "mongodb-memory-server": "^10.0.0",
+    "nodemon": "^3.1.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "testMatch": ["<rootDir>/tests/**/*.test.js"],
+    "testTimeout": 30000
+  }
+}
